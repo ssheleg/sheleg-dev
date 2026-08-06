@@ -1,0 +1,151 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Structural validator
+        run: python3 test/validate.py
+
+      # Every negative self-test below plants a defect and REQUIRES a failure.
+      # A validator nobody has watched fail is not evidence that it works.
+
+      - name: Negative self-test (version drift must fail)
+        run: |
+          set -eu
+          cp -R . /tmp/drift-copy
+          sed -i 's/"version": "[0-9.]*"/"version": "0.0.0-corrupt"/' \
+            /tmp/drift-copy/plugins/sheleg-dev/.claude-plugin/plugin.json
+          if python3 /tmp/drift-copy/test/validate.py; then
+            echo "ERROR: validator passed on a corrupted copy — it cannot fail"
+            exit 1
+          else
+            echo "OK: validator FAILs on version drift"
+          fi
+
+      - name: Negative self-test (over-long description must fail)
+        run: |
+          set -eu
+          cp -R . /tmp/desc-copy
+          python3 - <<'PY'
+          p = "/tmp/desc-copy/plugins/sheleg-dev/skills/crypto-payments/SKILL.md"
+          s = open(p, encoding="utf-8").read()
+          s = s.replace('"BTCPay".', '"BTCPay". ' + ("padding " * 40), 1)
+          open(p, "w", encoding="utf-8").write(s)
+          PY
+          if python3 /tmp/desc-copy/test/validate.py; then
+            echo "ERROR: validator accepted a description past the 1024-char limit"
+            exit 1
+          else
+            echo "OK: validator catches front matter the host would truncate silently"
+          fi
+
+      - name: Negative self-test (front-matter name must match the directory)
+        run: |
+          set -eu
+          cp -R . /tmp/name-copy
+          sed -i 's/^name: google-signin$/name: google-signin-gis/' \
+            /tmp/name-copy/plugins/sheleg-dev/skills/google-signin/SKILL.md
+          if python3 /tmp/name-copy/test/validate.py; then
+            echo "ERROR: validator accepted a skill whose name != its directory"
+            exit 1
+          else
+            echo "OK: validator catches the rename that was missed on the way in"
+          fi
+
+      - name: Negative self-test (a reference nobody links must fail)
+        run: |
+          set -eu
+          cp -R . /tmp/orphan-copy
+          touch /tmp/orphan-copy/plugins/sheleg-dev/skills/ad-tracking/references/nobody-loads-me.md
+          if python3 /tmp/orphan-copy/test/validate.py; then
+            echo "ERROR: validator accepted an unreferenced reference file"
+            exit 1
+          else
+            echo "OK: validator rejects a reference nothing loads"
+          fi
+
+      - name: Negative self-test (a dangling reference link must fail)
+        run: |
+          set -eu
+          cp -R . /tmp/dangling-copy
+          rm -f /tmp/dangling-copy/plugins/sheleg-dev/skills/google-auth/references/workload-identity.md
+          if python3 /tmp/dangling-copy/test/validate.py; then
+            echo "ERROR: validator passed with a linked reference missing"
+            exit 1
+          else
+            echo "OK: validator requires linked references to resolve"
+          fi
+
+      - name: Negative self-test (stray SKILL.md must fail)
+        run: |
+          set -eu
+          cp -R . /tmp/stray-copy
+          cp /tmp/stray-copy/plugins/sheleg-dev/skills/crypto-payments/SKILL.md \
+             /tmp/stray-copy/plugins/sheleg-dev/SKILL.md
+          if python3 /tmp/stray-copy/test/validate.py; then
+            echo "ERROR: validator passed with a stray SKILL.md outside plugins/*/skills/*/"
+            exit 1
+          else
+            echo "OK: validator rejects a stray SKILL.md"
+          fi
+
+      - name: Negative self-test (dropping the validator from CI must fail)
+        run: |
+          set -eu
+          cp -R . /tmp/nogate-copy
+          sed -i 's|python3 test/validate.py|echo skipped|' /tmp/nogate-copy/.github/workflows/validate.yml
+          if python3 /tmp/nogate-copy/test/validate.py; then
+            echo "ERROR: validator passed while CI no longer calls it"
+            exit 1
+          else
+            echo "OK: the gate notices when it stops being a gate"
+          fi
+
+      - name: install.sh syntax check
+        run: bash -n install.sh
+
+      - name: Installers run — all five skills, fresh / rerun-skip / --force / bad arg
+        run: |
+          set -eu
+          export HOME=/tmp/fakehome
+          mkdir -p "$HOME"
+          node bin/sheleg-dev.js
+          for s in ad-tracking crypto-payments frontend-performance google-auth google-signin; do
+            test -f "$HOME/.claude/skills/$s/SKILL.md" || { echo "missing $s"; exit 1; }
+          done
+          test -f "$HOME/.claude/skills/crypto-payments/references/heleket-provider.md"
+          test -f "$HOME/.claude/skills/google-auth/references/workload-identity.md"
+          test "$(node bin/sheleg-dev.js | grep -c '^skip:')" = 5
+          test "$(node bin/sheleg-dev.js --force | grep -c '^Installed')" = 5
+          if node bin/sheleg-dev.js --wat; then
+            echo "ERROR: unknown arg accepted"; exit 1
+          fi
+          rm -rf "$HOME/.claude"
+          bash install.sh | tail -1 | grep -q 'Installed 5 skill'
+          echo "OK: both installers behave"
+
+      - name: Workflow YAML parses
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 -c "import yaml; yaml.safe_load(open('.github/workflows/validate.yml')); print('workflow parses OK')"
+
+      - name: Official Claude Code conformance (plugin + marketplace, strict)
+        run: |
+          set -eu
+          npm install -g @anthropic-ai/claude-code
+          claude plugin validate . --strict
+          claude plugin validate plugins/sheleg-dev --strict

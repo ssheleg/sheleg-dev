@@ -1,0 +1,42 @@
+{
+  "name": "@ssheleg/sheleg-dev",
+  "version": "0.1.0",
+  "description": "Five integration skills for the layer a product reaches once it has users: crypto payments, ad and conversion tracking under Consent Mode v2, Google sign-in and the wider Google auth surface, and Core Web Vitals. This package is the installer CLI.",
+  "bin": {
+    "sheleg-dev": "bin/sheleg-dev.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "bin",
+    "plugins",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "SECURITY.md"
+  ],
+  "repository": "github:ssheleg/sheleg-dev",
+  "homepage": "https://github.com/ssheleg/sheleg-dev",
+  "license": "MIT",
+  "author": {
+    "name": "ssheleg",
+    "url": "https://x.com/sshlg93"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "keywords": [
+    "crypto-payments",
+    "webhooks",
+    "google-analytics",
+    "consent-mode",
+    "meta-pixel",
+    "google-auth",
+    "oauth2",
+    "core-web-vitals",
+    "claude-code",
+    "cursor",
+    "skill"
+  ]
+}
