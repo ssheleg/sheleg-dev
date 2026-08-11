@@ -7,10 +7,11 @@ Part of the [ssheleg skill family](https://github.com/ssheleg/sshlg-skills).
 
 ---
 
-## The five skills
+## The six skills
 
 | Skill | Answers |
 |---|---|
+| **`stripe-billing`** | how does a Stripe payment become an entitlement in my database, exactly once |
 | **`crypto-payments`** | how do I take crypto without losing money to under-payment, duplicate webhooks or rate drift |
 | **`ad-tracking`** | how do GA4, Google Ads, Meta and LinkedIn fire correctly under Consent Mode v2 |
 | **`google-signin`** | how do I let people sign in with Google without handing someone their account |
@@ -18,6 +19,18 @@ Part of the [ssheleg skill family](https://github.com/ssheleg/sshlg-skills).
 | **`frontend-performance`** | why is the Lighthouse score bad and which fix actually moves it |
 
 Each carries its own references and loads them only when the work reaches them.
+
+**`stripe-billing`** — Stripe's own agent toolchain first (CLI, `stripe agent
+setup`, a sandbox without an account, the MCP implementation planner), then the
+seam it cannot help with: a pinned API version and SDK retries instead of a loop
+that buys two subscriptions for one intent; metadata written twice, because
+renewal events never see the checkout session; claim-first webhook idempotency
+with a release on failure; `billing_reason` as the difference between a renewal
+and a $0.40 proration invoice; proration with a compensating revert when the
+local write fails; `amount_refunded` as a cumulative total, not an increment; a
+reconciliation job that leaves non-Stripe rows alone; and price drift, which
+fails no request and reaches only customers. Which Stripe primitive to use is
+deferred to Stripe's own `stripe-best-practices` skill.
 
 **`crypto-payments`** — status mapping with an explicit terminal set;
 signature verification in constant time, with the forward-slash escaping trap
@@ -60,7 +73,7 @@ a Lighthouse score.
 /plugin install sheleg-dev@sheleg-dev
 ```
 
-**npm installer** — copies all five skills into `~/.claude/skills/`:
+**npm installer** — copies all six skills into `~/.claude/skills/`:
 
 ```bash
 npx @ssheleg/sheleg-dev

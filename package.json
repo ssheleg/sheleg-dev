@@ -1,7 +1,7 @@
 {
   "name": "@ssheleg/sheleg-dev",
-  "version": "0.1.0",
-  "description": "Five integration skills for the layer a product reaches once it has users: crypto payments, ad and conversion tracking under Consent Mode v2, Google sign-in and the wider Google auth surface, and Core Web Vitals. This package is the installer CLI.",
+  "version": "0.2.0",
+  "description": "Six integration skills for the layer a product reaches once it has users: Stripe subscription billing, crypto payments, ad and conversion tracking under Consent Mode v2, Google sign-in and the wider Google auth surface, and Core Web Vitals. This package is the installer CLI.",
   "bin": {
     "sheleg-dev": "bin/sheleg-dev.js"
   },
@@ -27,6 +27,9 @@
     "node": ">=16"
   },
   "keywords": [
+    "subscriptions",
+    "stripe-billing",
+    "stripe",
     "crypto-payments",
     "webhooks",
     "google-analytics",

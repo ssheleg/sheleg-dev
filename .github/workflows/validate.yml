@@ -118,24 +118,25 @@ jobs:
       - name: install.sh syntax check
         run: bash -n install.sh
 
-      - name: Installers run — all five skills, fresh / rerun-skip / --force / bad arg
+      - name: Installers run — all six skills, fresh / rerun-skip / --force / bad arg
         run: |
           set -eu
           export HOME=/tmp/fakehome
           mkdir -p "$HOME"
           node bin/sheleg-dev.js
-          for s in ad-tracking crypto-payments frontend-performance google-auth google-signin; do
+          for s in ad-tracking crypto-payments frontend-performance google-auth google-signin stripe-billing; do
             test -f "$HOME/.claude/skills/$s/SKILL.md" || { echo "missing $s"; exit 1; }
           done
           test -f "$HOME/.claude/skills/crypto-payments/references/heleket-provider.md"
           test -f "$HOME/.claude/skills/google-auth/references/workload-identity.md"
-          test "$(node bin/sheleg-dev.js | grep -c '^skip:')" = 5
-          test "$(node bin/sheleg-dev.js --force | grep -c '^Installed')" = 5
+          test -f "$HOME/.claude/skills/stripe-billing/references/webhook-events.md"
+          test "$(node bin/sheleg-dev.js | grep -c '^skip:')" = 6
+          test "$(node bin/sheleg-dev.js --force | grep -c '^Installed')" = 6
           if node bin/sheleg-dev.js --wat; then
             echo "ERROR: unknown arg accepted"; exit 1
           fi
           rm -rf "$HOME/.claude"
-          bash install.sh | tail -1 | grep -q 'Installed 5 skill'
+          bash install.sh | tail -1 | grep -q 'Installed 6 skill'
           echo "OK: both installers behave"
 
       - name: Workflow YAML parses

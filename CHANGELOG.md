@@ -4,6 +4,51 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-08-11
+
+A sixth skill, and the one the pack was missing: cards. `crypto-payments`
+covered the gateway that calls you back; nothing covered the gateway that holds
+the money and the subscription state.
+
+### Added
+
+- **`stripe-billing`** — the seam between Stripe and your own database, which is
+  where subscription integrations actually fail. Stripe's agent toolchain first
+  (CLI, `stripe agent setup`, `stripe sandbox create` for keys without an
+  account, the MCP server's implementation planner, `.md` docs), then the
+  invariants: a lazily-built client with a pinned API version and
+  `maxNetworkRetries` rather than a hand-rolled loop that buys two subscriptions
+  for one intent; product-to-price resolution with pinned ids and both modes'
+  ids in every allowlist; the get-or-create customer race as a conditional
+  update with orphan cleanup; metadata written to the session **and**
+  `subscription_data`, because renewal events never see the session;
+  claim-first webhook idempotency with a release on failure, and the response
+  codes that decide whether Stripe retries; the verify endpoint as a safety net,
+  with the ownership check that stops one user claiming another's purchase;
+  `billing_reason` as the difference between a renewal and a $0.40 proration
+  invoice; proration with `error_if_incomplete` and a compensating Stripe revert
+  when the local write fails; cumulative `amount_refunded` handled as a
+  compare-and-swap; a sequential reconciliation job that leaves non-Stripe rows
+  alone; and price drift, which fails no request and reaches only customers.
+
+  Five references: `stripe-agent-toolchain.md`, `webhook-events.md`,
+  `subscription-lifecycle.md`, `price-integrity.md`,
+  `testing-and-local-dev.md`.
+
+  Stripe-side decisions — Checkout vs PaymentIntents, Connect, Tax, Metronome
+  for new usage-based billing — are deferred by name to Stripe's own
+  `stripe-best-practices` skill, which wins any disagreement. The rules taken
+  from Stripe's documentation (no `payment_method_types` on subscription
+  Checkout Sessions, one Product per plan a customer can choose, restricted keys
+  over secret keys, a secrets vault over environment variables) were read from
+  `docs.stripe.com` on 2026-08-11 against Stripe CLI 1.45.2 and the official
+  plugin 0.5.1.
+
+### Changed
+
+- CI installs and asserts six skills, not five, and requires a `stripe-billing`
+  reference to land with them.
+
 ## [0.1.0] — 2026-08-06
 
 First release. Five skills, ported out of a Cursor-only skills directory where

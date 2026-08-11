@@ -1,8 +1,8 @@
 {
   "name": "sheleg-dev",
   "displayName": "Sheleg Dev",
-  "description": "The integration layer a product needs once it has users: crypto payments that survive over-payment and duplicate webhooks, ad and conversion tracking under Consent Mode v2, Google sign-in with the account-linking guards, the wider Google auth surface, and Core Web Vitals work that moves the score.",
-  "version": "0.1.0",
+  "description": "The integration layer a product needs once it has users: Stripe subscription billing reconciled into your own database, crypto payments that survive over-payment and duplicate webhooks, ad and conversion tracking under Consent Mode v2, Google sign-in with the account-linking guards, the wider Google auth surface, and Core Web Vitals work that moves the score.",
+  "version": "0.2.0",
   "author": {
     "name": "ssheleg",
     "url": "https://x.com/sshlg93"
@@ -11,6 +11,9 @@
   "repository": "https://github.com/ssheleg/sheleg-dev",
   "license": "MIT",
   "keywords": [
+    "stripe",
+    "subscriptions",
+    "stripe-billing",
     "crypto-payments",
     "webhooks",
     "google-analytics",
