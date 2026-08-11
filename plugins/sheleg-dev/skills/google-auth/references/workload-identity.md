@@ -1,5 +1,20 @@
 # Workload & Workforce Identity Federation (Node.js & Python)
 
+
+## Contents
+
+- [Table of Contents](#table-of-contents)
+- [Overview](#overview)
+- [AWS Federation](#aws-federation)
+- [Azure Federation](#azure-federation)
+- [OIDC Provider Federation](#oidc-provider-federation)
+- [Custom Subject Token Supplier](#custom-subject-token-supplier)
+- [Workforce Identity Federation](#workforce-identity-federation)
+- [Executable-Sourced Credentials](#executable-sourced-credentials)
+- [Using External Identities](#using-external-identities)
+- [Configurable Token Lifetime](#configurable-token-lifetime)
+- [Security Considerations](#security-considerations)
+
 ## Table of Contents
 - [Overview](#overview)
 - [AWS Federation](#aws-federation)

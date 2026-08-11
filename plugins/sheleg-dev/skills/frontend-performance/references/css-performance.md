@@ -1,5 +1,15 @@
 # CSS & Animation Performance
 
+
+## Contents
+
+- [GPU-Composited Properties](#gpu-composited-properties)
+- [Gradient Animation Alternatives](#gradient-animation-alternatives)
+- [`will-change` Usage](#will-change-usage)
+- [Critical CSS](#critical-css)
+- [Layout Shift Prevention](#layout-shift-prevention)
+- [Tailwind CSS Performance](#tailwind-css-performance)
+
 ## GPU-Composited Properties
 
 The browser can animate these properties on the GPU compositor thread without triggering layout or paint:

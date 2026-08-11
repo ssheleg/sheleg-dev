@@ -6,6 +6,17 @@
 > throughout is Prowl (`web/auth.py`, `web/server.py`, `web/static/js/app.js`)
 > — but every section works standalone for any stack.
 
+## Contents
+
+- [1. The two Google auth flows — and which one this is](#1-the-two-google-auth-flows--and-which-one-this-is)
+- [2. How the GIS flow works — step by step](#2-how-the-gis-flow-works--step-by-step)
+- [3. Setup from scratch (~10 minutes)](#3-setup-from-scratch-10-minutes)
+- [4. Security checklist (each item maps to a real attack)](#4-security-checklist-each-item-maps-to-a-real-attack)
+- [5. Troubleshooting](#5-troubleshooting)
+- [6. Reference implementation map (Prowl)](#6-reference-implementation-map-prowl)
+- [7. Minimal end-to-end skeleton (copy-paste starting point, FastAPI)](#7-minimal-end-to-end-skeleton-copy-paste-starting-point-fastapi)
+
+
 ---
 
 ## 1. The two Google auth flows — and which one this is

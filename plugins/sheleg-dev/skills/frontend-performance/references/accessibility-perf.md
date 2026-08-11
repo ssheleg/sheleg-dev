@@ -2,6 +2,17 @@
 
 These accessibility issues are automatically detected by Lighthouse and directly reduce the Accessibility score.
 
+## Contents
+
+- [Color Contrast](#color-contrast)
+- [Heading Hierarchy](#heading-hierarchy)
+- [Image Alt Text](#image-alt-text)
+- [Interactive Element Sizing](#interactive-element-sizing)
+- [Focus Indicators](#focus-indicators)
+- [ARIA Landmarks](#aria-landmarks)
+- [Language Attribute](#language-attribute)
+
+
 ## Color Contrast
 
 ### WCAG AA Requirements

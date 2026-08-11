@@ -4,6 +4,29 @@ One gateway, worked end to end. Read this **after**
 [`../SKILL.md`](../SKILL.md): the invariants there are what matter, this is what
 one provider's wire format looks like when you apply them.
 
+## Contents
+
+- [1. What is Heleket and when to use it](#1-what-is-heleket-and-when-to-use-it)
+- [2. Architecture overview](#2-architecture-overview)
+- [3. Environment variables](#3-environment-variables)
+- [4. Database schema (Prisma)](#4-database-schema-prisma)
+- [5. Heleket REST API reference](#5-heleket-rest-api-reference)
+- [6. Webhook (IPN) payload reference](#6-webhook-ipn-payload-reference)
+- [7. Implementation — client library (`src/lib/heleket.ts`)](#7-implementation--client-library-srclibheleketts)
+- [8. Implementation — checkout endpoint](#8-implementation--checkout-endpoint)
+- [9. Implementation — webhook endpoint](#9-implementation--webhook-endpoint)
+- [10. Status endpoint (for client polling UX)](#10-status-endpoint-for-client-polling-ux)
+- [11. The 1% buffer pattern (read this section before adapting)](#11-the-1-buffer-pattern-read-this-section-before-adapting)
+- [12. Reconciliation fields (always store)](#12-reconciliation-fields-always-store)
+- [13. Refund handling](#13-refund-handling)
+- [14. Integration with subscriptions / credits](#14-integration-with-subscriptions--credits)
+- [15. Local development & SKIP_BILLING](#15-local-development--skip_billing)
+- [16. Testing strategy](#16-testing-strategy)
+- [17. Security checklist](#17-security-checklist)
+- [18. Common pitfalls & troubleshooting](#18-common-pitfalls--troubleshooting)
+- [19. Step-by-step playbook for a NEW project](#19-step-by-step-playbook-for-a-new-project)
+
+
 > **Provider standing is not a technical property and it changes.** Heleket is
 > the successor/parallel service of Cryptomus, which was fined by Canada's
 > FINTRAC in October 2025 over anti-money-laundering and terrorist-financing

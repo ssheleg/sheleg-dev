@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-08-11
+
+### Changed
+
+- **Thirteen references over 100 lines now open with a `## Contents` list**,
+  generated from each file's own `##` headings. A partial read is what an agent
+  does with a long reference, and without the list it gets an arbitrary slice.
+
 ## [0.3.0] — 2026-08-11
 
 ### Changed

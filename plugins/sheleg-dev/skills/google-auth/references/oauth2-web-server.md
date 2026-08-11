@@ -1,5 +1,23 @@
 # OAuth 2.0 Web Server Flow (Node.js & Python)
 
+
+## Contents
+
+- [Table of Contents](#table-of-contents)
+- [Prerequisites](#prerequisites)
+- [Step 1: Set Authorization Parameters](#step-1-set-authorization-parameters)
+- [Step 2: Redirect to Google](#step-2-redirect-to-google)
+- [Step 3: Handle Callback](#step-3-handle-callback)
+- [Step 4: Use Access Token](#step-4-use-access-token)
+- [Refreshing Tokens](#refreshing-tokens)
+- [Revoking Tokens](#revoking-tokens)
+- [Incremental Authorization](#incremental-authorization)
+- [Error Reference](#error-reference)
+- [Complete Express Example](#complete-express-example)
+- [Complete Flask Example](#complete-flask-example)
+- [Complete FastAPI Example](#complete-fastapi-example)
+- [Scopes Reference](#scopes-reference)
+
 ## Table of Contents
 - [Prerequisites](#prerequisites)
 - [Step 1: Set Authorization Parameters](#step-1-set-authorization-parameters)

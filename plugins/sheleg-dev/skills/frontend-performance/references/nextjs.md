@@ -1,5 +1,17 @@
 # Next.js Performance Patterns
 
+
+## Contents
+
+- [Font Optimization with `next/font`](#font-optimization-with-nextfont)
+- [Code Splitting with `next/dynamic`](#code-splitting-with-nextdynamic)
+- [Cache Headers in `next.config.ts`](#cache-headers-in-nextconfigts)
+- [Content Security Policy](#content-security-policy)
+- [Script Loading Strategy](#script-loading-strategy)
+- [Image Optimization](#image-optimization)
+- [Bundle Analysis](#bundle-analysis)
+- [Browserslist Configuration](#browserslist-configuration)
+
 ## Font Optimization with `next/font`
 
 ### Migration from `<link>` to `next/font/google`
