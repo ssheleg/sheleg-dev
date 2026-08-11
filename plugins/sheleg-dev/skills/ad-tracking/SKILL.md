@@ -1,18 +1,16 @@
 ---
 name: ad-tracking
 description: >-
-  Comprehensive guide for integrating advertising analytics and conversion tracking
-  with Google Analytics 4 (GA4), Google Ads, Meta (Facebook) Pixel, and LinkedIn Insight Tag
-  in web applications. Covers Consent Mode v2, standard events, e-commerce tracking,
-  advanced matching, Enhanced Conversions, CSP configuration, user identification,
-  cross-device tracking, and GDPR/DMA compliance. Use when setting up or modifying
-  ad pixel integration, conversion tracking, consent management, purchase event tracking,
-  retargeting audiences, or auditing an existing advertising analytics stack.
-  Triggers: "ad tracking", "conversion tracking", "facebook pixel", "meta pixel", "fbq",
-  "google ads", "google analytics", "GA4", "gtag", "consent mode", "cookie consent",
-  "enhanced conversions", "advanced matching", "retargeting"."remarketing",
-  "purchase event", "pixel", "CAPI", "linkedin insight", "conversion API",
-  "gclid", "UTM", "attribution", "ad funnel", "ROAS tracking", 
+  Use when setting up or modifying ad pixel integration, conversion tracking, consent
+  management, purchase event tracking, retargeting audiences, or auditing an existing
+  advertising analytics stack. Covers Google Analytics 4, Google Ads, Meta (Facebook) Pixel and
+  LinkedIn Insight Tag in web applications: Consent Mode v2, standard events, e-commerce
+  tracking, advanced matching, Enhanced Conversions, CSP configuration, user identification,
+  cross-device tracking, and GDPR/DMA compliance. Triggers - "ad tracking", "conversion
+  tracking", "meta pixel", "fbq", "google ads", "GA4", "gtag", "consent mode", "cookie consent",
+  "enhanced conversions", "retargeting", "purchase event", "CAPI", "gclid", "UTM",
+  "attribution", "отслеживание конверсий", "пиксель Meta", "согласие на куки", "ретаргетинг",
+  "аналитика рекламы". Not for running the ad campaigns themselves.
 ---
 
 # Advertising Analytics & Conversion Tracking Integration

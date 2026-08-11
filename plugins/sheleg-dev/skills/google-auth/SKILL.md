@@ -1,16 +1,16 @@
 ---
 name: google-auth
-description: >
-  Google Authentication for Node.js and Python web applications — OAuth 2.0, Sign In with Google (GIS),
-  Application Default Credentials (ADC), service accounts (JWT), API keys, ID token verification,
-  Workload Identity Federation, and security best practices. Use when implementing Google login/sign-in,
-  setting up OAuth 2.0 flows, verifying Google ID tokens, configuring service account authentication,
-  using Application Default Credentials, integrating Google Identity Services, or working with
-  google-auth-library (Node.js) or google-auth (Python). Triggers: "google auth", "google login",
-  "google sign in", "OAuth 2.0 Google", "google-auth-library", "google-auth", "Sign In with Google",
-  "Google Identity Services", "GIS", "ADC", "Application Default Credentials", "service account",
-  "Google ID token", "verifyIdToken", "verify_oauth2_token", "GOOGLE_APPLICATION_CREDENTIALS",
-  "google OAuth", "Google SSO".
+description: >-
+  Use when implementing Google authentication in a Node.js or Python web application — Google
+  login, OAuth 2.0 flows, verifying Google ID tokens, service account authentication,
+  Application Default Credentials, Google Identity Services, Workload Identity Federation, API
+  keys, or working with google-auth-library (Node.js) or google-auth (Python). Covers ID token
+  verification and security best practices. Triggers - "google auth", "google login", "google
+  sign in", "OAuth 2.0 Google", "google-auth-library", "Sign In with Google", "Google Identity
+  Services", "GIS", "ADC", "Application Default Credentials", "service account", "Google ID
+  token", "verifyIdToken", "GOOGLE_APPLICATION_CREDENTIALS", "Google SSO", "вход через Google",
+  "авторизация Google", "сервисный аккаунт", "проверить ID-токен", "гугл-логин". For end-user
+  web sign-in only, use the google-signin skill instead.
 ---
 
 # Google Authentication for Node.js & Python

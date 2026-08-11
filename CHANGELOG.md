@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-08-12
+
+### Changed
+
+- **Five of the six skills now open with `Use when …` and carry paired Russian
+  triggers** — `ad-tracking`, `crypto-payments`, `frontend-performance`, `google-auth`,
+  `google-signin`. `stripe-billing` already did, which is how the gap stayed invisible:
+  the pack looked migrated because the one skill anybody checked was. The other five
+  were unreachable from a request written in Russian.
+
+  v0.3.0 brought three of these descriptions inside the 970 headroom by dropping
+  duplicate triggers; this release rebuilds all five to the house shape — capability,
+  coverage, English and Russian triggers, exclusion — and every one lands between 821
+  and 884 chars.
+
 ## [0.3.1] — 2026-08-11
 
 ### Changed

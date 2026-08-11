@@ -1,6 +1,16 @@
 ---
 name: frontend-performance
-description: "Frontend performance optimization for web applications and landing pages. Covers Core Web Vitals (LCP, FCP, CLS, INP, TBT, SI), font loading strategies, CSS animation compositing, JavaScript bundle optimization, cache headers, code splitting, Content Security Policy, image optimization, and accessibility contrast/heading issues that affect Lighthouse scores. Use when building or auditing web pages for performance, running PageSpeed Insights, optimizing Lighthouse scores, fixing render-blocking resources, reducing bundle size, improving load times, or diagnosing slow page rendering. Triggers: performance audit, PageSpeed, Lighthouse, Core Web Vitals, LCP, FCP, CLS, INP, TBT, Speed Index, render-blocking, bundle size, code splitting, lazy loading, cache headers, font optimization, web performance, page speed, slow loading, performance budget."
+description: >-
+  Use when building or auditing web pages for performance — running PageSpeed Insights,
+  optimizing Lighthouse scores, fixing render-blocking resources, reducing bundle size,
+  improving load times, or diagnosing slow page rendering. Covers Core Web Vitals (LCP, FCP,
+  CLS, INP, TBT, Speed Index), font loading strategies, CSS animation compositing, JavaScript
+  bundle optimization, cache headers, code splitting, Content Security Policy, image
+  optimization, and the contrast and heading issues that move a Lighthouse score. Triggers -
+  "performance audit", "PageSpeed", "Lighthouse", "Core Web Vitals", "LCP", "CLS", "INP",
+  "render-blocking", "bundle size", "code splitting", "lazy loading", "cache headers",
+  "performance budget", "ускорить сайт", "медленно грузится", "оптимизация скорости", "вес
+  бандла". Not for visual design or conversion work.
 ---
 
 # Frontend Performance

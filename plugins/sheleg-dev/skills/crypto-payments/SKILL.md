@@ -1,19 +1,16 @@
 ---
 name: crypto-payments
 description: >-
-  Accept cryptocurrency payments in a web application without losing money to the
-  three things that make crypto unlike cards: a payer who sends the wrong amount,
-  a webhook that arrives more than once, and a rate that moves between quote and
-  transfer. Covers invoice lifecycle and status mapping, webhook signature
-  verification and the JSON-escaping trap, idempotent processing, IP allowlisting
-  behind a proxy, CSRF exemption for callback routes, the conversion buffer, the
-  reconciliation fields that make "what did we receive" answerable, credit
-  waterfalls, refund and AML-hold states, local development with a tunnel and
-  signed mock callbacks, a test matrix and a security checklist. Use when adding
-  or auditing crypto checkout, crypto top-up, or payment webhooks. Triggers:
-  "crypto payment", "crypto checkout", "pay with crypto",
-  "USDT payment", "TRC20", "payment webhook", "IPN", "webhook
-  signature", "paid_over", "underpayment", "Heleket", "NOWPayments", "BTCPay".
+  Use when adding or auditing crypto checkout, crypto top-up, or payment webhooks — where a
+  payer sends the wrong amount, a webhook arrives more than once, and the rate moves between
+  quote and transfer. Covers invoice lifecycle and status mapping, webhook signature
+  verification and the JSON-escaping trap, idempotent processing, IP allowlisting behind a
+  proxy, CSRF exemption for callback routes, the conversion buffer, reconciliation fields,
+  credit waterfalls, refund and AML-hold states, local development with a tunnel and signed mock
+  callbacks, a test matrix and a security checklist. Triggers - "crypto payment", "crypto
+  checkout", "pay with crypto", "USDT payment", "TRC20", "payment webhook", "IPN", "webhook
+  signature", "underpayment", "Heleket", "NOWPayments", "приём криптоплатежей", "оплата
+  криптой", "вебхук платежа", "недоплата". Not for card billing — use stripe-billing.
 ---
 
 # Crypto payments

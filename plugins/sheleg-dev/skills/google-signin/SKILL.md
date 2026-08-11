@@ -1,17 +1,15 @@
 ---
 name: google-signin
-description: >
-  Production-grade "Sign in with Google" (Google Identity Services ID-token flow) for web apps —
-  end-to-end implementation, GCP OAuth client setup, backend ID-token verification, three-way
-  account linking with the pre-hijacking guard, login-CSRF defense, nonce/replay protection, and a
-  mandatory security checklist. Use when implementing, reviewing, or debugging Google login /
-  sign-in / sign-up on a website, wiring the GIS button or One Tap, verifying Google ID tokens on
-  the server, linking Google to existing password accounts, or fixing errors like "origin is not
-  allowed for the given client ID". Triggers: "sign in with google", "google login", "google
-  sign-in button", "GIS", "google.accounts.id", "gsi/client", "google id
-  token", "login csrf", "g_csrf_token". For the broader google-auth
-  library surface (ADC, service accounts, Workload Identity Federation, API keys) use the
-  `google-auth` skill instead — this one is the deep dive on end-user web sign-in only.
+description: >-
+  Use when implementing, reviewing or debugging Google login / sign-in / sign-up on a website —
+  wiring the GIS button or One Tap, verifying Google ID tokens on the server, linking Google to
+  existing password accounts, or fixing "origin is not allowed for the given client ID". Covers
+  GCP OAuth client setup, backend ID-token verification, three-way account linking with the pre-
+  hijacking guard, login-CSRF defense, nonce/replay protection and a mandatory security
+  checklist. Triggers - "sign in with google", "google login", "google sign-in button", "GIS",
+  "google.accounts.id", "gsi/client", "verify google token", "one tap", "account linking",
+  "login csrf", "g_csrf_token", "вход через Google", "кнопка входа Google", "связать аккаунты",
+  "проверить токен Google". For the broader library surface use google-auth instead.
 ---
 
 # Google Sign-In (GIS) — production web login
