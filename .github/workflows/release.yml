@@ -56,12 +56,19 @@ jobs:
       - name: Extract this version's CHANGELOG section
         run: |
           set -eu
+          # Accept every heading shape this repo has used: `## v0.2.0`,
+          # `## [0.2.0] — date`, `## 0.2.0`. A pattern matching only `## v`
+          # shipped broken with v0.1.0 — which was never tagged, so nothing ran
+          # it — and failed the first time a release actually used it. The house
+          # validator is deliberately permissive here (`^## \[?v?X.Y.Z\]?`);
+          # this must be too, or the two gates disagree about what a heading is.
           awk -v v="${{ steps.t.outputs.ver }}" '
-            $0 ~ "^## v" v "([^0-9]|$)" {f=1; next}
-            /^## v/ {f=0}
+            $0 ~ "^## \\[?v?" v "\\]?([^0-9]|$)" {f=1; next}
+            /^## \[?v?[0-9]+\.[0-9]+\.[0-9]+/ {f=0}
             f {print}
           ' CHANGELOG.md > /tmp/notes.md
           test -s /tmp/notes.md || { echo "no CHANGELOG section for ${{ steps.t.outputs.ver }}"; exit 1; }
+          echo "release notes start:"; head -3 /tmp/notes.md
 
       - name: Create or refresh the GitHub release
         env:
