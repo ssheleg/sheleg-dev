@@ -11,8 +11,8 @@ description: >-
   waterfalls, refund and AML-hold states, local development with a tunnel and
   signed mock callbacks, a test matrix and a security checklist. Use when adding
   or auditing crypto checkout, crypto top-up, or payment webhooks. Triggers:
-  "crypto payment", "crypto checkout", "crypto invoice", "pay with crypto",
-  "USDT payment", "TRC20", "ERC20", "payment webhook", "IPN", "webhook
+  "crypto payment", "crypto checkout", "pay with crypto",
+  "USDT payment", "TRC20", "payment webhook", "IPN", "webhook
   signature", "paid_over", "underpayment", "Heleket", "NOWPayments", "BTCPay".
 ---
 

@@ -4,6 +4,37 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-08-11
+
+### Changed
+
+- **`ad-tracking`'s body went from 891 lines / 9160 tokens to 429 / 4747** —
+  both caps are 500 lines and 5000 tokens, so it had been running at nearly
+  double each. Measured with `cl100k`, not estimated.
+
+  Nothing was deleted. Consent, event naming, e-commerce, CSP, Next.js and
+  verification were duplicating `consent-mode.md`, `event-tracking.md`,
+  `gtag-api.md` and `performance-security.md` — which cover the same ground in
+  more depth — so the body keeps a load trigger and the trap, and the depth
+  stays where it already was. The GA4 command table and the recommended-event
+  table were verbatim subsets of two references.
+
+  What had **no** reference to go to was moved into a new one:
+  `references/meta-linkedin.md` (parameter objects per standard event, the
+  firing wrapper, advanced matching, CAPI deduplication).
+
+  The traps stay in the body on purpose — an agent cannot know to open a file
+  about a trap it does not know exists. The consent ordering, the
+  `NEXT_PUBLIC_*` build-time inlining, purchase deduplication and the
+  double-counted SPA page view are all still inline.
+
+- **Three descriptions brought inside the 5% headroom** the canon asks for
+  (≤970 of 1024): `google-signin` 1021 → 968, `crypto-payments` 993 → 966,
+  `ad-tracking` 988 → 959. Only duplicate trigger phrases were dropped —
+  "crypto invoice" beside "crypto checkout", "ad pixel" beside "pixel". A
+  description at 99% of the cap has nowhere to put the "NOT for …" clause a
+  near-miss neighbour will eventually force.
+
 ## [0.2.0] — 2026-08-11
 
 A sixth skill, and the one the pack was missing: cards. `crypto-payments`

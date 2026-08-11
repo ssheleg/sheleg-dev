@@ -8,8 +8,8 @@ description: >
   sign-in / sign-up on a website, wiring the GIS button or One Tap, verifying Google ID tokens on
   the server, linking Google to existing password accounts, or fixing errors like "origin is not
   allowed for the given client ID". Triggers: "sign in with google", "google login", "google
-  sign-in button", "GIS", "google.accounts.id", "gsi/client", "verify google token", "google id
-  token", "one tap", "account linking", "login csrf", "g_csrf_token". For the broader google-auth
+  sign-in button", "GIS", "google.accounts.id", "gsi/client", "google id
+  token", "login csrf", "g_csrf_token". For the broader google-auth
   library surface (ADC, service accounts, Workload Identity Federation, API keys) use the
   `google-auth` skill instead — this one is the deep dive on end-user web sign-in only.
 ---
