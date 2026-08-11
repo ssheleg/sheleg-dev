@@ -89,12 +89,28 @@ jobs:
       - name: Post-release smoke test (npx from a clean cwd — the verify gate)
         run: |
           set -eu
+          # This repo ships SIX skills under their own names and no /commands.
+          # The assertions here were inherited from a single-skill template and
+          # looked for skills/sheleg-dev/SKILL.md and commands/sheleg-dev.md —
+          # neither of which this installer has ever produced. Nothing caught it
+          # because v0.1.0 was never tagged and the workflow had never run.
+          #
+          # Derived from the repo, not hardcoded: a seventh skill must not need
+          # an edit here to be covered.
+          SRC="$PWD/plugins/sheleg-dev/skills"
+          NAMES="$(ls -1 "$SRC")"
+          test -n "$NAMES"
           export HOME="$(mktemp -d)"
           cd "$(mktemp -d)"
           npx --yes "github:ssheleg/sheleg-dev#${{ steps.t.outputs.tag }}"
-          test -f "$HOME/.claude/skills/sheleg-dev/SKILL.md"
-          test -f "$HOME/.claude/commands/sheleg-dev.md"
-          echo "OK: released ${{ steps.t.outputs.tag }} installs cleanly via npx"
+          for n in $NAMES; do
+            test -f "$HOME/.claude/skills/$n/SKILL.md" \
+              || { echo "missing skill after install: $n"; exit 1; }
+          done
+          # references travel too — the skills are useless without them
+          test -f "$HOME/.claude/skills/stripe-billing/references/webhook-events.md"
+          test -f "$HOME/.claude/skills/crypto-payments/references/heleket-provider.md"
+          echo "OK: released ${{ steps.t.outputs.tag }} installs $(echo "$NAMES" | wc -w | tr -d ' ') skills cleanly via npx"
 
   publish:
     # `npm publish` used to be the one human step in every release: 2FA blocks a
