@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] — 2026-08-12
+
+### Changed
+
+- **`ad-tracking`'s body is back inside the token budget** — ~5076 → ~4802 of 5000.
+  The `Deep references` table was carrying a paragraph per file; each reference now
+  opens with its own `Load this when` line, so the trigger has one home, the table is
+  an index, and the two cannot drift apart.
+
 ## [0.4.0] — 2026-08-12
 
 ### Changed

@@ -1,6 +1,8 @@
 # Consent Mode v2 — Detailed Patterns
 
 
+**Load this when** consent is the task: advanced vs basic mode and what each still sends, all consent types, region-specific defaults, granular consent with its localStorage schema, the update flow, GTM wiring, exactly what tags do when denied, URL passthrough, ads data redaction, and how to verify in Tag Assistant / DevTools / DebugView.
+
 ## Contents
 
 - [Table of Contents](#table-of-contents)

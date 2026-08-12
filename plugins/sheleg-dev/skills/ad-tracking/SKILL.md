@@ -426,17 +426,17 @@ LinkedIn: [Insight Tag](https://www.linkedin.com/help/lms/answer/a418880).
 Compliance: [EU DMA](https://digital-markets-act.ec.europa.eu/).
 ## Deep references
 
-The sections above are the integration surface across four platforms. When the
-work is specifically Google's tag — and it usually becomes that — these carry
-the depth this file deliberately does not:
+The sections above are the integration surface across four platforms; these carry
+the depth this file deliberately does not. Each opens with its own **Load this
+when** line, so the trigger has one home and this table stays an index.
 
 | File | Read it when |
 |---|---|
-| [`references/consent-mode.md`](references/consent-mode.md) | **consent is the task**: advanced vs basic mode and what each still sends, all consent types, region-specific defaults, granular consent with its localStorage schema, the update flow, GTM wiring, exactly what tags do when denied, URL passthrough, ads data redaction, and how to verify in Tag Assistant / DevTools / DebugView |
-| [`references/gtag-api.md`](references/gtag-api.md) | you are **calling gtag directly**: every command (`config`, `event`, `set`, `get`, `consent`), tag-ID formats, parameter scope and precedence, `send_to` routing and groups, multi-product configuration, and the Next.js App Router integration including the Docker `NEXT_PUBLIC_*` build-time trap |
-| [`references/event-tracking.md`](references/event-tracking.md) | you are **designing the event schema**: recommended vs custom events, naming rules, parameter limits, the item object, the ecommerce funnel, SaaS/subscription events, and a typed `trackEvent` wrapper |
-| [`references/performance-security.md`](references/performance-security.md) | the tag is **costing you Lighthouse points or failing CSP**: loading strategies and their measured impact, CSP directives with and without a nonce, EU region endpoints, SPA page_view handling, and verification in the network tab |
-| [`references/meta-linkedin.md`](references/meta-linkedin.md) | the work is **Meta or LinkedIn rather than Google**: the parameter object per standard event, the firing wrapper and its consent gate, advanced matching with hashed identifiers and what must never be sent, and deduplication against the Conversions API |
+| [`references/consent-mode.md`](references/consent-mode.md) | **consent is the task** |
+| [`references/gtag-api.md`](references/gtag-api.md) | you are **calling gtag directly** |
+| [`references/event-tracking.md`](references/event-tracking.md) | you are **designing the event schema** |
+| [`references/performance-security.md`](references/performance-security.md) | the tag **costs Lighthouse points or fails CSP** |
+| [`references/meta-linkedin.md`](references/meta-linkedin.md) | the work is **Meta or LinkedIn rather than Google** |
 
 For the page-speed side of the same problem — what the tag does to LCP and TBT,
 and what to do about it — see the `frontend-performance` skill in this pack.

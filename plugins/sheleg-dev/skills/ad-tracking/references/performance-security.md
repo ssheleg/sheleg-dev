@@ -1,6 +1,8 @@
 # GA4 Performance & Security — Reference
 
 
+**Load this when** the tag is costing you Lighthouse points or failing CSP: loading strategies and their measured impact, CSP directives with and without a nonce, EU region endpoints, SPA page_view handling, and verification in the network tab.
+
 ## Contents
 
 - [Table of Contents](#table-of-contents)

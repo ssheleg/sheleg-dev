@@ -1,5 +1,7 @@
 # gtag.js API Reference
 
+**Load this when** you are calling gtag directly: every command (`config`, `event`, `set`, `get`, `consent`), tag-ID formats, parameter scope and precedence, `send_to` routing and groups, multi-product configuration, and the Next.js App Router integration including the Docker `NEXT_PUBLIC_*` build-time trap.
+
 Source: [Google Tag Platform — gtag.js](https://developers.google.com/tag-platform/gtagjs)
 
 ## Contents

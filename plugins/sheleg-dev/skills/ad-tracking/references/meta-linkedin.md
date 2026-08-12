@@ -1,5 +1,7 @@
 # Meta Pixel & LinkedIn — Reference
 
+**Load this when** the work is Meta or LinkedIn rather than Google: the parameter object per standard event, the firing wrapper and its consent gate, advanced matching with hashed identifiers and what must never be sent, and deduplication against the Conversions API.
+
 Moved out of `SKILL.md` when the body was 906 lines against a 500-line budget.
 Everything here is detail the body used to carry inline; the body keeps the
 setup snippet and the traps.

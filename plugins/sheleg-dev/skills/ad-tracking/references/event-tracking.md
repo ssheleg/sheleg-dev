@@ -1,6 +1,8 @@
 # GA4 Event Tracking — Reference
 
 
+**Load this when** you are designing the event schema: recommended vs custom events, naming rules, parameter limits, the item object, the ecommerce funnel, SaaS/subscription events, and a typed `trackEvent` wrapper.
+
 ## Contents
 
 - [Table of Contents](#table-of-contents)
