@@ -4,6 +4,25 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.4.3 — 2026-08-14
+
+A red `validate` could not stop a publish, and this repository proved it.
+
+### Fixed
+
+- **The release now runs the whole validate suite before anything is published.** On
+  2026-08-12 this repository tagged v0.4.1 while its own `validate` run for that exact tag
+  **failed**, and npm served 0.4.1 four minutes later. Two separate workflows, nothing
+  connecting them: `release.yml` ran the structural validator and never the negative
+  self-tests, which are steps in `validate.yml`.
+- `validate.yml` gained a `workflow_call` trigger and `release.yml` calls it with
+  `needs: validate`, so the release runs **after** the real suite rather than beside a
+  copy of it. No plant is duplicated: there is still exactly one home for each.
+- **A guard keeps the connection there** — `check_release_gates_on_validate()` fails when
+  the trigger, the call, or the `needs` goes missing. A dependency nobody checks is a
+  dependency somebody removes. Watched failing against each of the three removals, with a
+  negative self-test in CI.
+
 ## v0.4.2 — 2026-08-13
 
 Its own negative self-tests could not be run on a developer's machine, and one of

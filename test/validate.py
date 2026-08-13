@@ -211,6 +211,41 @@ else:
 
 # ---------------------------------------------------------------- verdict
 
+
+def check_release_gates_on_validate():
+    """A release must not publish over a red `validate`.
+
+    On 2026-08-12 this repository tagged v0.4.1 while its own `validate` run for that
+    exact tag FAILED, and npm served 0.4.1 four minutes later. The two are separate
+    workflows, so nothing connected them: `release.yml` ran the structural validator and
+    never the negative self-tests, which are steps in `validate.yml`.
+
+    The fix is a `workflow_call` — the release calls the real suite rather than a copy of
+    it — and this guard is what keeps the call there. A dependency nobody checks is a
+    dependency somebody removes.
+    """
+    wf = os.path.join(ROOT, ".github/workflows")
+    rel, val = os.path.join(wf, "release.yml"), os.path.join(wf, "validate.yml")
+    if not (os.path.isfile(rel) and os.path.isfile(val)):
+        return
+    v = open(val, encoding="utf-8").read()
+    r = open(rel, encoding="utf-8").read()
+    if not re.search(r"^\s*workflow_call:\s*$", v, re.M):
+        fail(".github/workflows/validate.yml: no `workflow_call:` trigger — the release "
+             "workflow cannot run this suite, and a publish would go out over whatever "
+             "subset it runs itself")
+    if not re.search(r"^\s*uses:\s*\./\.github/workflows/validate\.yml\s*$", r, re.M):
+        fail(".github/workflows/release.yml: does not call ./.github/workflows/validate.yml "
+             "— a red validate would not stop a publish. This repository tagged v0.4.1 with "
+             "a failing validate run and npm served it")
+    if not re.search(r"^\s*needs:\s*(?:\[[^\]]*\bvalidate\b[^\]]*\]|validate)\s*$", r, re.M):
+        fail(".github/workflows/release.yml: no job declares `needs: validate` — calling "
+             "the suite without depending on it lets the release run beside it rather "
+             "than after it")
+
+
+check_release_gates_on_validate()
+
 if FAILURES:
     print(f"FAIL: {len(FAILURES)} problem(s)", file=sys.stderr)
     for f in FAILURES:
