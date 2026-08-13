@@ -3,6 +3,10 @@ name: validate
 on:
   push:
   pull_request:
+  # Callable, so `release.yml` can gate a publish on THIS suite instead of a copy of
+  # it. The negatives live here as steps; running them from the release workflow any
+  # other way would mean a second home for every plant.
+  workflow_call:
 
 permissions:
   contents: read
@@ -22,6 +26,29 @@ jobs:
 
       # Every negative self-test below plants a defect and REQUIRES a failure.
       # A validator nobody has watched fail is not evidence that it works.
+
+      - name: Negative self-test (a release that does not gate on validate must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/nogate-rel && cp -R . /tmp/nogate-rel
+          python3 - <<'PY'
+          # On 2026-08-12 this repository tagged v0.4.1 while its own validate run for that
+          # tag FAILED, and npm served 0.4.1 four minutes later. Two separate workflows,
+          # nothing connecting them. The `workflow_call` connects them; this proves the
+          # connection is checked, because a dependency nobody checks is one somebody
+          # removes.
+          p = "/tmp/nogate-rel/.github/workflows/release.yml"
+          s = open(p, encoding="utf-8").read()
+          old = "    needs: validate\n"
+          assert old in s, "PLANT DID NOT LAND: release.yml no longer declares needs: validate"
+          open(p, "w", encoding="utf-8").write(s.replace(old, "", 1))
+          PY
+          if python3 /tmp/nogate-rel/test/validate.py; then
+            echo "ERROR: validator accepted a release that runs beside validate instead of after it"
+            exit 1
+          else
+            echo "OK: validator refuses a release that could publish over a red suite"
+          fi
 
       - name: Negative self-test (version drift must fail)
         run: |

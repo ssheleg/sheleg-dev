@@ -22,7 +22,14 @@ on:
         type: string
 
 jobs:
+  # The whole validate suite, including every negative self-test, before anything
+  # is published. Until 2026-08-14 a red `validate` did not stop a release: this
+  # repository tagged v0.4.1 while its own validate run failed, and npm served it.
+  validate:
+    uses: ./.github/workflows/validate.yml
+
   release:
+    needs: validate
     if: vars.RELEASE_ENABLED == 'true'
     runs-on: ubuntu-latest
     permissions:
