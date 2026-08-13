@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.4.2 — 2026-08-13
+
+Its own negative self-tests could not be run on a developer's machine, and one of
+them had been reporting a healthy guard as broken since 2026-08-12.
+
+### Fixed
+
+- **`main` was red for two days over a guard that works.** The over-long-description
+  plant replaced the literal `"BTCPay".`; the description stopped containing it, so
+  `str.replace` changed nothing, the validator honestly passed, and the step printed
+  *ERROR: validator accepted a description past the 1024-char limit*. Re-anchored on the
+  folded `>-` block's SHAPE and proven: the plant now produces a 1204-char description
+  and the validator rejects it. Standing instruction #6 of the family's retro, which
+  names this exact failure in another member.
+- **Three plants used `sed -i` and were no-ops on macOS.** BSD sed requires an argument
+  to `-i`, so they errored and changed nothing; they could only ever be exercised in CI,
+  which is how the broken one went unnoticed. Converted to Python — the rule
+  `task-pipeline` has enforced on itself for months.
+- **Every plant now asserts that it changed the file.** A plant that stops landing says
+  `PLANT DID NOT LAND: <why>` instead of blaming the guard it can no longer disarm.
+
+All four verified by running them: each lands, and each makes the validator fail.
+
 ## [0.4.1] — 2026-08-12
 
 ### Changed

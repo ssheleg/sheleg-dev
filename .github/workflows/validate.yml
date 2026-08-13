@@ -27,8 +27,20 @@ jobs:
         run: |
           set -eu
           cp -R . /tmp/drift-copy
-          sed -i 's/"version": "[0-9.]*"/"version": "0.0.0-corrupt"/' \
-            /tmp/drift-copy/plugins/sheleg-dev/.claude-plugin/plugin.json
+          python3 - <<'PY'
+          # Python, never `sed -i`: BSD sed needs an argument to -i, so every sed plant
+          # in this file was a no-op on macOS and could only ever be exercised in CI —
+          # which is how a broken one went unnoticed for two days. And it asserts it
+          # changed something, so a plant that stops landing says so instead of blaming
+          # the guard it can no longer disarm.
+          import json, re
+          p = "/tmp/drift-copy/plugins/sheleg-dev/.claude-plugin/plugin.json"
+          s = open(p, encoding="utf-8").read()
+          s2 = re.sub(r'"version":\s*"[0-9][0-9.]*"', '"version": "0.0.0-corrupt"', s, count=1)
+          assert s2 != s, "PLANT DID NOT LAND: no version field in this plugin.json"
+          open(p, "w", encoding="utf-8").write(s2)
+          assert json.load(open(p))["version"] == "0.0.0-corrupt", "PLANT DID NOT LAND"
+          PY
           if python3 /tmp/drift-copy/test/validate.py; then
             echo "ERROR: validator passed on a corrupted copy — it cannot fail"
             exit 1
@@ -41,10 +53,19 @@ jobs:
           set -eu
           cp -R . /tmp/desc-copy
           python3 - <<'PY'
+          import re
           p = "/tmp/desc-copy/plugins/sheleg-dev/skills/crypto-payments/SKILL.md"
           s = open(p, encoding="utf-8").read()
-          s = s.replace('"BTCPay".', '"BTCPay". ' + ("padding " * 40), 1)
-          open(p, "w", encoding="utf-8").write(s)
+          # Anchored on the folded block's SHAPE, not on any wording. The previous
+          # version replaced the literal '"BTCPay".', which the description stopped
+          # containing: the plant silently planted nothing, the validator honestly
+          # passed, and this step blamed a healthy guard — red main from 2026-08-12
+          # to 2026-08-13. Standing instruction #6 in the umbrella's retro.
+          m = re.search(r"^description: >-\n((?:  .*\n)+)", s, re.M)
+          assert m, "PLANT DID NOT LAND: no folded description block in this SKILL.md"
+          s2 = s[:m.end(1)] + "  " + ("padding " * 40).strip() + "\n" + s[m.end(1):]
+          assert s2 != s, "PLANT DID NOT LAND: the description block was not extended"
+          open(p, "w", encoding="utf-8").write(s2)
           PY
           if python3 /tmp/desc-copy/test/validate.py; then
             echo "ERROR: validator accepted a description past the 1024-char limit"
@@ -57,8 +78,15 @@ jobs:
         run: |
           set -eu
           cp -R . /tmp/name-copy
-          sed -i 's/^name: google-signin$/name: google-signin-gis/' \
-            /tmp/name-copy/plugins/sheleg-dev/skills/google-signin/SKILL.md
+          python3 - <<'PY'
+          import re
+          p = "/tmp/name-copy/plugins/sheleg-dev/skills/google-signin/SKILL.md"
+          s = open(p, encoding="utf-8").read()
+          # the front-matter KEY is the shape; the value is free to change
+          s2, n = re.subn(r"^name: google-signin$", "name: google-signin-gis", s, count=1, flags=re.M)
+          assert n == 1, "PLANT DID NOT LAND: no `name: google-signin` line in this SKILL.md"
+          open(p, "w", encoding="utf-8").write(s2)
+          PY
           if python3 /tmp/name-copy/test/validate.py; then
             echo "ERROR: validator accepted a skill whose name != its directory"
             exit 1
@@ -107,7 +135,15 @@ jobs:
         run: |
           set -eu
           cp -R . /tmp/nogate-copy
-          sed -i 's|python3 test/validate.py|echo skipped|' /tmp/nogate-copy/.github/workflows/validate.yml
+          python3 - <<'PY'
+          p = "/tmp/nogate-copy/.github/workflows/validate.yml"
+          s = open(p, encoding="utf-8").read()
+          old = "python3 test/validate.py"
+          assert old in s, "PLANT DID NOT LAND: CI no longer calls the validator by this name"
+          s2 = s.replace(old, "echo skipped")
+          assert s2 != s, "PLANT DID NOT LAND"
+          open(p, "w", encoding="utf-8").write(s2)
+          PY
           if python3 /tmp/nogate-copy/test/validate.py; then
             echo "ERROR: validator passed while CI no longer calls it"
             exit 1
