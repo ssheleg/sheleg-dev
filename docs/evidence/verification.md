@@ -51,7 +51,3 @@ reads as coverage it does not have.
 - **The eight negatives, one by one, locally.** REQ-002 reads their step conclusions from
   the CI run rather than re-running each — a run's verdict, not eight local
   reproductions.
-- **This repository has no `npm test`.** `package.json` carries an empty `scripts` block,
-  so the family's usual one-command gate does not exist here — CI calls
-  `python3 test/validate.py` directly. Filed as a board row rather than fixed inside a
-  ledger seeding.
