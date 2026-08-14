@@ -43,6 +43,7 @@ Deep material, loaded on demand:
 | [`references/subscription-lifecycle.md`](references/subscription-lifecycle.md) | implementing checkout, verify, renewal, seats, plan change, trials, cancellation, clawback |
 | [`references/price-integrity.md`](references/price-integrity.md) | pricing lives in more than one file, or an advertised price must be proved against Stripe |
 | [`references/testing-and-local-dev.md`](references/testing-and-local-dev.md) | local webhooks, fixtures, mocks, and a suite that would actually catch a money defect |
+| [`references/provider-concentration.md`](references/provider-concentration.md) | growing revenue, opening a second market, separating involuntary churn, or asking what happens if the payment account is limited |
 
 ---
 
@@ -392,6 +393,29 @@ Stripe what is true and repairs the difference:
 The same function is the "Sync now" button on the billing page. Money is minor
 units: convert once, at the boundary, and compare in integer cents —
 `Math.abs(20.83 - 20.84) > 0.01` is `true` in floating point.
+
+---
+
+## Depending on one provider
+
+Everything above assumes Stripe is the payment system. That is a reasonable
+default and it is also a concentration: the account that runs the charges can be
+limited or closed, and there is no second route unless one was built before it
+was needed. Three things make adding a second provider cheap later and are
+nearly free now — the entitlement keyed to **your** user id with provider ids as
+fields, the customer identity resolved before checkout, and the reconciliation
+job above, which is the only number in the system that is not your own telemetry.
+
+At volume, three leaks that do not look like payment problems: approval rates
+differing by country, renewals failing on reissued cards, and a `canceled`
+status that cannot tell a decision from a bank reissue. Stripe's **automatic
+card updates** cover some of the second one, with two limits worth knowing —
+coverage varies by country and Stripe states you **cannot identify which cards
+it covers**, so handle `payment_method.automatically_updated` and
+`payment_method.updated` rather than assuming the save.
+
+Full treatment, including the involuntary-versus-voluntary table:
+[`references/provider-concentration.md`](references/provider-concentration.md).
 
 ---
 

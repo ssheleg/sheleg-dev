@@ -319,6 +319,36 @@ from both the browser and the server (Conversions API, server-side GA4) must
 carry the SAME `event_id` / `transaction_id`, or both are counted. Test it by
 reloading the thank-you page: a purchase that increments twice is a
 deduplication bug, not a tracking success.
+
+**A purchase is not a browser event, and that decides where it comes from.**
+Every other event on the list is something a person did in a tab, so the browser
+is its natural source. A purchase is the outcome of a charge that succeeded
+inside a payment system, and the only thing that knows it succeeded is the
+provider's webhook. Firing it from the thank-you page means firing it from the
+one place that has no idea whether the charge cleared — which is why a purchase
+event exists for every session that reached the page and a refund exists for
+none of them.
+
+The consequence is an ordering, not a preference:
+
+1. **The webhook handler is the source of truth for the purchase.** It writes the
+   entitlement, and the same handler sends the server-side conversion. If the
+   handler is where the money is recorded, it is where the event belongs.
+2. **The browser event stays, and it stays subordinate.** Keep it for the
+   attribution signals only the browser carries (click ids, the consent state,
+   the session), give it the `event_id` the server will reuse, and treat the
+   server as authoritative when they disagree.
+3. **Everything the browser loses, it loses closest to the money.** Blockers, a
+   mobile browser terminating a tab on redirect, a payment provider's hosted page
+   ending the session before the return leg — each of them removes the *last*
+   step preferentially, so the browser-only purchase count is biased low by an
+   amount you cannot measure from inside the browser.
+
+Reconcile against the provider rather than the analytics dashboard: the count of
+succeeded charges in a period is a number the payment system will give you
+exactly, and it is the only external check on this event that is not itself
+telemetry. See `stripe-billing` → **Depending on one provider** for what else
+that reconciliation surfaces.
 ## Content Security Policy
 
 Read `references/performance-security.md` → **Content Security Policy** for the

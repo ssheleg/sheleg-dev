@@ -4,6 +4,63 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.5.0 — 2026-08-14
+
+Two gaps found by reading a web2app funnel guide against the pack. Both are about
+the same seam: the payment layer is where a funnel's money and its measurement
+actually live, and both skills were treating it as somebody else's concern.
+
+### Added
+
+- **`stripe-billing` → `references/provider-concentration.md`.** The skill covered
+  dunning *inside* Stripe and never dependence *on* Stripe. The new reference is
+  about the seam rather than about adding a second provider: the entitlement keyed
+  to your own user id with provider ids as fields, the customer identity resolved
+  before checkout, and the reconciliation job as the only number in the system
+  that is not your own telemetry. `SKILL.md` → **Reconciliation** already excluded
+  "rows that were never Stripe's", which is that seam half-built and was never
+  named as one.
+
+  It also declines the obvious answer: a generic `PaymentProvider` interface
+  written against one provider encodes that provider's model and gets rewritten
+  for the second one anyway. The seam is in the data, not in the code shape.
+
+  **Automatic card updates are documented with their two limits**, both taken from
+  Stripe's own text rather than from recall: coverage varies by country, and Stripe
+  states it is **not possible to identify which cards support it** — so any plan
+  that assumes a reissue will be caught has an unmeasurable branch. Handle
+  `payment_method.automatically_updated` and `payment_method.updated`, write the
+  new expiry and last four to your own records, and review anything keyed on
+  `fingerprint`, which moves when the card number does.
+
+  And the distinction the pack had no field for: a subscription that ended because
+  someone chose to leave, versus one that ended because a bank reissued a number.
+  A single `canceled` status for both is how a recoverable failure gets a farewell
+  email.
+
+### Changed
+
+- **`ad-tracking` now says where a purchase event comes from.** Deduplication by
+  `event_id` was already covered; what was missing is the reason the server side
+  is not optional. Every other event on the list is something a person did in a
+  tab. A purchase is the outcome of a charge that succeeded inside a payment
+  system, and the only thing that knows it succeeded is the provider's webhook —
+  so firing it from the thank-you page fires it from the one place with no idea
+  whether the charge cleared, which is why a browser-only purchase count has an
+  event for every session that reached the page and a refund for none of them.
+
+  The ordering that follows: the webhook handler is the source of truth and sends
+  the server-side conversion; the browser event stays for the signals only it
+  carries and is subordinate on conflict; and everything the browser loses, it
+  loses closest to the money, so the bias is downward by an amount that cannot be
+  measured from inside the browser. Reconcile against the provider's count of
+  succeeded charges, which is the only external check on this event that is not
+  itself telemetry.
+
+Both `SKILL.md` bodies stay inside the 500-line progressive-disclosure budget:
+`stripe-billing` went to 502 lines when this was written inline, which is what
+moved the full treatment into a reference and left a pointer behind.
+
 ## v0.4.3 — 2026-08-14
 
 A red `validate` could not stop a publish, and this repository proved it.
