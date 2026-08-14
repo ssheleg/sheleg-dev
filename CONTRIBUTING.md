@@ -102,6 +102,13 @@ Adding a reference file means wiring it into `SKILL.md` and into
 loaded — progressive disclosure means the agent reads only what `SKILL.md` points
 at.
 
+## Coordinating with other agents
+
+`docs/AGENT_SYNC.md` describes how coordination is wired in this repository and
+what it does **not** guarantee. It is generated from `.claude/agent-sync.json`:
+read it before editing a file that config guards, and regenerate it with
+`agent_sync.py setup` in the same change that alters the config.
+
 ## Style
 
 - US spelling. A mixed standard has already cost one broken anchor here.
