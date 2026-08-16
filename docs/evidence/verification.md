@@ -40,8 +40,8 @@ Six skills ship: `ad-tracking`, `crypto-payments`, `frontend-performance`, `goog
 | 006 | The installer installs all six skills into a fresh HOME | `HOME=/tmp/fakehome-sd node bin/sheleg-dev.js`, then list `$HOME/.claude/skills/` | six directories: `ad-tracking crypto-payments frontend-performance google-auth google-signin stripe-billing` | **verified** |
 | 007 | A second run skips rather than re-writing | re-run the installer against the same HOME and count `^skip:` | `6` — one per skill, none re-installed | **verified** |
 | 008 | Both workflows are parseable by the parser GitHub uses | `yaml.safe_load` over `validate.yml` and `release.yml` | both parse | **verified** |
-| 009 | npm serves exactly the version this tree claims | `npm view @ssheleg/sheleg-dev version` | to be read after the v0.6.0 publish lands | **never** |
-| 010 | The tag exists at the released version | `git tag --sort=-v:refname \| head -2` | to be read after the v0.6.0 tag is pushed | **never** |
+| 009 | npm serves exactly the version this tree claims | `npm view @ssheleg/sheleg-dev version` | `0.6.0`, and the published tarball carries the deduplication contract (`grep -c event_name` in the shipped `meta-linkedin.md` → 5, where the pre-release file had 0) | **verified** |
+| 010 | The tag exists at the released version | `git tag --sort=-v:refname \| head -2`; `git cat-file -t v0.6.0` | `v0.6.0`, `v0.5.2` — newest tag matches, and it is **annotated**, so `git describe` and `git submodule status` name it (umbrella B-69) | **verified** |
 
 ## What these checks do not cover
 
