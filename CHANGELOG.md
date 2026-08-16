@@ -4,6 +4,32 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.5.2 — 2026-08-16
+
+**`CONTRIBUTING.md` described a different repository.** Its *Where things go* table routed
+contributions to `benchmarks.md`, `growth-plays.md`, `myths.md`, `algorithm-updates.md`,
+`aeo-geo.md` and `scripts/page_audit.py` — all six belong to `seo-aeo-audit`, and
+`git ls-files` here matched none of them. Sweeping every file name in the document found
+**eleven** absent, not six: also `deliverable-templates.md`, `technical-checks.md`,
+`threats-and-defense.md`, `test_page_audit.py`, and an `evidence-tiers.md` under a skill
+directory named `sheleg-dev` that has never existed — the six skills are `stripe-billing`,
+`crypto-payments`, `ad-tracking`, `google-signin`, `google-auth` and
+`frontend-performance`.
+
+Most of the document was a sibling's, adapted only at the edges. It claimed a
+standard-library auditor and a second test command; there is no runtime code in this
+repository at all, and `python3 test/validate.py` is the whole gate. Rewritten against what
+`git ls-files` actually returns: six skills, twenty reference files, one executable
+(`install.sh`), a four-way version sync, and the eight negative self-tests CI really runs.
+
+**The guard is narrow on purpose.** Only the *Where things go* table is checked, because a
+general "every path must exist" rule cannot tell a path being used from a path being
+discussed — the rewrite deliberately names three `seo-aeo-audit` files to send a reader to
+the right repository. The first draft of the guard read the whole section and flagged
+exactly those, one paragraph after the comment explaining why it must not. A bare filename
+resolves by basename, so `SKILL.md` passes as the generic it is while `benchmarks.md` still
+fails. Watched rejecting the original row verbatim.
+
 ## v0.5.1 — 2026-08-16
 
 **This gate can now see an invariant it breaks one repository away.** The family umbrella

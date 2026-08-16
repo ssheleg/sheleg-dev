@@ -121,6 +121,26 @@ jobs:
             echo "OK: validator catches the rename that was missed on the way in"
           fi
 
+      - name: Negative self-test (CONTRIBUTING routing to a file we do not have must fail)
+        run: |
+          set -eu
+          # The B-47 row, restored verbatim: this table used to send benchmarks to a file
+          # that lives in seo-aeo-audit and has never existed here.
+          rm -rf /tmp/contrib && cp -R . /tmp/contrib
+          python3 - <<'PY'
+          p = "/tmp/contrib/CONTRIBUTING.md"
+          t = open(p, encoding="utf-8").read()
+          anchor = "| Anything user-visible |"
+          assert anchor in t, "PLANT DID NOT LAND: no `Anything user-visible` row"
+          row = "| A number, benchmark or dated figure | `benchmarks.md` |\n"
+          open(p, "w", encoding="utf-8").write(t.replace(anchor, row + anchor, 1))
+          PY
+          if (cd /tmp/contrib && python3 test/validate.py); then
+            echo "the validator accepted a table routing work to a file this repo has nowhere"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
       - name: Negative self-test (a reference nobody links must fail)
         run: |
           set -eu

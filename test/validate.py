@@ -252,6 +252,64 @@ def _disclose_routing(msg):
     print(f"  unlooked: {msg}")
 
 
+def check_contributing_routes_to_files_that_exist():
+    """The *Where things go* table sends a contributor somewhere; it had better be here.
+
+    B-47: this table routed contributions to `benchmarks.md`, `growth-plays.md`,
+    `myths.md`, `algorithm-updates.md`, `aeo-geo.md` and `scripts/page_audit.py`. All six
+    belong to `seo-aeo-audit`; `git ls-files` here matched none. A whole document had been
+    copied from a sibling and never adapted, and a sweep found **eleven** absent names
+    where the board row had spotted six.
+
+    **Only this table, and that is the point.** A general "every path in the file must
+    exist" check cannot tell a path being USED from a path being DISCUSSED — the rewritten
+    document names three of `seo-aeo-audit`'s files on purpose, to send a reader who wants
+    them to the right repository, and the umbrella's `skills.json` for the same reason.
+    Flagging those is standing instruction #7, which this family has recorded three times.
+    The table is unambiguous: it is a list of places to put work in THIS repository.
+    """
+    path = os.path.join(ROOT, "CONTRIBUTING.md")
+    if not os.path.isfile(path):
+        fail("CONTRIBUTING.md is missing")
+        return
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    match = re.search(r"^## Where things go\n(.*?)(?=^## )", text, re.S | re.M)
+    if not match:
+        fail("CONTRIBUTING.md: no `## Where things go` section — it is the one place that "
+             "tells a contributor where work belongs, and B-47 is what happens when it "
+             "describes another repository")
+        return
+    # TABLE ROWS ONLY, not the whole section. The first draft of this guard read
+    # everything up to the next heading and immediately flagged the paragraph directly
+    # below the table — the one that names three `seo-aeo-audit` files to send a reader
+    # to the right repository. It caught its own author demonstrating #7 one paragraph
+    # after writing about it.
+    rows = [ln for ln in match.group(1).splitlines() if ln.lstrip().startswith("|")]
+    cited = re.findall(r"`([A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:md|py|json|sh|yml))`", "\n".join(rows))
+    if not cited:
+        fail("CONTRIBUTING.md: the `Where things go` table names no file — an empty "
+             "corpus makes this guard pass everything")
+        return
+    # A bare filename in this table is generic on purpose — "that skill's `SKILL.md`"
+    # means one of six, not a file at the root. So a name resolves if the exact path
+    # exists OR the basename exists anywhere here. `SKILL.md` passes; `benchmarks.md`,
+    # the defect this guard was written for, still does not.
+    present = set()
+    for dirpath, dirnames, filenames in os.walk(ROOT):
+        dirnames[:] = [d for d in dirnames if d not in (".git", "node_modules")]
+        for fn in filenames:
+            present.add(fn)
+    for rel in dict.fromkeys(cited):
+        if os.path.exists(os.path.join(ROOT, rel)) or os.path.basename(rel) in present:
+            continue
+        fail(f"CONTRIBUTING.md: `Where things go` sends contributions to {rel!r}, "
+             f"which this repository has nowhere (B-47)")
+
+
+check_contributing_routes_to_files_that_exist()
+
+
 def check_routed_triggers_still_advertised():
     """The family's routing hook fires on words this description has to keep.
 
