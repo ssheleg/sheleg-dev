@@ -3,8 +3,8 @@ name: frontend-performance
 description: >-
   Use when building or auditing web pages for performance — running PageSpeed Insights,
   optimizing Lighthouse scores, fixing render-blocking resources, reducing bundle size,
-  improving load times, or diagnosing slow page rendering. Covers Core Web Vitals (LCP, FCP,
-  CLS, INP, TBT, Speed Index), font loading strategies, CSS animation compositing, JavaScript
+  improving load times, or diagnosing slow page rendering. Covers Core Web Vitals (LCP, INP,
+  CLS) and the Lighthouse diagnostics beside them (FCP, TBT, Speed Index), font loading strategies, CSS animation compositing, JavaScript
   bundle optimization, cache headers, code splitting, Content Security Policy, image
   optimization, and the contrast and heading issues that move a Lighthouse score. Triggers -
   "performance audit", "PageSpeed", "Lighthouse", "Core Web Vitals", "LCP", "CLS", "INP",
@@ -15,7 +15,7 @@ description: >-
 
 # Frontend Performance
 
-Optimize frontend applications for maximum Lighthouse scores and real-user performance. This skill covers the technical performance layer -- for visual design, see `frontend-design`; for conversion optimization, see `landing-page-design`.
+Optimize frontend applications for maximum Lighthouse scores and real-user performance. This skill covers the technical performance layer -- for how it looks, see `sheleg-design`; for what the interface must do, see `super-ux`.
 
 ## Audit Workflow
 
@@ -25,16 +25,29 @@ Optimize frontend applications for maximum Lighthouse scores and real-user perfo
 4. **Implement** -- Apply fixes per the reference guides.
 5. **Validate** -- `next build` (or framework equivalent) + re-run Lighthouse. Verify no regressions.
 
-## Core Web Vitals Targets
+## Core Web Vitals, and the diagnostics beside them
 
-| Metric | Good | Needs Work | Poor |
+**Three metrics are Core Web Vitals. The other three are not**, and the difference
+is not pedantry: only the first three are what Google reports and ranks on, and
+only they are field-measurable. TBT is a *lab* metric — web.dev says it "is not
+part of the Core Web Vitals set because they are not field-measurable" — and it
+stands in for INP when you have no field data. Telling a client their Speed Index
+is a failing Core Web Vital is telling them about a thing Google does not measure.
+
+| Core Web Vital | Good | Needs Work | Poor |
 |--------|------|------------|------|
 | LCP (Largest Contentful Paint) | < 2.5s | 2.5-4.0s | > 4.0s |
 | INP (Interaction to Next Paint) | < 200ms | 200-500ms | > 500ms |
 | CLS (Cumulative Layout Shift) | < 0.1 | 0.1-0.25 | > 0.25 |
-| FCP (First Contentful Paint) | < 1.8s | 1.8-3.0s | > 3.0s |
-| TBT (Total Blocking Time) | < 200ms | 200-600ms | > 600ms |
-| SI (Speed Index) | < 3.4s | 3.4-5.8s | > 5.8s |
+
+| Lab diagnostic | Good | Needs Work | Poor | Stands in for |
+|--------|------|------------|------|---|
+| FCP (First Contentful Paint) | < 1.8s | 1.8-3.0s | > 3.0s | early LCP signal |
+| TBT (Total Blocking Time) | < 200ms | 200-600ms | > 600ms | INP, in the lab |
+| SI (Speed Index) | < 3.4s | 3.4-5.8s | > 5.8s | perceived load |
+
+Thresholds and the classification verified against `web.dev/articles/vitals`,
+2026-08-16.
 
 ## Performance Checklist
 
@@ -140,8 +153,13 @@ Set these limits for landing pages:
 
 ## Related Skills
 
-- `frontend-design` -- Visual aesthetics and UI design
-- `landing-page-design` -- Conversion optimization and layout
-- `next-best-practices` -- Next.js framework patterns
-- `seo-audit` -- Technical SEO and crawlability
-- `responsive-design` -- Adaptive layouts and container queries
+- `sheleg-design` -- how it looks and moves, including the motion budget this page's
+  numbers constrain
+- `super-ux` -- what the interface must do, and the flows a slow page loses
+- `seo-aeo-audit` -- technical SEO and crawlability, which reads the same Core Web
+  Vitals from the field rather than the lab
+
+Four names that used to sit here — `frontend-design`, `landing-page-design`,
+`next-best-practices`, `responsive-design` — resolved to nothing installable, and
+`seo-audit` was one character-class away from the real `seo-aeo-audit`, which is
+how a typo survives review.

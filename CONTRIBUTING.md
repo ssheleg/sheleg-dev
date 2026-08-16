@@ -81,7 +81,7 @@ routing hook fires on. That check needs an `sshlg-skills` checkout above this on
 **discloses instead of passing** when there is none, so a standalone clone prints an
 `unlooked:` line rather than a false green.
 
-CI runs the same validator plus eight negative self-tests, each of which plants a real
+CI runs the same validator plus nine negative self-tests, each of which plants a real
 defect — a version drift, an over-long description, a front-matter name that stops
 matching its directory, a dangling reference link, a reference nobody links, a stray
 `SKILL.md`, a release that stops gating on validate, the validator dropped from CI — and

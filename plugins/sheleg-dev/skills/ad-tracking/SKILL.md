@@ -220,19 +220,11 @@ fbq('track', 'PageView');
 
 ### Standard Events
 
-Meta defines 17 standard events. The most important for SaaS conversion funnels:
-
-| Event | When | Parameters | Notes |
-|---|---|---|---|
-| `PageView` | Every page load | (automatic from base code) | Fires from the init script |
-| `CompleteRegistration` | User signs up | `content_name` (method), `status: true` | Separate from GA4 `sign_up` |
-| `InitiateCheckout` | Checkout started | `value`, `currency`, `content_name`, `content_category`, `num_items` | |
-| `Purchase` | Purchase completed | `value` (required), `currency` (required), `content_name`, `content_category`, `content_type`, `contents[]` | `value` + `currency` are **mandatory** for optimisation |
-| `Subscribe` | Recurring subscription | `value`, `currency`, `predicted_ltv` | Distinct from one-time Purchase |
-| `Lead` | Lead form submitted | (optional params) | |
-| `ViewContent` | Key content viewed | `content_name`, `content_category` | |
-| `AddToCart` | Item added to cart | `content_name`, `value`, `currency` | |
-| `Search` | Search performed | `search_string` | |
+Meta defines 17 standard events. The four that carry a SaaS funnel are
+`CompleteRegistration`, `InitiateCheckout`, `Purchase` and `Subscribe`, and only
+`Purchase` has mandatory parameters: `value` and `currency`, without which Meta
+cannot optimise. The full table — every event, its parameters and the traps —
+is in `references/meta-linkedin.md` → **Standard events**.
 
 ### Deeper Meta and LinkedIn detail
 
@@ -241,68 +233,21 @@ firing wrapper, advanced matching (hashed identifiers, and what must never be
 sent) and CAPI deduplication.
 ## LinkedIn Insight Tag
 
-### Setup
-
-**Env var:** `NEXT_PUBLIC_LINKEDIN_PARTNER_ID` (numeric string)
-
-The LinkedIn Insight Tag is consent-gated (same pattern as Meta Pixel). It loads the `insight.min.js` script and includes a noscript pixel fallback.
-
-```javascript
-_linkedin_partner_id = "PARTNER_ID";
-window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
-window._linkedin_data_partner_ids.push(_linkedin_partner_id);
-```
-
-### Conversion Tracking
-
-LinkedIn conversions are configured in Campaign Manager (not in code). The Insight Tag automatically tracks page views, and you define URL-based conversion rules in the LinkedIn Campaign Manager:
-
-1. Campaign Manager → Analyze → Conversion tracking → Create conversion
-2. Define URL rules (e.g. `/thank-you`, `/onboarding`)
-3. LinkedIn Insight Tag automatically matches page loads to conversion rules
-
-For event-based conversions, use `window.lintrk('track', { conversion_id: 123456 })`.
-
-**Docs:**
-- [LinkedIn Insight Tag setup](https://www.linkedin.com/help/lms/answer/a418880)
-- [LinkedIn conversion tracking](https://www.linkedin.com/help/lms/answer/a423304)
-
----
+Consent-gated on the same wrapper as the Meta Pixel, env var
+`NEXT_PUBLIC_LINKEDIN_PARTNER_ID`. Conversions are configured in Campaign Manager
+rather than in code, so there is nothing to deduplicate and nothing that fails
+silently in the bundle — but a URL rule on a refreshable page counts every
+refresh. Setup snippet, the Campaign Manager steps and `lintrk` are in
+`references/meta-linkedin.md` → **LinkedIn conversion tracking**.
 
 ## User Identification
 
-### Cross-Platform Identification Strategy
-
-| Platform | Method | When | What it enables |
-|---|---|---|---|
-| GA4 | `user_id` via `gtag('config', TAG_ID, { user_id })` | After login/onboarding | Cross-device tracking, audience building |
-| GA4 | Enhanced Conversions via `gtag('set', 'user_data', { email })` | After login/onboarding | Better conversion attribution |
-| Meta Pixel | Advanced Matching via `fbq('init', PIXEL_ID, { em, fn })` | After login/onboarding | Better conversion attribution, larger custom audiences |
-| Mixpanel | `alias()` + `identify()` | After login/onboarding | Merge anonymous → identified user profiles |
-
-**All identification calls should be placed in a single identification component** that runs in the dashboard/authenticated layout. This ensures:
-- User data is sent once per session
-- All platforms receive identification data at the same time
-- Pre-login anonymous events merge into the identified profile
-
-### Alias vs Identify (Mixpanel)
-
-- `alias(userId, anonymousId)` — creates a permanent link between the anonymous and real user ID. Must be called **exactly once** per user, **before** `identify()`. Use a localStorage flag to prevent duplicate calls.
-- `identify(userId)` — sets the user ID for all subsequent events.
-
-### Timing
-
-Fire identification in a `useEffect` in the authenticated layout:
-
-```typescript
-useEffect(() => {
-  // 1. Mixpanel alias + identify
-  // 2. GA4 user_id + Enhanced Conversions
-  // 3. Meta Advanced Matching
-}, [userId, email, name]);
-```
-
----
+One rule the body keeps, because getting it wrong corrupts attribution rather
+than losing it: **identify before you track, never after**. An event fired for an
+anonymous id and re-attributed later is two users to every platform that already
+ingested it. The per-platform strategy, the Mixpanel `alias` vs `identify`
+distinction and the timing rules are in `references/event-tracking.md` →
+**User identification**.
 
 ## Event naming
 

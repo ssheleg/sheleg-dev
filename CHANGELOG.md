@@ -4,6 +4,97 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.6.0 — 2026-08-16
+
+### The file that promised the deduplication contract contained none of it
+
+`ad-tracking/references/meta-linkedin.md` advertised *"deduplication against the
+Conversions API"* in its own first line and in its Contents, ended at line 104, and
+contained the word `event_id` exactly twice — both times in those promises. Its
+Contents row for the missing half was `[Everything below](#)`, a dead anchor. The
+pack's entire statement of the contract was one clause elsewhere: *"must carry the
+SAME `event_id`"*.
+
+That clause is **not the contract**, and the gap is money. Verified against Meta's
+own documentation, 2026-08-16:
+
+- **Two fields must match, not one** — `eventID`↔`event_id` **and**
+  `event`↔`event_name`. An integration that shares an id and lets the two sides
+  disagree on the name (`Purchase` vs `purchase`) never deduplicates, and the
+  revenue is counted twice. The id half is obvious; the name half is not.
+- **The window is 48 hours**, measured from when Meta receives the *first* event
+  carrying that `event_id` — not from the purchase. A server event retried out of a
+  dead-letter queue two days later is a second conversion.
+- **The `fbp`/`external_id` alternative has a direction**: *"server events will not
+  be discarded if a browser event has not been received in the past 48 hours, even
+  if an identical browser event arrives after"*. For a purchase confirmed by a
+  webhook — the pattern this skill teaches, because the webhook is the payment —
+  the server event arrives first and that method does nothing.
+
+The file also now carries **what must never be sent**, which it promised and
+omitted: the categories Meta's Business Tools Terms prohibit (health, financial,
+consumer-report, SSNs, card numbers, under-13 data), the fact that **event and
+audience names are covered too** — `trackCustom('DiabetesPlanPurchase')` is a
+breach with an empty parameter object — and that SHA-256 is a matching mechanism,
+not a permission. And the LinkedIn conversion detail it promised.
+
+### Two bodies over the 5000-token budget, split rather than trimmed
+
+`ad-tracking` was ~5273 tokens and `stripe-billing` ~5367, both against `< 5000`,
+and `ad-tracking`'s own text said *"the tables, schemas and per-framework wiring
+live in `references/`"* while carrying five tables. Both are under the **4750
+working limit** now, and every move went to a file that already owned the subject:
+
+| Moved | To | Why there |
+|---|---|---|
+| Meta standard-events table, LinkedIn setup + conversions | `meta-linkedin.md` | the file that advertises them |
+| User identification: cross-platform, alias-vs-identify, timing | `event-tracking.md` | an event name says what happened; identity says who to |
+| Stripe CLI/MCP commands | `stripe-agent-toolchain.md` | every command was already there |
+| Provider concentration | `provider-concentration.md` | the section already closed by pointing at it |
+| Local dev + test matrix | `testing-and-local-dev.md` | one home, and they were two pointers to it |
+
+The security checklist and the pitfalls table were **deleted rather than moved**:
+every row restated a rule stated in its own section above, and a rule with two
+homes drifts at one of them. Four rules whose failure is money are kept inline.
+
+### `billing_mode` — a one-way choice this skill did not mention
+
+Stripe creates every subscription in flexible or classic mode, the choice is made
+at creation, **cannot be reversed**, and Stripe recommends flexible. Under flexible
+a credit proration is computed from the amount **originally debited**, so one
+change can emit **several** credit prorations where classic emitted one, and
+discounts apply proportionally rather than evenly. Code that takes `[0]` of the
+proration lines is correct under classic and wrong under flexible — silently, in
+the refund clawback path. The pinned example `apiVersion` moved from
+`2026-01-28.clover`, a major train behind and older than a feature the same file
+recommended two sections later, to `2026-07-29.dahlia`.
+
+### FCP, TBT and Speed Index are not Core Web Vitals
+
+`frontend-performance` said they were, in its description and over its threshold
+table. web.dev is explicit — the Core Web Vitals are LCP, INP and CLS, and TBT *"is
+not part of the Core Web Vitals set because they are not field-measurable"*. An
+agent asked *"are my Core Web Vitals passing?"* was being told a Speed Index of 4s
+is a failing Core Web Vital, which is not a thing Google measures or ranks on. The
+two sets are separate tables now, with what each lab metric stands in for.
+
+Its **Related Skills** block named five skills, four of which resolve nowhere
+(`landing-page-design`, `next-best-practices`, `responsive-design`, and
+`frontend-design`, which resolves only to a third party) and one — `seo-audit` —
+that is one character-class away from the real `seo-aeo-audit`, which is how a typo
+survives review. Replaced with the family's actual routers.
+
+### Fixed
+
+- Three documents said CI runs **eight** negative self-tests; it runs **nine**, and
+  the ninth arrived in the same commit that restated eight.
+- The verification ledger was pinned to **v0.5.0** with two releases shipped since,
+  reading green for a version npm no longer served. Re-pinned to v0.6.0, with the
+  two rows that can only be read after publish marked `never` rather than assumed.
+
+Found by the nine-repository audit of 2026-08-16 (umbrella `B-73`, `B-66`, `B-70`;
+`F-sheleg-dev-01` through `-08`, `-17`).
+
 ## v0.5.2 — 2026-08-16
 
 **`CONTRIBUTING.md` described a different repository.** Its *Where things go* table routed

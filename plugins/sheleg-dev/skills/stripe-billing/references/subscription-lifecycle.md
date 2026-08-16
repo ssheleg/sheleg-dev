@@ -292,3 +292,30 @@ const isNonStripe = (row) => row.paymentSource !== "stripe" || row.stripeSubscri
 
 The reconciliation job is where this bites: without the guard it finds rows
 Stripe has never heard of and cancels every one of them.
+
+---
+
+## `billing_mode`: flexible vs classic, and what it does to proration
+
+Set at `subscriptions.create` or via `subscription_data` on a Checkout session,
+**one-way** — there is no migration from flexible back to classic. Stripe
+recommends flexible for new subscriptions.
+
+The difference is not cosmetic and it lands exactly where this file's proration
+rules do:
+
+- **Credit prorations are computed from the amount originally debited**, not from
+  current subscription values. Where the period being credited was itself billed
+  across several debits, Stripe generates **several credit prorations** for one
+  change.
+- **Discounts are applied proportionally** rather than evenly, which produces more
+  proration lines again.
+
+So under flexible mode, "the proration line" is the wrong mental model. Anything
+that reads `lines.data[0]`, sums a single credit, or reconciles one change to one
+line item is correct under classic and wrong under flexible — silently, and in the
+clawback direction.
+
+Verified against Stripe's billing-mode documentation, 2026-08-16. Re-check before
+quoting: this is a recent split and the guidance is still moving.
+

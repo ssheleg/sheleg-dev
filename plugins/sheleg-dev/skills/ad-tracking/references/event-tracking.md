@@ -201,3 +201,45 @@ function trackEvent(name, params) {
   gtag('event', name, params);
 }
 ```
+
+---
+
+## User identification
+
+### Cross-Platform Identification Strategy
+
+| Platform | Method | When | What it enables |
+|---|---|---|---|
+| GA4 | `user_id` via `gtag('config', TAG_ID, { user_id })` | After login/onboarding | Cross-device tracking, audience building |
+| GA4 | Enhanced Conversions via `gtag('set', 'user_data', { email })` | After login/onboarding | Better conversion attribution |
+| Meta Pixel | Advanced Matching via `fbq('init', PIXEL_ID, { em, fn })` | After login/onboarding | Better conversion attribution, larger custom audiences |
+| Mixpanel | `alias()` + `identify()` | After login/onboarding | Merge anonymous → identified user profiles |
+
+**All identification calls should be placed in a single identification component** that runs in the dashboard/authenticated layout. This ensures:
+- User data is sent once per session
+- All platforms receive identification data at the same time
+- Pre-login anonymous events merge into the identified profile
+
+### Alias vs Identify (Mixpanel)
+
+- `alias(userId, anonymousId)` — creates a permanent link between the anonymous and real user ID. Must be called **exactly once** per user, **before** `identify()`. Use a localStorage flag to prevent duplicate calls.
+- `identify(userId)` — sets the user ID for all subsequent events.
+
+### Timing
+
+Fire identification in a `useEffect` in the authenticated layout:
+
+```typescript
+useEffect(() => {
+  // 1. Mixpanel alias + identify
+  // 2. GA4 user_id + Enhanced Conversions
+  // 3. Meta Advanced Matching
+}, [userId, email, name]);
+```
+
+---
+
+Moved out of `SKILL.md` on 2026-08-16: the body was 5273 tokens against a
+< 5000 budget, and identity is the other half of the question this file already
+owns — an event name says what happened, identity says who it happened to.
+
