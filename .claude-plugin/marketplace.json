@@ -11,7 +11,7 @@
       "displayName": "Sheleg Dev",
       "source": "./plugins/sheleg-dev",
       "description": "stripe-billing \u2014 the seam between Stripe and your database: checkout, renewals, seats and proration, refunds, claim-first webhook idempotency, reconciliation and price drift, plus Stripe's own agent toolchain. crypto-payments \u2014 accept crypto without losing money to under-payment, duplicate webhooks or rate drift. ad-tracking \u2014 GA4, Google Ads, Meta and LinkedIn under Consent Mode v2, with four deep references on the Google tag. google-signin \u2014 the GIS ID-token flow with the account pre-hijacking guard and login-CSRF defence on both delivery paths. google-auth \u2014 the server side: OAuth 2.0, ADC, service accounts, Workload Identity Federation, Node and Python. frontend-performance \u2014 Core Web Vitals, font and CSS compositing, bundle and cache work, plus the accessibility rules that move a Lighthouse score.",
-      "version": "0.5.0",
+      "version": "0.5.1",
       "author": {
         "name": "ssheleg",
         "url": "https://x.com/sshlg93"
