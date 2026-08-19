@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v0.8.0 — 2026-08-20
 
 **The self-test that proved the money invariants was measuring one thing and claiming
 another.** `--self-test` deleted a rule, ran an invariant, and asked whether the invariant

@@ -1622,9 +1622,24 @@ def check_ledger_names_the_shipped_version():
                               "compared against package.json only")
         return
     tag = proc.stdout.strip().lstrip("v")
-    if tag and named != tag:
+    if not tag or named == tag:
+        return
+
+    def parts(v):
+        return tuple(int(x) if x.isdigit() else 0 for x in re.split(r"[.\-+]", v)[:3])
+
+    if parts(named) < parts(tag):
         fail(f"{rel}: the shipped block is headed v{named} and `git describe --tags` prints "
              f"v{tag} -- the ledger describes an artifact nobody ships")
+        return
+    # AHEAD of the newest tag is a release being prepared, and the first version of this
+    # guard made that state uncommittable: the bump has to name the version it is about to
+    # ship, and the tag cannot exist before the commit that bumps it. Failing here would
+    # have forced the ledger to describe only the PAST, which is the opposite of the defect
+    # this check closes. It is disclosed instead, and the release workflow is where a tag
+    # that never arrives becomes a failure.
+    _disclose_routing(f"shipped version — the block is headed v{named} and the newest tag is "
+                      f"v{tag}: a release in preparation, and the tag is cut after this commit")
 
 
 @check
