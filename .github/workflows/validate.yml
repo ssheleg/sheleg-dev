@@ -141,6 +141,66 @@ jobs:
           fi
           echo "rejected, as it must be"
 
+      - name: Negative self-test (a shipped document naming a path we do not have must fail)
+        run: |
+          set -eu
+          # The B-79 row, restored verbatim: SECURITY.md was a wholesale copy of
+          # seo-aeo-audit's and named `scripts/page_audit.py`, a file this repository has
+          # never had, in the npm-published document a reader consults precisely because
+          # they will not read the code.
+          rm -rf /tmp/deadpath && cp -R . /tmp/deadpath
+          python3 - <<'PY'
+          p = "/tmp/deadpath/SECURITY.md"
+          t = open(p, encoding="utf-8").read()
+          anchor = "## Credentials\n"
+          assert anchor in t, "PLANT DID NOT LAND: no `## Credentials` heading in SECURITY.md"
+          plant = "The auditor is `scripts/page_audit.py`.\n\n"
+          open(p, "w", encoding="utf-8").write(t.replace(anchor, plant + anchor, 1))
+          PY
+          if (cd /tmp/deadpath && python3 test/validate.py); then
+            echo "the validator accepted a shipped document naming a path this repo has nowhere"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
+      - name: Negative self-test (a file:line citation past the end of the file must fail)
+        run: |
+          set -eu
+          # The same defect one level down: an address that resolves to nothing. M-07 is
+          # about a claim another actor can resolve, and `install.sh:9001` cannot be.
+          rm -rf /tmp/deadline && cp -R . /tmp/deadline
+          python3 - <<'PY'
+          p = "/tmp/deadline/SECURITY.md"
+          t = open(p, encoding="utf-8").read()
+          old = "(`install.sh:21-22`)"
+          assert old in t, "PLANT DID NOT LAND: SECURITY.md no longer cites install.sh:21-22"
+          open(p, "w", encoding="utf-8").write(t.replace(old, "(`install.sh:9001`)", 1))
+          PY
+          if (cd /tmp/deadline && python3 test/validate.py); then
+            echo "the validator accepted a citation pointing past the end of the file"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
+      - name: Negative self-test (a stale FOREIGN_BY_DESIGN exemption must fail)
+        run: |
+          set -eu
+          # An exemption list that keeps passing after the document stops naming the path
+          # widens silently into a blanket, and the next copied paragraph walks through it.
+          rm -rf /tmp/staleexempt && cp -R . /tmp/staleexempt
+          python3 - <<'PY'
+          p = "/tmp/staleexempt/CONTRIBUTING.md"
+          t = open(p, encoding="utf-8").read()
+          old = "`benchmarks.md`, `growth-plays.md`"
+          assert old in t, "PLANT DID NOT LAND: CONTRIBUTING no longer signposts benchmarks.md"
+          open(p, "w", encoding="utf-8").write(t.replace(old, "`growth-plays.md`", 1))
+          PY
+          if (cd /tmp/staleexempt && python3 test/validate.py); then
+            echo "the validator accepted an exemption for a path no document names any more"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
       - name: Negative self-test (a reference nobody links must fail)
         run: |
           set -eu

@@ -4,6 +4,61 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+No version heading yet, deliberately: the version converges at the family level, and a
+`## vX.Y.Z` here would make this the release notes for a tag that does not exist.
+
+### `SECURITY.md` described a different skill, in the published tarball
+
+The document was a wholesale copy of `seo-aeo-audit`'s. It opened *"documentation plus one
+small Python script"* and named `scripts/page_audit.py`, a `commands/` directory, a
+`cursor/rules/` directory and `references/threats-and-defense.md` — this repository has
+never contained any of them; there is no runtime code in the skill payload at all. A whole
+section described the network behaviour of that auditor, down to `--url`, `--timeout` and
+`--max-bytes`. It closed with *Verifying for yourself*, three commands of which **two could
+not run**: `python3 test/test_page_audit.py` exits 2, and a `grep` at
+`plugins/sheleg-dev/skills/sheleg-dev/scripts/page_audit.py` exits 2 under a skill
+directory named `sheleg-dev` that has never existed.
+
+`package.json` ships `SECURITY.md` in the tarball, so the pack was inviting an outside
+reader to verify its safety with commands that fail — for a pack whose subject is payment
+credentials and sign-in. **Six dead references** in one document.
+
+Rewritten against what the tree actually returns: 27 files in the skill payload, 26 of them
+markdown and one a plugin manifest; two installers using nothing but Node built-ins and
+coreutils, with no network, no subprocess and no npm lifecycle script; the one destructive
+difference between them (`install.sh` runs `rm -rf` on the destination every time,
+`bin/sheleg-dev.js` skips unless `--force`); credential *names* in examples and no key, with
+the one live-key-shaped line in the payload named and explained; and the five vendor commands
+the advice can lead an agent to run, each with the `file:line` that says it. Every command in
+the new *Verifying for yourself* block was run and its output is what the document claims.
+
+### The guard the B-47 guard was waiting for
+
+B-47 fixed this disease inside one table of `CONTRIBUTING.md` and said, in the guard's own
+docstring, that going wider would flag paths being *discussed* rather than used. This is the
+widening, bounded twice instead of not at all:
+
+- **By corpus** — the documents whose subject is this repository: `README.md`, `SECURITY.md`,
+  `CONTRIBUTING.md`, `.github/PULL_REQUEST_TEMPLATE.md`. A skill reference naming the
+  reader's `next.config.ts` or `src/lib/heleket.ts` is describing their project; 41 such
+  names in the payload would have been false positives, and a guard with 41 of those gets
+  switched off.
+- **By `FOREIGN_BY_DESIGN`** — the cross-repo signposts, enumerated one document at a time
+  with a reason. An exemption the document stops naming **fails**, so the list cannot widen
+  into a blanket.
+
+It reads fenced blocks as well as inline spans, because the worst reference in the old
+document was a fenced command, and it understands `path:line`: an address past the end of the
+file resolves to nothing, which is the same defect one level down.
+
+Watched refusing three plants and the real defect. Turned up two more of its own on the first
+run: `.github/PULL_REQUEST_TEMPLATE.md` asked every contributor to paste output from
+`python3 test/test_page_audit.py` and to avoid relative links in `cursor/rules/*.mdc` — both
+inherited from the same copy. Also `CONTRIBUTING.md` named `agent_sync.py` with no owner; it
+now says the script ships with the `agent-sync` skill.
+
 ## v0.6.0 — 2026-08-16
 
 ### The file that promised the deduplication contract contained none of it

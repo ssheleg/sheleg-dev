@@ -8,7 +8,6 @@
 
 ```
 python3 test/validate.py
-python3 test/test_page_audit.py
 ```
 
 ## Checklist
@@ -17,4 +16,4 @@ python3 test/test_page_audit.py
 - [ ] Behavior change is reflected in `README.md` and in the skill's own docs
 - [ ] `CHANGELOG.md` has an entry for this change
 - [ ] If versions moved: `marketplace.json`, `plugin.json`, `package.json` and the top `CHANGELOG.md` entry all agree
-- [ ] No relative links added to `cursor/rules/*.mdc` (those files get copied standalone)
+- [ ] A new `references/` file is linked from its `SKILL.md` — the validator fails a dangling link and an unlinked file alike

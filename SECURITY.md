@@ -1,63 +1,159 @@
 # Security
 
-## What this skill actually does on your machine
+`sheleg-dev` is six skills about the layer a product reaches once it has users.
+Five of them touch other people's money or identity — Stripe billing, crypto
+payments, ad and conversion tracking, Google sign-in, server-side Google auth —
+and the sixth is front-end performance. That subject is the reason this document
+has to be exact about the pack itself.
 
-`sheleg-dev` is documentation plus one small Python script. Installed, it is:
+Everything below is checkable from a clone, and the commands at the end are the
+checks. **If one of them does not run, that is a defect in this document** —
+please report it as one. Until this rewrite the file was a wholesale copy of a
+sibling skill's, published in the npm tarball: it described a Python auditor this
+repository has never had, and closed with a "verify for yourself" block whose
+second and third commands exited 2. `test/validate.py` now refuses any path these
+documents name that does not exist here.
 
-| Component | Runtime behavior |
-|---|---|
-| `SKILL.md` + `references/*.md` | Text. Read by the agent, executes nothing. |
-| `scripts/page_audit.py` | Runs only when you or the agent invokes it. Python **standard library only** — no dependencies, no install step. |
-| `commands/`, `cursor/rules/` | Text read by the host agent. |
-| `bin/sheleg-dev.js` (npm installer) | Copies the skill directory and the slash command into `~/.claude/`. No network, no post-install script. |
+## What ships, and what of it executes
 
-There is no telemetry, no analytics, no phone-home, and nothing writes outside
-the paths above.
+`git ls-files plugins` returns **27 files: 26 markdown and one plugin manifest.**
+There is no runtime code inside the skills.
 
-## Network behavior of `page_audit.py`
+| Component | Count | Runtime behavior |
+|---|---|---|
+| `SKILL.md`, one per skill | 6 | Text. Read by the agent, executes nothing. |
+| `references/` files, loaded on demand | 20 | Text. Same. |
+| `plugins/sheleg-dev/.claude-plugin/plugin.json` | 1 | Manifest read by Claude Code. |
+| `bin/sheleg-dev.js` — the npm installer | 1 | Runs only when you invoke it. Node built-ins only: `fs`, `path`, `os`. |
+| `install.sh` — the shell installer | 1 | Runs only when you invoke it. Coreutils only: `cd`, `pwd`, `dirname`, `basename`, `mkdir`, `rm`, `cp`, `echo`. |
 
-- Plain `GET` requests, **http and https only** — any other scheme (`file://`,
-  `ftp://`, `gopher://`, …) is refused before a request is made, and a redirect
-  that leaves http(s) is refused too.
-- Only to URLs **you** pass via `--url` / `--url-list`. In `--file` mode it makes
-  no requests at all, which is how the test suite runs.
-- No cookies, no credentials, no auth headers; a plain User-Agent that identifies
-  the tool.
-- Bounded: `--timeout` (default 20s) and `--max-bytes` (default 5 MB). A declared
-  content type that is not HTML/XHTML/XML is refused rather than parsed.
-- Read-only: results go to stdout. The script never writes a file. The only files
-  it ever **reads** are the two you name yourself (`--file`, `--url-list`).
+The published tarball is those plus `README.md`, `CHANGELOG.md`, `SECURITY.md`,
+`LICENSE` and `package.json` — 33 files, listed by `npm pack --dry-run`.
 
-## What the skill will not tell an agent to do
+**There are no npm lifecycle scripts.** `package.json` declares exactly one
+script, `test`. Installing this package, or reaching it through `npx`, runs
+nothing but the CLI you typed.
 
-The audit procedure is explicitly **defensive**. Manipulative tactics —
-cloaking, fabricated consensus networks, review manipulation, click-signal
-spoofing, takedown abuse — appear only in `references/threats-and-defense.md`,
-written as *detect and withstand*, and the skill's non-negotiables forbid
-recommending them.
+## What the installers read and write
 
-The procedure is also read-only by default: it will not submit forms, request
-indexing, disavow links or change a live property without explicit approval in
-the session.
+Both do one thing: copy the six skill directories out of the package into
+`~/.claude/skills/<name>`.
+
+- **Read:** only files inside the package.
+- **Write:** only `~/.claude/skills/` — six directories, named for the six skills.
+  Nothing else on the filesystem, nothing outside `$HOME`.
+- **Network: none.** Neither file opens a socket or resolves a hostname.
+  `bin/sheleg-dev.js` requires `fs`, `path` and `os` and nothing else — no
+  `child_process`, no `fetch`, no `http` — so it spawns no process at all;
+  `install.sh` runs only the coreutils named above. The grep below prints the
+  whole surface of both files in eleven lines.
+- **No telemetry, no analytics, no phone-home.** Nothing here has anywhere to
+  send anything.
+
+**One destructive difference between the two installers.** `bin/sheleg-dev.js`
+skips a skill that is already installed and says so, unless you pass `--force`
+(`bin/sheleg-dev.js:45-46`). `install.sh` does not ask: for each of the six names
+it runs `rm -rf` on the destination and re-copies, every time
+(`install.sh:21-22`). If you have hand-edited an installed skill, the shell
+installer deletes your edits and the node installer does not.
+
+## Credentials
+
+**This pack handles payment credentials as a subject and never as a value.** It
+reads no credential, stores none, transmits none, logs none. It is markdown; it
+could not.
+
+What it contains is credential *names*, inside example code you adapt —
+`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `HELEKET_API_KEY`,
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`. No real key ships. The grep below
+searches the whole skill payload for live-key shapes and returns exactly one line
+— a `-----BEGIN RSA PRIVATE KEY-----\n...` placeholder inside a service-account
+JSON example, at
+`plugins/sheleg-dev/skills/google-auth/references/adc-and-service-accounts.md:236`.
+The pack's own position on live keys, that one in a repository is an incident
+rather than a lint warning, is at
+`plugins/sheleg-dev/skills/stripe-billing/references/stripe-agent-toolchain.md:156`.
+
+`.env` and `.env.*` are gitignored here, `.env.example` excepted.
+
+## What the advice can lead an agent to run
+
+The pack executes nothing — but it tells an agent what to run, and some of those
+commands move real credentials. Every one is a vendor's own tool, invoked by you
+or by an agent you approved:
+
+- `stripe login` and `stripe agent setup` — browser consent, then a written CLI
+  profile. The reference marks the login a human step:
+  `plugins/sheleg-dev/skills/stripe-billing/references/stripe-agent-toolchain.md:36-37`
+- `stripe listen`, `stripe trigger`, `stripe logs tail` — use the profile the CLI
+  already holds:
+  `plugins/sheleg-dev/skills/stripe-billing/references/testing-and-local-dev.md:24-51`
+- `gcloud auth application-default login` — mints a local credential file:
+  `plugins/sheleg-dev/skills/google-auth/references/adc-and-service-accounts.md:50-57`
+- `gcloud iam workload-identity-pools create-cred-config` — writes a
+  credential-configuration file:
+  `plugins/sheleg-dev/skills/google-auth/references/workload-identity.md:127`
+- `claude mcp add --transport http stripe https://mcp.stripe.com/` — OAuth
+  consent to **Stripe's own MCP server**, which can make live calls against your
+  account:
+  `plugins/sheleg-dev/skills/stripe-billing/references/stripe-agent-toolchain.md:106-107`
+
+The last is the one to weigh. This pack *points at* Stripe's MCP server and does
+not install, proxy or wrap it; if you connect it, that account access is between
+you and Stripe. The same file states the key hygiene the pack expects — restricted
+`rk_` keys, one per service, minimum permissions, a secrets vault in preference to
+environment variables, never in source and never in logs:
+`plugins/sheleg-dev/skills/stripe-billing/references/stripe-agent-toolchain.md:144-158`.
+
+## What this pack never does
+
+- It never charges, refunds, rotates or revokes anything. It has no code that could.
+- It never asks for a key, and has nowhere to send one.
+- It does not choose your payment processor. Licensing, AML programme and
+  sanctions exposure are a business and compliance decision, and `README.md` says
+  so where a reader meets the crypto skill.
+
+## Where the real risk is
+
+Not the bytes — the advice. These six skills describe Stripe, Heleket and BTCPay,
+Google Sign-In, Workload Identity Federation, four ad platforms and browser
+defaults, and every one of those changes. **A claim here that a provider has since
+changed is a security defect in this pack**, not merely a stale doc, and it is the
+exposure `docs/evidence/verification.md` names as the largest one this repository
+does not test. `CONTRIBUTING.md` requires a claim about what a provider does
+*today* to carry the date it was true. If you find one that has rotted, report it
+with what the correct claim is and what backs it.
 
 ## Reporting a problem
 
-Open an issue at <https://github.com/ssheleg/sheleg-dev/issues>. If it is
-sensitive, say so in the issue without the details and a private channel will be
-arranged.
+Open an issue: <https://github.com/ssheleg/sheleg-dev/issues>. **For a security
+problem, do not put the details in a public issue** — open one saying you have
+found something, and a private channel will be arranged.
 
 ## Verifying for yourself
 
 ```bash
 git clone https://github.com/ssheleg/sheleg-dev && cd sheleg-dev
-python3 test/validate.py         # structure, version sync, references, links, anchors
-python3 test/test_page_audit.py  # auditor behavior, offline fixtures + scheme guard
-grep -rnE "urlopen|build_opener|opener\.open|socket|subprocess|os\.system|\beval\(|\bexec\(|\bopen\(" \
-  plugins/sheleg-dev/skills/sheleg-dev/scripts/page_audit.py
-```
 
-The last command prints the auditor's entire I/O surface — six lines: the
-`urllib.request` import, one comment, the opener that carries the scheme guard,
-the one `opener.open(...)` call, and the two `open()` calls that read the file
-paths you pass on the command line. No `subprocess`, no `os.system`, no `eval`,
-no `exec`, no raw sockets. Everything else in `plugins/` is markdown.
+# The whole gate: version sync across four manifests, front matter inside the
+# Agent Skills limits, references resolving both directions, and every path the
+# self-describing documents name -- this file included.
+python3 test/validate.py
+
+# The shipped payload: 27 files.
+git ls-files plugins
+
+# One line, the plugin manifest. Everything else in the payload is markdown.
+git ls-files plugins | grep -v '\.md$'
+
+# The entire I/O surface of the only two executable files: eleven lines. Three
+# built-in requires, the copy/mkdir/remove calls, homedir, and install.sh's
+# rm -rf + cp -R. No process, no socket, no network.
+grep -nE "require|child_process|exec|spawn|fetch|socket|rm -rf|cp -R|copyFileSync|mkdirSync|rmSync|homedir" bin/sheleg-dev.js install.sh
+
+# Live-key shapes across the skill payload: one line, and it is a placeholder.
+grep -rnE "sk_live_[A-Za-z0-9]|rk_live_[A-Za-z0-9]|whsec_[A-Za-z0-9]{8}|BEGIN [A-Z ]*PRIVATE KEY" plugins
+
+# What npm publishes, and nothing else: 33 files.
+npm pack --dry-run
+```

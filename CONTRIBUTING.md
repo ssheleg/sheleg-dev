@@ -73,19 +73,25 @@ would ship the wrong notes; that every skill's front matter is legal under the A
 Skills standard (name matches its directory, 1–64 characters, lowercase `[a-z0-9-]`,
 description present and free of angle-bracket tags); that every `references/…` link
 resolves and every reference is linked; that no build artifact and no stray `SKILL.md`
-has appeared outside `plugins/*/skills/*/`; and that the release workflow still gates on
-this validator rather than merely mentioning it.
+has appeared outside `plugins/*/skills/*/`; that every path named by the documents whose
+subject is this repository — `README.md`, `SECURITY.md`, this file and the PR template —
+exists here, and that a `file:line` citation in one of them does not point past the end
+of the file; and that the release workflow still gates on this validator rather than
+merely mentioning it.
 
 It also asks the family umbrella whether this repository still advertises every word the
 routing hook fires on. That check needs an `sshlg-skills` checkout above this one and
 **discloses instead of passing** when there is none, so a standalone clone prints an
 `unlooked:` line rather than a false green.
 
-CI runs the same validator plus nine negative self-tests, each of which plants a real
-defect — a version drift, an over-long description, a front-matter name that stops
+CI runs the same validator plus **twelve** negative self-tests, each of which plants a
+real defect — a version drift, an over-long description, a front-matter name that stops
 matching its directory, a dangling reference link, a reference nobody links, a stray
-`SKILL.md`, a release that stops gating on validate, the validator dropped from CI — and
-requires the gate to reject it. A guard nobody has watched fail is not a guard.
+`SKILL.md`, a release that stops gating on validate, the validator dropped from CI, a
+routing table sending work to a file we do not have, a shipped document naming a path we
+do not have, a `file:line` citation past the end of that file, and an exemption left
+behind after the document stopped naming the path — and requires the gate to reject it.
+A guard nobody has watched fail is not a guard.
 
 ### The family catalogue moves with the release
 
@@ -109,7 +115,8 @@ npx --yes sshlg-skills@latest list   # the new number must appear here
 `docs/AGENT_SYNC.md` describes how coordination is wired in this repository and
 what it does **not** guarantee. It is generated from `.claude/agent-sync.json`:
 read it before editing a file that config guards, and regenerate it with
-`agent_sync.py setup` in the same change that alters the config.
+`agent_sync.py setup` in the same change that alters the config. That script
+ships with the `agent-sync` skill, not with this repository.
 
 ## Style
 

@@ -14,11 +14,17 @@ House rules, each one written because it can actually break:
     reference.md that nothing referenced.
   * no stray SKILL.md outside plugins/*/skills/*/, no build artifacts in the
     shipped tree.
+  * every path the SELF-DESCRIBING documents name exists here, and a `file:line`
+    citation in one of them does not point past the end of that file. SECURITY.md
+    was a copy of a sibling skill's and named six things this repository has never
+    had, in the npm tarball -- a security document inviting the reader to verify,
+    with commands that exit 2.
   * CI runs this file. A validator that CI stopped calling is decoration.
 
 Exit code 0 = green. Anything else = a fail with a reason on stderr.
 """
 
+import glob
 import json
 import subprocess
 import os
@@ -310,6 +316,166 @@ def check_contributing_routes_to_files_that_exist():
 check_contributing_routes_to_files_that_exist()
 
 
+# ------------------------------------------------- self-describing documents
+
+# The documents whose SUBJECT is this repository. An outside reader meets the pack
+# through these: `README.md` and `SECURITY.md` ship in the npm tarball (`package.json`
+# -> `files`), `CONTRIBUTING.md` and the PR template greet a contributor on GitHub. A
+# path named in one of them is a claim about what is IN this repository, so it has to
+# resolve.
+#
+# `CHANGELOG.md` ships too and is deliberately NOT in this list, said out loud rather than
+# left to be inferred: a history entry has to be able to name the dead path it removed,
+# verbatim, or the record of the fix becomes unwritable. The B-47 and B-79 entries each
+# quote half a dozen files that were never here, on purpose.
+SELF_DESCRIBING_DOCS = (
+    "README.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+)
+
+# A path that belongs to another repository ON PURPOSE, declared one document at a time
+# with the reason. This is the narrow answer to standing instruction #7 -- a check cannot
+# tell a path being USED from a path being DISCUSSED, so the discussion is enumerated
+# instead of guessed. Scoped to a single document each: the same name leaking into a
+# different document is still a failure, which is how B-79 was found.
+FOREIGN_BY_DESIGN = {
+    ("CONTRIBUTING.md", "benchmarks.md"):
+        "signpost: sends a contributor looking for it to seo-aeo-audit (B-47)",
+    ("CONTRIBUTING.md", "growth-plays.md"):
+        "signpost: sends a contributor looking for it to seo-aeo-audit (B-47)",
+    ("CONTRIBUTING.md", "scripts/page_audit.py"):
+        "signpost: sends a contributor looking for it to seo-aeo-audit (B-47)",
+    ("CONTRIBUTING.md", "skills.json"):
+        "the umbrella's catalogue in ssheleg/sshlg-skills, which re-pins this member",
+    ("CONTRIBUTING.md", "agent_sync.py"):
+        "ships with the agent-sync skill, which CONTRIBUTING names alongside it",
+}
+
+_PATH_TOKEN = re.compile(
+    r"^(?:[A-Za-z0-9_.*-]+/)*[A-Za-z0-9_.*-]+"
+    r"\.(?:md|mdc|py|js|json|sh|yml|yaml|ts|tsx|txt)$"
+)
+
+
+def _named_paths(text):
+    """Every path-shaped token a reader could try, with its line number.
+
+    Two sources, because the defect hides in the second one. Inline code spans are the
+    obvious half; the other half is fenced blocks, and B-79's worst reference -- a
+    "verify for yourself" command that cannot run -- was a fenced line, not a span. A
+    guard reading only backticks would have passed the document it exists to catch.
+
+    Tokenised on whitespace so a span holding a command (`agent_sync.py setup`) is read
+    as its parts. URLs, flags and `~/`-rooted paths are somebody else's filesystem.
+    """
+    fenced = False
+    for lineno, line in enumerate(text.splitlines(), 1):
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            continue
+        spans = [line] if fenced else [m.group(1) for m in re.finditer(r"`([^`\n]+)`", line)]
+        for span in spans:
+            for raw in span.split():
+                tok = raw.strip("(),;:'\"<>[]|").lstrip("$")
+                if "://" in tok or tok.startswith(("-", "~", "@", "/")):
+                    continue
+                # `path:236` and `path:21-22` are this family's evidence convention, and
+                # M-07 is about an address another actor can RESOLVE. So the suffix is
+                # split off and checked rather than making the whole token unreadable --
+                # which is also how an `…/abbreviated/path.md:12` would evade the guard
+                # entirely, so do not write one.
+                ref = re.search(r":(\d+)(?:-\d+)?$", tok)
+                if ref:
+                    tok = tok[: ref.start()]
+                if _PATH_TOKEN.match(tok):
+                    yield lineno, tok, int(ref.group(1)) if ref else None
+
+
+def _resolves_here(tok, basenames):
+    """Exact path, glob, or a bare name that exists somewhere in the tree.
+
+    The basename fallback is deliberate and inherited from the B-47 guard: `SKILL.md`
+    means one of six, not a file at the root. It is also the reason this guard is not a
+    substitute for reading -- it answers "is there such a file at all", which is the
+    question a dead cross-repo copy fails.
+    """
+    rel = tok[2:] if tok.startswith("./") else tok
+    if os.path.exists(os.path.join(ROOT, rel)):
+        return True
+    if glob.glob(os.path.join(ROOT, rel)):
+        return True
+    return os.path.basename(rel) in basenames
+
+
+def check_self_describing_docs_resolve():
+    """Every path these four documents name must exist here (B-79).
+
+    B-79, 2026-08-19: `SECURITY.md` was a wholesale copy of `seo-aeo-audit`'s. It
+    described "one small Python script", `scripts/page_audit.py`, a `commands/` and a
+    `cursor/rules/` directory, and `references/threats-and-defense.md` -- none of which
+    this repository has ever had -- and closed with a *Verifying for yourself* block whose
+    second command (`python3 test/test_page_audit.py`) exits 2 and whose third greps a
+    path under a skill directory named `sheleg-dev` that does not exist. It shipped in the
+    npm tarball, so the pack was telling an outside reader to verify its safety with
+    commands that cannot run. Six dead references in the one document a reader consults
+    precisely because they will not read the code.
+
+    B-47 fixed the same disease in one table of `CONTRIBUTING.md` and deliberately went no
+    wider. This is the widening it was waiting for, and it is bounded twice rather than
+    once: by the corpus (documents ABOUT this repository -- a skill reference naming the
+    reader's `next.config.ts` or `src/lib/heleket.ts` is describing their project, not
+    claiming a file here, and 41 such names would have been false positives) and by
+    `FOREIGN_BY_DESIGN`, which enumerates the cross-repo signposts one document at a time.
+
+    An exemption that stops matching anything is itself a failure -- otherwise the list
+    silently widens into a blanket as the documents move underneath it.
+    """
+    basenames = set()
+    for dirpath, dirnames, filenames in os.walk(ROOT):
+        dirnames[:] = [d for d in dirnames if d not in (".git", "node_modules", "graphify-out")]
+        basenames.update(filenames)
+
+    used = set()
+    for doc in SELF_DESCRIBING_DOCS:
+        path = os.path.join(ROOT, doc)
+        if not os.path.isfile(path):
+            fail(f"{doc} is missing -- it is one of the documents an outside reader meets "
+                 "the pack through")
+            continue
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+        for lineno, tok, ref in _named_paths(text):
+            if (doc, tok) in FOREIGN_BY_DESIGN:
+                used.add((doc, tok))
+                continue
+            if not _resolves_here(tok, basenames):
+                fail(f"{doc}:{lineno} names {tok!r}, which this repository has nowhere "
+                     "(B-79). Either the path is wrong or the claim is another "
+                     "repository's -- if it is deliberately foreign, declare it in "
+                     "FOREIGN_BY_DESIGN with a reason")
+                continue
+            # A `file:line` whose line is past the end of the file is a pointer that
+            # resolves to nothing, which is the same defect one level down.
+            target = os.path.join(ROOT, tok[2:] if tok.startswith("./") else tok)
+            if ref and os.path.isfile(target):
+                with open(target, encoding="utf-8", errors="replace") as fh:
+                    total = sum(1 for _ in fh)
+                if ref > total:
+                    fail(f"{doc}:{lineno} cites {tok}:{ref}, but that file has {total} "
+                         "lines -- the address resolves to nothing (B-79)")
+
+    for key, reason in FOREIGN_BY_DESIGN.items():
+        if key not in used:
+            fail(f"FOREIGN_BY_DESIGN carries {key[1]!r} for {key[0]} ({reason}) but the "
+                 "document no longer names it -- a stale exemption is a hole waiting for "
+                 "the next copied paragraph")
+
+
+check_self_describing_docs_resolve()
+
+
 def check_routed_triggers_still_advertised():
     """The family's routing hook fires on words this description has to keep.
 
@@ -350,5 +516,5 @@ if FAILURES:
         print(f"  - {f}", file=sys.stderr)
     sys.exit(1)
 
-checks = 6 + len(skill_dirs)
+checks = 7 + len(skill_dirs)
 print(f"OK: sheleg-dev structurally valid ({checks} checks, {len(skill_dirs)} skill(s), v{version})")
