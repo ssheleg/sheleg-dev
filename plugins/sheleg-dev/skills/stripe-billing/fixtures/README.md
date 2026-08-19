@@ -2,14 +2,15 @@
 
 **Copy this whole directory into your repository.** It is the executable half of what
 `SKILL.md` and `references/webhook-events.md` state in prose: nine real Stripe event
-bodies, twelve assertions a correct webhook handler must pass, and a self-test that
-breaks the handler one rule at a time so you can watch every assertion fail.
+bodies, twelve invariants a correct webhook handler must hold — 45 assertions between
+them — and a self-test that breaks the handler one rule at a time so you can watch each
+assertion fail on its own.
 
 Two commands, no dependencies, no network, no key:
 
 ```bash
-node assert-money-invariants.mjs              # 12 assertions against the reference handler
-node assert-money-invariants.mjs --self-test  # break one rule at a time; every assertion must go red
+node assert-money-invariants.mjs              # 12 invariants / 45 assertions
+node assert-money-invariants.mjs --self-test  # break one rule at a time; EACH ASSERTION must go red
 ```
 
 Point it at **your** handler by replacing the two imports at the top of

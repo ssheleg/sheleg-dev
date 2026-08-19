@@ -102,8 +102,12 @@ by accident, because the wrapper accepts whatever you hand it and hashes it
 without judgement. SHA-256 does **not** make a value safe to send: hashing is a
 matching mechanism, not a permission. That the wrapper receives a hash at all is checkable:
 `identifiers-reach-the-server-hashed` in `fixtures/assert-dedup-contract.mjs` requires every
-`user_data.em` entry to be 64 hex characters and refuses anything with an `@` in it. What may
-be hashed in the first place is the table below, and no assertion decides it.
+`user_data.em` entry to be 64 hex characters and refuses anything with an `@` in it. **Both
+halves are separately watched failing**, which they were not until 2026-08-20: the pack's
+`--self-test` measured one row per invariant, so the `@` guard could be neutered while the
+hex-shape assertion above it kept the invariant red, and this paragraph advertised a control
+nothing had ever seen fail. The matrix is now per call site. What may be hashed in the first
+place is the table below, and no assertion decides it.
 
 Meta's Business Tools Terms prohibit sharing data that "includes or is based on"
 any of these, and the prohibition covers the Pixel, the Conversions API, the

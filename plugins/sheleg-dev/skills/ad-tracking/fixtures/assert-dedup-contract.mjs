@@ -77,7 +77,7 @@ export const INVARIANTS = [
     fixtures: [PIXEL_BROWSER, CAPI_SERVER],
     states: 'one id, generated once and used by both sides, or the revenue counts twice',
     breaks: ['shared-event-id'],
-    run({ sink, emitter }) {
+    run({ sink, emitter, assert }) {
       runPurchase({ sink, emitter }, CLEARED());
       // The browser side is read from the SHIPPED fixture rather than from the sink. That
       // is deliberate: it keeps this assertion independent of whether the browser event
@@ -95,7 +95,7 @@ export const INVARIANTS = [
     fixtures: [PIXEL_BROWSER, CAPI_SERVER],
     states: 'Meta compares the name as well as the id, and the name is the half that is missed',
     breaks: ['exact-event-name'],
-    run({ sink, emitter }) {
+    run({ sink, emitter, assert }) {
       runPurchase({ sink, emitter }, CLEARED());
       const pixelName = fixture(PIXEL_BROWSER)[1];   // the browser contract, not the sink
       const serverName = sink.capi[0].data[0].event_name;
@@ -110,7 +110,7 @@ export const INVARIANTS = [
     fixtures: [CAPI_FORBIDDEN],
     states: 'the thank-you page has no idea whether the money moved, so it reports nothing',
     breaks: ['webhook-sourced'],
-    run({ sink, emitter }) {
+    run({ sink, emitter, assert }) {
       runPurchase({ sink, emitter }, NOT_CLEARED());
       assert.equal(sink.capi.length, 0,
         'a Conversions API purchase was sent for a charge that has not cleared — this is '
@@ -125,12 +125,16 @@ export const INVARIANTS = [
     fixtures: [PIXEL_BROWSER],
     states: 'the browser event stays and stays subordinate — it carries the click ids',
     breaks: ['keep-browser-event'],
-    run({ sink, emitter }) {
+    run({ sink, emitter, assert }) {
       runPurchase({ sink, emitter }, CLEARED());
       assert.equal(sink.pixel.length, 1,
         'no browser event fired: the click id, the consent state and the session are lost, '
         + 'and only the browser had them');
-      assert.equal(sink.pixel[0][0], 'track');
+      // `|| []` on purpose: with no browser event at all this must FAIL rather than throw a
+      // TypeError, because an assertion the runner never reached is one no mutant has been
+      // watched breaking — which is how it sat unmeasured until 2026-08-20.
+      assert.equal((sink.pixel[0] || [])[0], 'track',
+        'the browser event is not a `track` call — the pixel contract is `fbq(\'track\', …)`');
     },
   },
   {
@@ -138,7 +142,7 @@ export const INVARIANTS = [
     fixtures: [CAPI_SERVER],
     states: 'advanced matching sends hashes, never the address itself',
     breaks: ['hashed-identifiers'],
-    run({ sink, emitter }) {
+    run({ sink, emitter, assert }) {
       runPurchase({ sink, emitter }, CLEARED());
       const userData = sink.capi[0].data[0].user_data;
       for (const value of userData.em) {
@@ -156,7 +160,7 @@ export const INVARIANTS = [
     // Broad by construction: it compares the whole body, so every rule that changes any
     // field turns it red. It is here so a reader can trust the fixtures they copy.
     breaks: ['shared-event-id', 'exact-event-name', 'hashed-identifiers', 'keep-browser-event'],
-    run({ sink, emitter }) {
+    run({ sink, emitter, assert }) {
       runPurchase({ sink, emitter }, CLEARED());
       assert.deepEqual(sink.capi[0], fixture(CAPI_SERVER));
       assert.deepEqual(sink.pixel[0], fixture(PIXEL_BROWSER));
@@ -164,46 +168,166 @@ export const INVARIANTS = [
   },
 ];
 
+// ------------------------------------------------- one assertion, one measurement
+//
+// Why the assertions are not called straight through `node:assert`. Until 2026-08-20 the
+// runner returned on the FIRST throw and the matrix compared one row per invariant, so an
+// invariant was measured as a single unit: any assertion that was not the sole
+// discriminator could be replaced by `assert.ok(true)` and nothing went red. Measured that
+// day in this pack too — the PII guard below (*"user_data carries something with an @ in
+// it"*, advertised by name at `references/meta-linkedin.md`) was neutered and
+// `--self-test` stayed at exit 0, because the `assert.match` above it discriminated the
+// same rule.
+//
+// So the `assert` an invariant receives is a RECORDER: same API, but a failure is
+// remembered instead of thrown and the assertions after it still run. Each call site is one
+// assertion with its own identity — its line in this file — and `--self-test` asks the
+// question per assertion rather than per invariant.
+//
+// `assert.unmutated.equal(...)` marks an assertion NO mutant in this pack varies: it pins
+// something the rules do not touch, so it has never been watched failing and the verdict
+// counts it apart rather than as evidence. Measured, not asserted — the self-test fails
+// both when a plain assertion turns out unbreakable and when an `unmutated` one turns out
+// breakable.
+//
+// Duplicated from `stripe-billing/fixtures/assert-money-invariants.mjs` for the reason
+// given at the top: a reader installs one skill, not six.
+
+const SELF = import.meta.url;
+const METHODS = ['equal', 'notEqual', 'deepEqual', 'notDeepEqual', 'ok', 'match', 'doesNotMatch'];
+
+/**
+ * The line in THIS file that called the recorder.
+ *
+ * `captureStackTrace(holder, boundary)` drops `boundary` and everything above it, so the
+ * top frame is the assertion's own line — no frame counting, which is what makes the
+ * identity survive a refactor of the recorder itself.
+ */
+function siteOf(boundary) {
+  const holder = {};
+  Error.captureStackTrace(holder, boundary);
+  const frame = (holder.stack || '').split('\n').slice(1).find((f) => f.includes(SELF));
+  const m = frame && frame.match(/:(\d+):\d+\)?\s*$/);
+  return m ? Number(m[1]) : 0;
+}
+
+function recorder() {
+  const seen = new Map(); // line -> { site, unmutated, ok, why }
+
+  function record(site, unmutated, name, args) {
+    let ok = true;
+    let why = null;
+    try {
+      assert[name](...args);
+    } catch (error) {
+      ok = false;
+      why = error.message.split('\n')[0];
+    }
+    const prev = seen.get(site);
+    if (prev) {
+      prev.ok = prev.ok && ok;
+      prev.why = prev.why || why;
+    } else {
+      seen.set(site, { site, unmutated, ok, why });
+    }
+  }
+
+  const bind = (unmutated) => {
+    const api = {};
+    for (const name of METHODS) {
+      const call = (...args) => record(siteOf(call), unmutated, name, args);
+      api[name] = call;
+    }
+    return api;
+  };
+
+  const api = bind(false);
+  api.unmutated = bind(true);
+  return { api, seen };
+}
+
 // ------------------------------------------------------------------------- runners
 
 async function runOne(invariant, without) {
-  const context = harness(without);
+  const { api, seen } = recorder();
+  const { sink, emitter } = harness(without);
+  let threw = null;
   try {
-    await invariant.run(context);
-    return null;
+    await invariant.run({ sink, emitter, assert: api });
   } catch (error) {
-    return error.message.split('\n')[0];
+    // A real error — a read off a row the mutant never wrote, say. It aborts the remaining
+    // assertions, and it is still the invariant going red.
+    threw = error.message.split('\n')[0];
   }
+  const sites = [...seen.values()];
+  return {
+    threw,
+    sites,
+    failed: sites.filter((s) => !s.ok),
+    broke: Boolean(threw) || sites.some((s) => !s.ok),
+  };
 }
 
 async function runAll() {
   let failed = 0;
+  let asserted = 0;
   for (const invariant of INVARIANTS) {
-    const why = await runOne(invariant, []);
-    if (why) {
+    const result = await runOne(invariant, []);
+    asserted += result.sites.length;
+    if (result.broke) {
       failed += 1;
-      console.error(`FAIL ${invariant.id}\n     ${why}`);
+      console.error(`FAIL ${invariant.id}`);
+      for (const s of result.failed) console.error(`     :${s.site} ${s.why}`);
+      if (result.threw) console.error(`     threw: ${result.threw}`);
     } else {
-      console.log(`pass ${invariant.id} — ${invariant.states}`);
+      console.log(`pass ${invariant.id} (${result.sites.length} assertions) — ${invariant.states}`);
     }
   }
   if (failed) {
     console.error(`\n${failed} of ${INVARIANTS.length} deduplication assertions failed`);
     return 1;
   }
-  console.log(`\nOK: ${INVARIANTS.length} deduplication assertions hold against the emitter`);
+  console.log(`\nOK: ${INVARIANTS.length} deduplication invariants hold against the emitter `
+    + `(${asserted} assertions)`);
   return 0;
 }
 
 async function selfTest() {
   const problems = [];
   const matrix = [];
+  const coverage = []; // one row per ASSERTION: which mutants turn that call site red
   for (const invariant of INVARIANTS) {
+    // The clean run is the census: it names every assertion this invariant executes. One
+    // that records nothing has a run() which never took the recorder, so nothing about it
+    // is measured — the failure mode of the injection itself.
+    const clean = await runOne(invariant, []);
+    if (clean.broke) {
+      problems.push(`${invariant.id}: fails against the unmutated emitter `
+        + `(${(clean.failed[0] && `:${clean.failed[0].site} ${clean.failed[0].why}`) || clean.threw})`);
+    }
+    if (!clean.sites.length) {
+      problems.push(`${invariant.id}: recorded no assertion — its run() does not take the `
+        + '`assert` the runner passes it, so nothing about it is measured');
+    }
+    const broken = new Map(clean.sites.map((s) => [s.site, []]));
+
     const broke = [];
     for (const rule of RULES) {
-      if (await runOne(invariant, [rule])) broke.push(rule);
+      const r = await runOne(invariant, [rule]);
+      if (r.broke) broke.push(rule);
+      for (const s of r.failed) if (broken.has(s.site)) broken.get(s.site).push(rule);
     }
     matrix.push({ id: invariant.id, broke });
+
+    for (const site of clean.sites) {
+      coverage.push({
+        invariant: invariant.id,
+        site: site.site,
+        unmutated: site.unmutated,
+        by: broken.get(site.site) || [],
+      });
+    }
+
     const expected = [...invariant.breaks].sort().join(', ');
     const measured = [...broke].sort().join(', ');
     if (expected !== measured) {
@@ -215,10 +339,31 @@ async function selfTest() {
   }
 
   const width = Math.max(...matrix.map((row) => row.id.length));
-  console.log(`\nassertion x mutant — ${RULES.length} mutants, `
-    + 'and which removed rule turns each assertion red\n');
+  console.log(`\ninvariant x mutant — ${RULES.length} mutants, `
+    + 'and which removed rule turns each invariant red\n');
   for (const row of matrix) {
     console.log(`  ${row.id.padEnd(width)}  ${row.broke.join(', ') || '(nothing)'}`);
+  }
+
+  // The per-ASSERTION half, and the one the table above cannot give: an invariant goes red
+  // as a unit, so a dead assertion inside a live one is invisible there.
+  console.log('\nassertion x mutant — every call site, and what turns IT red\n');
+  for (const row of coverage) {
+    const label = `${row.invariant}:${row.site}`.padEnd(width + 6);
+    if (row.unmutated) {
+      console.log(`  ${label}  unmutated — no rule varies what it checks`);
+      if (row.by.length) {
+        problems.push(`${row.invariant} :${row.site} is declared assert.unmutated and `
+          + `[${row.by.join(', ')}] breaks it — it discriminates, so drop the .unmutated`);
+      }
+    } else {
+      console.log(`  ${label}  ${row.by.join(', ') || '(nothing)'}`);
+      if (!row.by.length) {
+        problems.push(`${row.invariant} :${row.site} is broken by no mutant — the assertion `
+          + 'cannot fail. Either it is not testing anything, or no rule varies what it '
+          + 'checks and it belongs on assert.unmutated, which the verdict counts apart');
+      }
+    }
   }
 
   console.log('\nisolation — the fixture that separates each rule from every other\n');
@@ -237,7 +382,10 @@ async function selfTest() {
     for (const p of problems) console.error(`  - ${p}`);
     return 1;
   }
-  console.log(`\nOK: ${INVARIANTS.length} assertions, each watched failing; `
+  const pinned = coverage.filter((r) => r.unmutated).length;
+  console.log(`\nOK: ${INVARIANTS.length} invariants over ${coverage.length} assertions — `
+    + `${coverage.length - pinned} watched failing ONE CALL SITE AT A TIME against `
+    + `${RULES.length} mutants; ${pinned} declared unmutated and measured unbreakable; `
     + `${RULES.length} rules, each isolated by a fixture`);
   return 0;
 }

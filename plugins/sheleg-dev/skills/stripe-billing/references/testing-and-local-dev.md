@@ -158,12 +158,13 @@ the helper works and says nothing about the route Stripe posts to.
 ## The shipped fixtures and the assertion pack
 
 Everything above tells you what to write. `fixtures/` is that suite already written:
-nine Stripe event bodies, twelve assertions, and the mutants that prove each assertion can
-fail. Copy the directory into your repository and run it.
+nine Stripe event bodies, twelve invariants over 45 assertions, and the mutants that prove
+each assertion can fail — per call site, not per invariant, which is a distinction this
+pack got wrong until 2026-08-20. Copy the directory into your repository and run it.
 
 ```bash
 node fixtures/assert-money-invariants.mjs              # the assertions
-node fixtures/assert-money-invariants.mjs --self-test  # every one of them, watched failing
+node fixtures/assert-money-invariants.mjs --self-test  # each ASSERTION, watched failing
 ```
 
 Point it at your handler by replacing the two imports at the top of

@@ -72,14 +72,20 @@ export const INVARIANTS = [
     fixtures: [CYCLE_JAN],
     states: 'a paid renewal becomes exactly one grant, and the mirror carries its period',
     breaks: ['grant-on-renewal'],
-    async run({ store, handler }) {
+    async run({ store, handler, assert }) {
       const event = fixture(CYCLE_JAN);
       const response = await handler.deliver(event);
-      assert.equal(response.status, 200);
-      assert.deepEqual(response.body, { received: true });
+      // `unmutated`: no rule in RULES makes this route answer anything but 200 with that
+      // body, so neither assertion has ever been watched failing. They pin the envelope a
+      // reader copies; they are not evidence, and the verdict line counts them apart.
+      assert.unmutated.equal(response.status, 200);
+      assert.unmutated.deepEqual(response.body, { received: true });
       assert.equal(store.grants.length, 1, 'a paid renewal granted nothing');
       assert.equal(store.credits.get('usr_PLACEHOLDER_alice'), CREDITS_PER_PERIOD);
-      const mirror = store.subscriptions.get('sub_PLACEHOLDER_alice');
+      // `|| {}` on purpose: with no mirror row at all these two assertions must FAIL
+      // rather than throw a TypeError on the line above them. A throw aborts the run, and
+      // an assertion the runner never reached is one no mutant has been watched breaking.
+      const mirror = store.subscriptions.get('sub_PLACEHOLDER_alice') || {};
       assert.equal(mirror.periodStart, 1767225600);
       assert.equal(mirror.periodEnd, 1769904000, 'the period is not the line period');
     },
@@ -89,10 +95,11 @@ export const INVARIANTS = [
     fixtures: [CYCLE_JAN, PRORATION],
     states: 'billing_reason subscription_update is a $40 proration, not a month of product',
     breaks: ['billing-reason', 'grant-on-renewal'],
-    async run({ store, handler }) {
+    async run({ store, handler, assert }) {
       await handler.deliver(fixture(CYCLE_JAN));
       const response = await handler.deliver(fixture(PRORATION));
-      assert.equal(response.status, 200, 'a proration invoice must not fail the endpoint');
+      // unmutated: nothing in RULES makes the endpoint answer 500 for a proration.
+      assert.unmutated.equal(response.status, 200, 'a proration invoice must not fail the endpoint');
       assert.equal(store.grants.length, 1,
         'the proration granted a second period — a user who adds and removes a seat '
         + 'four times has been given four months of product');
@@ -107,10 +114,10 @@ export const INVARIANTS = [
     fixtures: [CYCLE_JAN, CYCLE_JAN_REDELIVERY],
     states: 'the same evt_ delivered twice grants once AND runs its side effects once',
     breaks: ['claim', 'grant-on-renewal'],
-    async run({ store, handler }) {
+    async run({ store, handler, assert }) {
       const first = await handler.deliver(fixture(CYCLE_JAN));
       const second = await handler.deliver(fixture(CYCLE_JAN_REDELIVERY));
-      assert.deepEqual(first.body, { received: true });
+      assert.unmutated.deepEqual(first.body, { received: true }); // the envelope, again
       assert.deepEqual(second.body, { received: true, duplicate: true },
         'the second delivery was not recognised as a duplicate');
       assert.equal(store.grants.length, 1, 'the redelivery granted a second time');
@@ -124,7 +131,7 @@ export const INVARIANTS = [
     fixtures: [CYCLE_JAN, CYCLE_JAN_REDELIVERY],
     states: 'two deliveries in flight at once grant once — the claim is an INSERT, not a SELECT',
     breaks: ['claim', 'grant-on-renewal'],
-    async run({ store, handler }) {
+    async run({ store, handler, assert }) {
       // 40 ms apart in production; here, both before either has finished its first read.
       // This is the fixture that separates the event claim from the grant marker: the
       // marker reads before it writes, and a read is a round trip.
@@ -146,7 +153,7 @@ export const INVARIANTS = [
     fixtures: [CYCLE_JAN],
     states: 'the nightly repair reuses the webhook marker — a nightly job is not a nightly gift',
     breaks: ['grant-marker', 'grant-on-renewal'],
-    async run({ store, handler }) {
+    async run({ store, handler, assert }) {
       const event = fixture(CYCLE_JAN);
       await handler.deliver(event);
       const subId = subscriptionIdOf(event.data.object);
@@ -163,11 +170,11 @@ export const INVARIANTS = [
     fixtures: [CYCLE_FEB, CYCLE_JAN],
     states: 'February delivered before January leaves February in the mirror, and grants both',
     breaks: ['ordering', 'grant-on-renewal'],
-    async run({ store, handler }) {
+    async run({ store, handler, assert }) {
       await handler.deliver(fixture(CYCLE_FEB)); // arrives first
       await handler.deliver(fixture(CYCLE_JAN)); // the earlier period, delivered late
       assert.equal(store.grants.length, 2, 'both periods were paid, so both are owed');
-      const mirror = store.subscriptions.get('sub_PLACEHOLDER_alice');
+      const mirror = store.subscriptions.get('sub_PLACEHOLDER_alice') || {};
       assert.equal(mirror.periodStart, 1769904000,
         'the mirror was rewound to the older period — state derived from arrival order');
       assert.equal(mirror.periodEnd, 1772323200,
@@ -179,7 +186,7 @@ export const INVARIANTS = [
     fixtures: [REFUND_PARTIAL, REFUND_REMAINDER],
     states: 'amount_refunded is the total so far: two partials claw back $90, not $130',
     breaks: ['cumulative-refund'],
-    async run({ store, handler }) {
+    async run({ store, handler, assert }) {
       seedOneOffPurchase(store);
       await handler.deliver(fixture(REFUND_PARTIAL));
       await handler.deliver(fixture(REFUND_REMAINDER));
@@ -201,7 +208,7 @@ export const INVARIANTS = [
     // and the claim still refuses the second delivery. A suite that judged a redelivery by
     // its grant count alone would ship with no idempotency and stay green.
     breaks: [['claim', 'grant-marker'], 'grant-on-renewal'],
-    async run({ store, handler }) {
+    async run({ store, handler, assert }) {
       await handler.deliver(fixture(CYCLE_JAN));
       await handler.deliver(fixture(CYCLE_JAN_REDELIVERY));
       assert.equal(store.grants.length, 1, 'the redelivery granted a second time');
@@ -216,7 +223,7 @@ export const INVARIANTS = [
     // `increment <= 0` catches a sequential replay by itself, and the claim catches it
     // without the swap. Neither is tested by this fixture alone.
     breaks: [['claim', 'cumulative-refund']],
-    async run({ store, handler }) {
+    async run({ store, handler, assert }) {
       seedOneOffPurchase(store);
       await handler.deliver(fixture(REFUND_PARTIAL));
       await handler.deliver(fixture(REFUND_PARTIAL));
@@ -229,16 +236,20 @@ export const INVARIANTS = [
     fixtures: [SESSION_UNPAID, SESSION_FAILED],
     states: 'the redirect proves a browser: an unpaid async session grants and converts nothing',
     breaks: ['async-gate'],
-    async run({ store, handler }) {
+    async run({ store, handler, assert }) {
       const completed = await handler.deliver(fixture(SESSION_UNPAID));
-      assert.equal(completed.status, 200, 'an unpaid session must still answer 200');
+      // unmutated: the envelope. Removing `async-gate` grants the session and still answers 200.
+      assert.unmutated.equal(completed.status, 200, 'an unpaid session must still answer 200');
       assert.equal(store.grants.length, 0,
         'a session whose payment_status is unpaid was granted — the money has not moved');
-      assert.equal(store.conversions.length, 0,
+      // unmutated, and the reason is a gap worth seeing: this handler emits conversions on
+      // `invoice.paid` only, so no rule here can make a checkout session report one. The
+      // assertion states the rule for a reader whose handler DOES emit from a session.
+      assert.unmutated.equal(store.conversions.length, 0,
         'a purchase conversion was reported for a charge that has not cleared');
       await handler.deliver(fixture(SESSION_FAILED));
       assert.equal(store.grants.length, 0, 'the failed async payment still granted');
-      assert.equal(store.conversions.length, 0);
+      assert.unmutated.equal(store.conversions.length, 0); // same gap as above
       assert.equal(store.credits.get('usr_PLACEHOLDER_bob'), undefined);
     },
   },
@@ -249,9 +260,9 @@ export const INVARIANTS = [
     // Without it, a handler that refuses every checkout session satisfies the assertion
     // above and this pack would have taught the opposite defect.
     breaks: ['grant-on-checkout'],
-    async run({ store, handler }) {
+    async run({ store, handler, assert }) {
       const response = await handler.deliver(fixture(SESSION_PAID));
-      assert.deepEqual(response.body, { received: true });
+      assert.unmutated.deepEqual(response.body, { received: true }); // the envelope
       assert.equal(store.grants.length, 1, 'a cleared card session granted nothing');
       assert.equal(store.credits.get('usr_PLACEHOLDER_carol'), CREDITS_PER_PERIOD);
       assert.ok(store.subscriptions.has('sub_PLACEHOLDER_carol'));
@@ -262,10 +273,10 @@ export const INVARIANTS = [
     fixtures: [CYCLE_JAN],
     states: 'the conversion id comes from subscription metadata, so browser and server share it',
     breaks: ['conversion-id-from-metadata', 'grant-on-renewal'],
-    async run({ store, handler }) {
+    async run({ store, handler, assert }) {
       await handler.deliver(fixture(CYCLE_JAN));
       assert.equal(store.conversions.length, 1);
-      const [conversion] = store.conversions;
+      const [conversion = {}] = store.conversions;
       assert.equal(conversion.eventId, 'evtid_PLACEHOLDER_purchase_jan',
         'the server generated its own id — nothing will ever deduplicate against the pixel');
       assert.equal(conversion.eventName, 'Purchase', 'the event name is not byte-equal');
@@ -276,34 +287,131 @@ export const INVARIANTS = [
   },
 ];
 
+// ------------------------------------------------- one assertion, one measurement
+//
+// Why the assertions are not called straight through `node:assert`. Until 2026-08-20 the
+// runner returned on the FIRST throw and the matrix compared one row per invariant, so an
+// invariant was measured as a single unit: any assertion that was not the sole
+// discriminator could be replaced by `assert.ok(true)` and nothing went red. Measured that
+// day — three neutered assertions (the `clawbacks.map` deepEqual, the `mirror.periodEnd`
+// equality, and the `response.body` deepEqual) left `--self-test` at exit 0 still printing
+// *"12 assertions, each watched failing"*, and `npm test` at 0 with them.
+//
+// So the `assert` an invariant receives is a RECORDER: same API, but a failure is
+// remembered instead of thrown and the assertions after it still run. Each call site is one
+// assertion with its own identity — its line in this file — and `--self-test` asks the
+// question per assertion rather than per invariant.
+//
+// Two kinds, and the difference is declared at the call site rather than in a table:
+//
+//   assert.equal(...)        a DISCRIMINATING assertion. At least one mutant must turn it
+//                            red, or it is not evidence of anything.
+//   assert.unmutated.equal() an assertion NO mutant in this pack varies. It pins the
+//                            envelope or a field the rules do not touch, so it has never
+//                            been watched failing and the verdict line counts it apart
+//                            rather than as evidence. Measured, not asserted: the self-test
+//                            fails if a mutant does break one, because that is a
+//                            discriminator hiding in the wrong list.
+//
+// A reader pointing this at their own handler keeps writing `assert.equal`; the recorder is
+// API-compatible with `node:assert/strict` for the methods below.
+
+const SELF = import.meta.url;
+const METHODS = ['equal', 'notEqual', 'deepEqual', 'notDeepEqual', 'ok', 'match', 'doesNotMatch'];
+
+/**
+ * The line in THIS file that called the recorder.
+ *
+ * `captureStackTrace(holder, boundary)` drops `boundary` and everything above it, so the
+ * top frame is the assertion's own line — no frame counting, which is what makes the
+ * identity survive a refactor of the recorder itself.
+ */
+function siteOf(boundary) {
+  const holder = {};
+  Error.captureStackTrace(holder, boundary);
+  const frame = (holder.stack || '').split('\n').slice(1).find((f) => f.includes(SELF));
+  const m = frame && frame.match(/:(\d+):\d+\)?\s*$/);
+  return m ? Number(m[1]) : 0;
+}
+
+function recorder() {
+  const seen = new Map(); // line -> { site, unmutated, ok, why }
+
+  function record(site, unmutated, name, args) {
+    let ok = true;
+    let why = null;
+    try {
+      assert[name](...args);
+    } catch (error) {
+      ok = false;
+      why = error.message.split('\n')[0];
+    }
+    const prev = seen.get(site);
+    if (prev) {
+      prev.ok = prev.ok && ok;
+      prev.why = prev.why || why;
+    } else {
+      seen.set(site, { site, unmutated, ok, why });
+    }
+  }
+
+  const bind = (unmutated) => {
+    const api = {};
+    for (const name of METHODS) {
+      const call = (...args) => record(siteOf(call), unmutated, name, args);
+      api[name] = call;
+    }
+    return api;
+  };
+
+  const api = bind(false);
+  api.unmutated = bind(true);
+  return { api, seen };
+}
+
 // ------------------------------------------------------------------------- runners
 
 async function runOne(invariant, without) {
-  const context = harness(without);
+  const { api, seen } = recorder();
+  const { store, handler } = harness(without);
+  let threw = null;
   try {
-    await invariant.run(context);
-    return null;
+    await invariant.run({ store, handler, assert: api });
   } catch (error) {
-    return error.message.split('\n')[0];
+    // A real error — a `TypeError` on a row the mutant never wrote, say. It aborts the
+    // remaining assertions, and it is still the invariant going red.
+    threw = error.message.split('\n')[0];
   }
+  const sites = [...seen.values()];
+  return {
+    threw,
+    sites,
+    failed: sites.filter((s) => !s.ok),
+    broke: Boolean(threw) || sites.some((s) => !s.ok),
+  };
 }
 
 async function runAll() {
   let failed = 0;
+  let asserted = 0;
   for (const invariant of INVARIANTS) {
-    const why = await runOne(invariant, []);
-    if (why) {
+    const result = await runOne(invariant, []);
+    asserted += result.sites.length;
+    if (result.broke) {
       failed += 1;
-      console.error(`FAIL ${invariant.id}\n     ${why}`);
+      console.error(`FAIL ${invariant.id}`);
+      for (const s of result.failed) console.error(`     :${s.site} ${s.why}`);
+      if (result.threw) console.error(`     threw: ${result.threw}`);
     } else {
-      console.log(`pass ${invariant.id} — ${invariant.states}`);
+      console.log(`pass ${invariant.id} (${result.sites.length} assertions) — ${invariant.states}`);
     }
   }
   if (failed) {
     console.error(`\n${failed} of ${INVARIANTS.length} money invariants failed`);
     return 1;
   }
-  console.log(`\nOK: ${INVARIANTS.length} money invariants hold against the handler`);
+  console.log(`\nOK: ${INVARIANTS.length} money invariants hold against the handler `
+    + `(${asserted} assertions)`);
   return 0;
 }
 
@@ -333,20 +441,48 @@ async function selfTest() {
   const mutants = [...RULES.map((rule) => [rule]), ...combos];
 
   const matrix = [];
+  const coverage = []; // one row per ASSERTION: which mutants turn that call site red
   for (const invariant of INVARIANTS) {
+    // The clean run is the census: it names every assertion this invariant executes, and
+    // whether each is declared discriminating or shape. An invariant that records nothing
+    // is one whose `run` never took the recorder — the failure mode of the injection.
+    const clean = await runOne(invariant, []);
+    if (clean.broke) {
+      problems.push(`${invariant.id}: fails against the unmutated handler `
+        + `(${(clean.failed[0] && `:${clean.failed[0].site} ${clean.failed[0].why}`) || clean.threw})`);
+    }
+    if (!clean.sites.length) {
+      problems.push(`${invariant.id}: recorded no assertion — its run() does not take the `
+        + '`assert` the runner passes it, so nothing about it is measured');
+    }
+    const broken = new Map(clean.sites.map((s) => [s.site, []]));
+
     const singles = [];
     for (const rule of RULES) {
-      if (await runOne(invariant, [rule])) singles.push(rule);
+      const r = await runOne(invariant, [rule]);
+      if (r.broke) singles.push(rule);
+      for (const s of r.failed) if (broken.has(s.site)) broken.get(s.site).push(rule);
     }
     // Minimal mutants only: a combination containing a rule that already breaks the
     // assertion on its own says nothing new.
     const minimalCombos = [];
     for (const combo of combos) {
       if (combo.some((rule) => singles.includes(rule))) continue;
-      if (await runOne(invariant, combo)) minimalCombos.push(combo);
+      const r = await runOne(invariant, combo);
+      if (r.broke) minimalCombos.push(combo);
+      for (const s of r.failed) if (broken.has(s.site)) broken.get(s.site).push(key(combo));
     }
     const broke = [...singles.map((r) => [r]), ...minimalCombos];
     matrix.push({ id: invariant.id, broke, singles });
+
+    for (const site of clean.sites) {
+      coverage.push({
+        invariant: invariant.id,
+        site: site.site,
+        unmutated: site.unmutated,
+        by: broken.get(site.site) || [],
+      });
+    }
 
     const expected = invariant.breaks
       .map((b) => key(Array.isArray(b) ? b : [b])).sort().join(', ');
@@ -366,6 +502,27 @@ async function selfTest() {
     + 'and the minimal removal that turns each assertion red\n');
   for (const row of matrix) {
     console.log(`  ${row.id.padEnd(width)}  ${row.broke.map(key).join(', ') || '(nothing)'}`);
+  }
+
+  // The per-ASSERTION half, and the one the per-invariant table above cannot give: an
+  // invariant goes red as a unit, so a dead assertion inside a live one is invisible there.
+  console.log('\nassertion x mutant — every call site, and what turns IT red\n');
+  for (const row of coverage) {
+    const label = `${row.invariant}:${row.site}`.padEnd(width + 6);
+    if (row.unmutated) {
+      console.log(`  ${label}  unmutated — no rule varies what it checks`);
+      if (row.by.length) {
+        problems.push(`${row.invariant} :${row.site} is declared assert.unmutated and `
+          + `[${row.by.join(', ')}] breaks it — it discriminates, so drop the .unmutated`);
+      }
+    } else {
+      console.log(`  ${label}  ${row.by.join(', ') || '(nothing)'}`);
+      if (!row.by.length) {
+        problems.push(`${row.invariant} :${row.site} is broken by no mutant — the assertion `
+          + 'cannot fail. Either it is not testing anything, or no rule varies what it '
+          + 'checks and it belongs on assert.unmutated, which the verdict counts apart');
+      }
+    }
   }
 
   console.log('\nisolation — the fixture that separates each rule from every other\n');
@@ -392,7 +549,10 @@ async function selfTest() {
     for (const p of problems) console.error(`  - ${p}`);
     return 1;
   }
-  console.log(`\nOK: ${INVARIANTS.length} assertions, each watched failing; `
+  const pinned = coverage.filter((r) => r.unmutated).length;
+  console.log(`\nOK: ${INVARIANTS.length} invariants over ${coverage.length} assertions — `
+    + `${coverage.length - pinned} watched failing ONE CALL SITE AT A TIME against `
+    + `${mutants.length} mutants; ${pinned} declared unmutated and measured unbreakable; `
     + `${RULES.length} rules, each isolated by a fixture`);
   return 0;
 }

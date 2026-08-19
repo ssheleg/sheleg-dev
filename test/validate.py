@@ -19,11 +19,23 @@ House rules, each one written because it can actually break:
     was a copy of a sibling skill's and named six things this repository has never
     had, in the npm tarball -- a security document inviting the reader to verify,
     with commands that exit 2.
+  * every SKILL.md body inside the Agent Skills budget AND inside the house working
+    limit. Measured HERE: until 2026-08-20 this gate checked front matter only, and a
+    skill past the working limit was found by running another repository's auditor.
+  * every counted number in the two measuring documents recomputed rather than restated.
+    All four in SECURITY.md were correct on the day they were written, which is the point.
+  * the ledger's shipped heading naming what `git describe --tags` prints, and REQ-001's
+    quoted verdict equal to the line this file prints. Both were wrong for a day.
   * CI runs this file. A validator that CI stopped calling is decoration.
+
+**The verdict line counts the registry, not a guess.** It was `10 + len(skill_dirs)`, so
+adding a skill moved the number and adding a check did not -- and five rows of
+`docs/evidence/verification.md` read it as evidence a guard had arrived.
 
 Exit code 0 = green. Anything else = a fail with a reason on stderr.
 """
 
+import fnmatch
 import glob
 import json
 import subprocess
@@ -37,6 +49,26 @@ FAILURES = []
 
 def fail(msg):
     FAILURES.append(msg)
+
+
+# Every check this file makes is REGISTERED here, and the verdict line counts the registry.
+# Until 2026-08-20 the count was `10 + len(skill_dirs)`, so adding a skill moved the number
+# and adding a check did not — and four rows of `docs/evidence/verification.md` read that
+# number as evidence that a guard had been added. A count that answers a different question
+# from the one it is quoted for is worse than no count.
+CHECKS = []
+
+
+def check(fn):
+    """Register a check. `len(CHECKS)` is the number the verdict line prints."""
+    CHECKS.append(fn)
+    return fn
+
+
+def verdict_line():
+    """The exact line a green run prints. Quoted in the ledger, and checked there."""
+    return (f"OK: sheleg-dev structurally valid ({len(CHECKS)} checks, "
+            f"{len(skill_dirs)} skill(s), v{version})")
 
 
 def load_json(rel):
@@ -98,30 +130,37 @@ plugin = load_json("plugins/sheleg-dev/.claude-plugin/plugin.json")
 market = load_json(".claude-plugin/marketplace.json")
 
 version = pkg.get("version") if pkg else None
-if not version:
-    fail("package.json: missing version")
 
-if plugin and plugin.get("version") != version:
-    fail(f"version drift: plugin.json={plugin.get('version')!r} package.json={version!r}")
 
-if market:
-    plugins = market.get("plugins") or []
-    if not plugins:
-        fail("marketplace.json: plugins[] empty")
-    for entry in plugins:
-        if entry.get("version") != version:
-            fail(
-                f"version drift: marketplace.json {entry.get('name')!r}="
-                f"{entry.get('version')!r} package.json={version!r}"
-            )
-        src = entry.get("source", "")
-        if not os.path.isdir(os.path.join(ROOT, src.lstrip("./"))):
-            fail(f"marketplace.json: source {src!r} does not exist")
+@check
+def check_one_version_four_files():
+    """package.json, plugin.json, marketplace.json and the top CHANGELOG entry agree."""
+    if not version:
+        fail("package.json: missing version")
+    if plugin and plugin.get("version") != version:
+        fail(f"version drift: plugin.json={plugin.get('version')!r} package.json={version!r}")
+    if market:
+        plugins = market.get("plugins") or []
+        if not plugins:
+            fail("marketplace.json: plugins[] empty")
+        for entry in plugins:
+            if entry.get("version") != version:
+                fail(
+                    f"version drift: marketplace.json {entry.get('name')!r}="
+                    f"{entry.get('version')!r} package.json={version!r}"
+                )
+            src = entry.get("source", "")
+            if not os.path.isdir(os.path.join(ROOT, src.lstrip("./"))):
+                fail(f"marketplace.json: source {src!r} does not exist")
 
-changelog = os.path.join(ROOT, "CHANGELOG.md")
-if not os.path.exists(changelog):
-    fail("missing CHANGELOG.md")
-else:
+
+@check
+def check_changelog_heads_this_version():
+    """The top `## vX.Y.Z` is this version, and no version is documented twice."""
+    changelog = os.path.join(ROOT, "CHANGELOG.md")
+    if not os.path.exists(changelog):
+        fail("missing CHANGELOG.md")
+        return
     with open(changelog, encoding="utf-8") as fh:
         text = fh.read()
     headings = re.findall(r"^## \[?v?(\d+\.\d+\.\d+)\]?", text, re.M)
@@ -145,68 +184,93 @@ else:
     if not skill_dirs:
         fail("plugins/sheleg-dev/skills/ has no skills")
 
-for name in skill_dirs:
-    sdir = os.path.join(SKILL_ROOT, name)
-    spath = os.path.join(sdir, "SKILL.md")
+def _skill_front_matter(name):
+    """The front-matter block and full text of one SKILL.md, or (None, None)."""
+    spath = os.path.join(SKILL_ROOT, name, "SKILL.md")
     if not os.path.exists(spath):
-        fail(f"{name}: no SKILL.md")
-        continue
+        return None, None
+    return front_matter(spath)
 
-    block, text = front_matter(spath)
-    if block is None:
-        fail(f"{name}/SKILL.md: no front matter")
-        continue
 
-    fm_name = scalar(block, "name")
-    fm_desc = scalar(block, "description")
+@check
+def check_skill_front_matter():
+    """Front matter inside the Agent Skills limits, and `name` equal to the directory."""
+    for name in skill_dirs:
+        block, _text = _skill_front_matter(name)
+        if block is None and _text is None:
+            fail(f"{name}: no SKILL.md")
+            continue
+        if block is None:
+            fail(f"{name}/SKILL.md: no front matter")
+            continue
 
-    if fm_name != name:
-        fail(f"{name}/SKILL.md: front-matter name {fm_name!r} != directory {name!r}")
-    if not fm_name or len(fm_name) > 64:
-        fail(f"{name}/SKILL.md: name must be 1-64 chars, got {len(fm_name or '')}")
-    if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", fm_name or ""):
-        fail(f"{name}/SKILL.md: name {fm_name!r} must be lowercase [a-z0-9-]")
-    if not fm_desc:
-        fail(f"{name}/SKILL.md: description is required")
-    elif len(fm_desc) > 1024:
-        fail(
-            f"{name}/SKILL.md: description is {len(fm_desc)} chars, limit 1024 "
-            "-- hosts truncate silently, so this never surfaces at runtime"
-        )
-    if fm_desc and re.search(r"<[a-zA-Z/]", fm_desc):
-        fail(f"{name}/SKILL.md: description must not contain angle-bracket tags")
+        fm_name = scalar(block, "name")
+        fm_desc = scalar(block, "description")
 
-    # references: both directions
-    rdir = os.path.join(sdir, "references")
-    on_disk = set()
-    if os.path.isdir(rdir):
-        on_disk = {f for f in os.listdir(rdir) if f.endswith(".md")}
-    linked = set(re.findall(r"references/([A-Za-z0-9._-]+\.md)", text))
+        if fm_name != name:
+            fail(f"{name}/SKILL.md: front-matter name {fm_name!r} != directory {name!r}")
+        if not fm_name or len(fm_name) > 64:
+            fail(f"{name}/SKILL.md: name must be 1-64 chars, got {len(fm_name or '')}")
+        if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", fm_name or ""):
+            fail(f"{name}/SKILL.md: name {fm_name!r} must be lowercase [a-z0-9-]")
+        if not fm_desc:
+            fail(f"{name}/SKILL.md: description is required")
+        elif len(fm_desc) > 1024:
+            fail(
+                f"{name}/SKILL.md: description is {len(fm_desc)} chars, limit 1024 "
+                "-- hosts truncate silently, so this never surfaces at runtime"
+            )
+        if fm_desc and re.search(r"<[a-zA-Z/]", fm_desc):
+            fail(f"{name}/SKILL.md: description must not contain angle-bracket tags")
 
-    for missing in sorted(linked - on_disk):
-        fail(f"{name}/SKILL.md links references/{missing}, which does not exist")
-    for orphan in sorted(on_disk - linked):
-        fail(
-            f"{name}/references/{orphan} exists but SKILL.md never links it "
-            "-- an unreferenced reference is a file nobody loads"
-        )
+
+@check
+def check_references_resolve_both_ways():
+    """No link to a missing reference, and no reference nobody links."""
+    for name in skill_dirs:
+        _block, text = _skill_front_matter(name)
+        if text is None:
+            continue
+        rdir = os.path.join(SKILL_ROOT, name, "references")
+        on_disk = set()
+        if os.path.isdir(rdir):
+            on_disk = {f for f in os.listdir(rdir) if f.endswith(".md")}
+        linked = set(re.findall(r"references/([A-Za-z0-9._-]+\.md)", text))
+
+        for missing in sorted(linked - on_disk):
+            fail(f"{name}/SKILL.md links references/{missing}, which does not exist")
+        for orphan in sorted(on_disk - linked):
+            fail(
+                f"{name}/references/{orphan} exists but SKILL.md never links it "
+                "-- an unreferenced reference is a file nobody loads"
+            )
+
 
 # --------------------------------------------------------------- hygiene
 
-for dirpath, dirnames, filenames in os.walk(os.path.join(ROOT, "plugins")):
-    if "__pycache__" in dirnames or any(f.endswith(".pyc") for f in filenames):
-        fail(f"build artifacts inside plugins/ at {os.path.relpath(dirpath, ROOT)}")
-    if "SKILL.md" in filenames:
-        rel = os.path.relpath(dirpath, ROOT).replace(os.sep, "/")
-        if not re.fullmatch(r"plugins/[^/]+/skills/[^/]+", rel):
-            fail(f"stray SKILL.md at {rel}/SKILL.md -- only plugins/*/skills/*/ may hold one")
+
+@check
+def check_no_stray_skill_or_build_artifacts():
+    """No SKILL.md outside plugins/*/skills/*/, and no build artifacts in the shipped tree."""
+    for dirpath, dirnames, filenames in os.walk(os.path.join(ROOT, "plugins")):
+        if "__pycache__" in dirnames or any(f.endswith(".pyc") for f in filenames):
+            fail(f"build artifacts inside plugins/ at {os.path.relpath(dirpath, ROOT)}")
+        if "SKILL.md" in filenames:
+            rel = os.path.relpath(dirpath, ROOT).replace(os.sep, "/")
+            if not re.fullmatch(r"plugins/[^/]+/skills/[^/]+", rel):
+                fail(f"stray SKILL.md at {rel}/SKILL.md -- only plugins/*/skills/*/ may hold one")
+
 
 # ------------------------------------------------------------------- CI
 
-wf = os.path.join(ROOT, ".github", "workflows", "validate.yml")
-if not os.path.exists(wf):
-    fail("missing .github/workflows/validate.yml")
-else:
+
+@check
+def check_ci_runs_the_validator():
+    """CI runs this file. A validator that CI stopped calling is decoration."""
+    wf = os.path.join(ROOT, ".github", "workflows", "validate.yml")
+    if not os.path.exists(wf):
+        fail("missing .github/workflows/validate.yml")
+        return
     with open(wf, encoding="utf-8") as fh:
         ci = fh.read()
     # Match the ENTRY POINT, not any mention. The negative self-tests below run
@@ -219,6 +283,7 @@ else:
 # ---------------------------------------------------------------- verdict
 
 
+@check
 def check_release_gates_on_validate():
     """A release must not publish over a red `validate`.
 
@@ -251,13 +316,12 @@ def check_release_gates_on_validate():
              "than after it")
 
 
-check_release_gates_on_validate()
-
 def _disclose_routing(msg):
     """A check that could not run, said out loud rather than counted as a pass."""
     print(f"  unlooked: {msg}")
 
 
+@check
 def check_contributing_routes_to_files_that_exist():
     """The *Where things go* table sends a contributor somewhere; it had better be here.
 
@@ -313,8 +377,6 @@ def check_contributing_routes_to_files_that_exist():
              f"which this repository has nowhere (B-47)")
 
 
-check_contributing_routes_to_files_that_exist()
-
 
 # ------------------------------------------------- self-describing documents
 
@@ -333,7 +395,35 @@ SELF_DESCRIBING_DOCS = (
     "SECURITY.md",
     "CONTRIBUTING.md",
     ".github/PULL_REQUEST_TEMPLATE.md",
+    # `docs/` joined the corpus on 2026-08-20. Until then it was outside it, and
+    # `docs/AGENT_SYNC.md` named six paths this repository does not have -- five
+    # `references/*.md` and `agent_sync.py`, all of them the agent-sync skill's -- in a
+    # document whose whole subject is how to coordinate work HERE.
+    "docs/AGENT_SYNC.md",
+    "docs/evals/stripe-billing.md",
 )
+
+# The other documents under `docs/`, and why they are NOT in the corpus. Same argument as
+# `CHANGELOG.md` above, and it is the reason the exclusion is a list rather than a habit: a
+# dated record has to be able to name the dead path it removed, verbatim, or the record of
+# the fix becomes unwritable. `docs/evidence/verification.md` quotes `scripts/page_audit.py`
+# and `benchmarks.md` because those were the defect; `backlog.md` quotes `manifesto.md` and
+# `audit_skill.py`, which are another repository's tools.
+#
+# `check_docs_are_classified` is what keeps this honest: every markdown file under `docs/`
+# must be in exactly one of the two lists, so a new live document cannot arrive unchecked
+# and cannot be parked here without saying so.
+DATED_RECORDS = {
+    "docs/evidence/verification.md":
+        "one row per shipped requirement, dated. Its rows quote the dead paths and the "
+        "stale counts that WERE the defect, at the commit they were read",
+    "docs/evidence/backlog.md":
+        "the board. Its rows cite another repository's tools (`manifesto.md`, "
+        "`audit_skill.py`) and the reader-project paths a finding was measured over",
+    "docs/MERGES.md":
+        "the agent-sync merge log, appended by the tool rather than written by hand "
+        "(`.claude/agent-sync.json` -> `mergeLog.file`)",
+}
 
 # A path that belongs to another repository ON PURPOSE, declared one document at a time
 # with the reason. This is the narrow answer to standing instruction #7 -- a check cannot
@@ -355,6 +445,68 @@ FOREIGN_BY_DESIGN = {
         "the READER's settings file, where the manual gate is registered when the pack was "
         "installed by copy rather than as a plugin. It is the one path this repository must "
         "name and must never write -- SD-03",
+    # `docs/AGENT_SYNC.md` is GENERATED -- its first line says so and names the generator.
+    # A repo-local reword is overwritten by the next `agent_sync.py setup`, which is why
+    # board B-83 puts the fix upstream and this list carries the names meanwhile.
+    ("docs/AGENT_SYNC.md", "agent_sync.py"):
+        "the generator of this very file; it ships with the agent-sync skill (B-83)",
+    ("docs/AGENT_SYNC.md", "references/two-sources.md"):
+        "agent-sync's own doctrine, which the line above points at by name (B-83)",
+    ("docs/AGENT_SYNC.md", "references/lease-protocol.md"):
+        "agent-sync's own doctrine (B-83)",
+    ("docs/AGENT_SYNC.md", "references/branching.md"):
+        "agent-sync's own doctrine (B-83)",
+    ("docs/AGENT_SYNC.md", "references/roadmap.md"):
+        "agent-sync's own doctrine (B-83)",
+    ("docs/AGENT_SYNC.md", "references/pipeline-binding.md"):
+        "agent-sync's own doctrine (B-83)",
+    ("docs/evals/stripe-billing.md", "audit_skill.py"):
+        "make-skill's house auditor, in ssheleg/make-skill. Named because the GAP/PASS pair "
+        "beside it is that script's counter and this gate cannot recompute it",
+    ("docs/evals/stripe-billing.md", "settings.json"):
+        "the READER's Claude Code settings, read to establish the neighbour set rather "
+        "than assumed -- the same file README.md must name and never write",
+}
+
+# A path a document that SHIPS IN THE TARBALL names, which the tarball does not contain.
+# Declared one document at a time, with where a reader who only has the tarball can get it.
+#
+# The defect, measured 2026-08-20: `SECURITY.md:143-144` sent a reader to
+# `docs/evidence/verification.md` and `CONTRIBUTING.md`. Both resolve in a clone and
+# `npm pack --dry-run` lists neither, so the path guard passed while the one document an
+# outside reader consults *precisely because they will not read the code* pointed at two
+# files they do not have. The existing guard could not see it: it resolves against the
+# clone, which is the wrong filesystem for a document that ships.
+NOT_IN_THE_TARBALL = {
+    ("README.md", "install.sh"):
+        "the shell installer is clone-only: `files` ships `bin/` and `plugins/`, not the "
+        "root script. README names it as an alternative to `npx`, from the repository",
+    ("README.md", "marketplace.json"):
+        "the marketplace manifest is how a plugin channel finds the pack; it is read from "
+        "the GitHub repository, never from the npm tarball",
+    ("README.md", "test/validate.py"):
+        "the gate, named as the thing that compares the copy-channel snippet against the "
+        "plugin manifest. Clone-only, like the rest of `test/`",
+    ("README.md", "test/moneygate_test.js"):
+        "the gate's own suite. A tarball reader is pointed at the repository for it, and "
+        "`SECURITY.md` -> *Verifying for yourself* opens with the `git clone`",
+    ("README.md", "test/fixtures_test.js"):
+        "the money-fixture suite, same as above",
+    ("SECURITY.md", "test/validate.py"):
+        "the gate. Named before the clone block as the thing that refuses a dead path, and "
+        "run inside it -- the block's first line is `git clone`",
+    ("SECURITY.md", "test/moneygate_test.js"):
+        "run inside *Verifying for yourself*, after the `git clone`",
+    ("SECURITY.md", "test/fixtures_test.js"):
+        "run inside *Verifying for yourself*, after the `git clone`",
+    ("SECURITY.md", "install.sh"):
+        "clone-only, and the table row now says so: the tarball ships `bin/sheleg-dev.js`, "
+        "not the shell installer",
+    ("SECURITY.md", "docs/evidence/verification.md"):
+        "the ledger, named as repository-only in the sentence itself -- this is the "
+        "2026-08-20 defect, fixed by saying where it is rather than by shipping it",
+    ("SECURITY.md", "CONTRIBUTING.md"):
+        "the contributor guide, named as repository-only in the sentence itself",
 }
 
 _PATH_TOKEN = re.compile(
@@ -397,6 +549,50 @@ def _named_paths(text):
                     yield lineno, tok, int(ref.group(1)) if ref else None
 
 
+def _tarball_paths():
+    """Every path `npm pack` would put in the tarball, from `package.json` -> `files`.
+
+    Reimplemented rather than shelled out to `npm pack --dry-run`, because `npm test` has to
+    work offline and without npm on PATH. `files` here is six entries, two of them
+    directories, and npm always adds `package.json` -- so the expansion is a walk.
+
+    Verified against npm on 2026-08-20: **56 paths, set-identical** to
+    `npm pack --dry-run --json`. That command stays in `SECURITY.md` ->
+    *Verifying for yourself* as the cross-check a reader can run.
+    """
+    entries = (pkg or {}).get("files") or []
+    out = {"package.json"}
+    for entry in entries:
+        base = os.path.join(ROOT, entry)
+        if os.path.isdir(base):
+            for dirpath, dirnames, filenames in os.walk(base):
+                dirnames[:] = [d for d in dirnames if d not in ("__pycache__", "node_modules")]
+                for fn in filenames:
+                    if fn.endswith(".pyc") or fn == ".DS_Store":
+                        continue
+                    rel = os.path.relpath(os.path.join(dirpath, fn), ROOT)
+                    out.add(rel.replace(os.sep, "/"))
+        elif os.path.isfile(base):
+            out.add(entry)
+    return out
+
+
+def _in_tarball(tok, tarball, tarball_basenames):
+    """Same resolution rules as `_resolves_here`, against the tarball instead of the clone.
+
+    Exact path, directory prefix, glob, or a bare basename -- the last one deliberately, for
+    the same reason `_resolves_here` has it: `SKILL.md` in a table means one of six.
+    """
+    rel = tok[2:] if tok.startswith("./") else tok
+    if rel in tarball:
+        return True
+    if any(t == rel or t.startswith(rel.rstrip("/") + "/") for t in tarball):
+        return True
+    if "*" in rel and any(fnmatch.fnmatch(t, rel) for t in tarball):
+        return True
+    return os.path.basename(rel) in tarball_basenames
+
+
 def _resolves_here(tok, basenames):
     """Exact path, glob, or a bare name that exists somewhere in the tree.
 
@@ -413,6 +609,7 @@ def _resolves_here(tok, basenames):
     return os.path.basename(rel) in basenames
 
 
+@check
 def check_self_describing_docs_resolve():
     """Every path these four documents name must exist here (B-79).
 
@@ -441,13 +638,18 @@ def check_self_describing_docs_resolve():
         dirnames[:] = [d for d in dirnames if d not in (".git", "node_modules", "graphify-out")]
         basenames.update(filenames)
 
+    tarball = _tarball_paths()
+    tarball_basenames = {os.path.basename(t) for t in tarball}
+
     used = set()
+    used_tarball = set()
     for doc in SELF_DESCRIBING_DOCS:
         path = os.path.join(ROOT, doc)
         if not os.path.isfile(path):
             fail(f"{doc} is missing -- it is one of the documents an outside reader meets "
                  "the pack through")
             continue
+        ships = _in_tarball(doc, tarball, set())
         with open(path, encoding="utf-8") as fh:
             text = fh.read()
         for lineno, tok, ref in _named_paths(text):
@@ -460,6 +662,19 @@ def check_self_describing_docs_resolve():
                      "repository's -- if it is deliberately foreign, declare it in "
                      "FOREIGN_BY_DESIGN with a reason")
                 continue
+            # Resolving in the clone is the wrong question for a document that SHIPS. The
+            # tarball is a different filesystem and it is the only one a reader who reached
+            # this pack through npm has.
+            if ships and not _in_tarball(tok, tarball, tarball_basenames):
+                if (doc, tok) in NOT_IN_THE_TARBALL:
+                    used_tarball.add((doc, tok))
+                else:
+                    fail(f"{doc}:{lineno} names {tok!r}, which resolves in a clone and is "
+                         "NOT in the published tarball -- and this document ships. A reader "
+                         "who has only the tarball cannot reach it. Either put it in "
+                         "`package.json` -> `files`, say in the sentence where it lives, or "
+                         "declare it in NOT_IN_THE_TARBALL with a reason")
+                    continue
             # A `file:line` whose line is past the end of the file is a pointer that
             # resolves to nothing, which is the same defect one level down.
             target = os.path.join(ROOT, tok[2:] if tok.startswith("./") else tok)
@@ -475,9 +690,12 @@ def check_self_describing_docs_resolve():
             fail(f"FOREIGN_BY_DESIGN carries {key[1]!r} for {key[0]} ({reason}) but the "
                  "document no longer names it -- a stale exemption is a hole waiting for "
                  "the next copied paragraph")
+    for key, reason in NOT_IN_THE_TARBALL.items():
+        if key not in used_tarball:
+            fail(f"NOT_IN_THE_TARBALL carries {key[1]!r} for {key[0]} ({reason}) but that "
+                 "document no longer names it, or the path now ships -- either way the "
+                 "exemption is a hole")
 
-
-check_self_describing_docs_resolve()
 
 
 # ------------------------------------------------ credential boundaries (M-06)
@@ -494,7 +712,7 @@ check_self_describing_docs_resolve()
 # Table-driven so a second provider is a row, not a second shape (M-44). It carries ONE
 # row today, and that is a measurement rather than an oversight: `stripe-billing`
 # prescribes the same control at `references/price-integrity.md:62-64` and asks for it at
-# `references/testing-and-local-dev.md:210` ("something asserts they agree") while
+# `references/testing-and-local-dev.md:246` ("something asserts they agree") while
 # shipping no assertion to copy. Filed as board **B-85**, not enforced here, because a
 # guard added in the same breath as the defect it would flag turns the gate red for work
 # this row did not do.
@@ -544,6 +762,50 @@ def _fenced_blocks(text):
             i += 1
 
 
+@check
+def check_docs_are_classified():
+    """Every markdown file under `docs/` is either checked or declared a dated record.
+
+    `docs/` was outside the corpus until 2026-08-20, and `docs/AGENT_SYNC.md` spent that
+    time naming six paths this repository does not have. Widening the corpus closes those
+    six; this check is what stops the next document arriving outside it. A file in NEITHER
+    list is unclassified -- which is how `docs/` got out of the corpus the first time -- and
+    a file in BOTH is a contradiction rather than a belt-and-braces.
+    """
+    root = os.path.join(ROOT, "docs")
+    if not os.path.isdir(root):
+        fail("docs/ is missing -- AGENT_SYNC.md, the evals record and the two evidence "
+             "documents all live there")
+        return
+    found = set()
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in (".git", "node_modules")]
+        for fn in filenames:
+            if fn.endswith(".md"):
+                rel = os.path.relpath(os.path.join(dirpath, fn), ROOT)
+                found.add(rel.replace(os.sep, "/"))
+    if not found:
+        fail("docs/ holds no markdown -- an empty corpus makes this check pass everything")
+        return
+    checked = set(SELF_DESCRIBING_DOCS)
+    for rel in sorted(found):
+        in_corpus = rel in checked
+        in_records = rel in DATED_RECORDS
+        if in_corpus and in_records:
+            fail(f"{rel} is both in SELF_DESCRIBING_DOCS and in DATED_RECORDS -- one of the "
+                 "two is wrong, and the pair reads as coverage either way")
+        elif not in_corpus and not in_records:
+            fail(f"{rel} is in neither SELF_DESCRIBING_DOCS nor DATED_RECORDS. Every "
+                 "document under docs/ is one or the other: a live document whose paths "
+                 "must resolve, or a dated record that has to be able to quote a dead one. "
+                 "Unclassified is how docs/ sat outside the corpus until 2026-08-20")
+    for rel in sorted(DATED_RECORDS):
+        if rel not in found:
+            fail(f"DATED_RECORDS carries {rel!r}, which is not under docs/ -- a stale "
+                 "exemption is a hole")
+
+
+@check
 def check_credential_boundary():
     """A copyable block that sets a live credential must declare its environment.
 
@@ -613,8 +875,6 @@ def check_credential_boundary():
                  "after the assertion; unwritten, it reads as absent")
 
 
-check_credential_boundary()
-
 
 # The manual gate. Each entry is a category the hook must be able to refuse AND a fixture
 # file must be able to demonstrate — a list, because a gate whose categories drift out of
@@ -649,6 +909,7 @@ def _has_key(node, key):
     return False
 
 
+@check
 def check_manual_gate():
     """The four manual-gate categories must be refusable, not merely described.
 
@@ -716,6 +977,18 @@ def check_manual_gate():
     if not any("Bash" in (entry.get("matcher") or "") for entry in pre):
         fail(f"{hooks_rel}: no PreToolUse entry matches Bash -- a shell is where a live key "
              "gets exported and where the CLI runs")
+    # The OTHER half, and it had no guard at all until 2026-08-20. Measured that day:
+    # deleting the `mcp__.*` entry from hooks.json left this validator, the gate fixtures
+    # and the money fixtures all at exit 0, while `lib/moneygate.js` does refuse
+    # `mcp__plugin_stripe_stripe__create_refund` by name. A rule the module enforces and
+    # the manifest no longer routes to it is a refusal that never gets asked for -- and the
+    # Stripe MCP server ships `create_refund` as a tool, so the shell is not the only door.
+    if not any(re.search(r"mcp__", entry.get("matcher") or "") for entry in pre):
+        fail(f"{hooks_rel}: no PreToolUse entry matches an `mcp__…` tool name. "
+             f"{GATE_HOOKS}/lib/moneygate.js decides non-Bash tools from the NAME "
+             "(MONEY_TOOL), so `create_refund` on an MCP server is refusable -- but only if "
+             "the manifest routes those calls to it. A refund does not care which door it "
+             "came through")
     if _has_key(hooks, "if"):
         fail(f"{hooks_rel}: a hook entry declares `if`. The reference calls that filter "
              "best-effort and FAILS OPEN on a command it cannot parse, so a guard resting "
@@ -802,7 +1075,69 @@ def check_manual_gate():
                  "precondition has only the warning")
 
 
-check_manual_gate()
+
+@check
+def check_copy_channel_snippet_matches_the_plugin():
+    """The gate README hands a copy-channel reader must be the gate the plugin ships.
+
+    The defect, measured 2026-08-20: `README.md` -> *The manual gate* carries a
+    `~/.claude/settings.json` snippet for the install channels that carry no hook, and it
+    registered **one** matcher (`Bash`) against the plugin's two. So a reader who followed
+    the document to the letter could not refuse the `create_refund` tool the same README
+    advertises seventeen lines earlier -- a weaker gate handed out by the document that
+    exists because the channel has none.
+
+    Compared by MATCHER SET, not by text: the snippet is formatted for reading and the
+    manifest for a loader, and requiring them to be byte-equal would fail on whitespace and
+    teach the next person to delete the check.
+    """
+    hooks_path = os.path.join(ROOT, GATE_HOOKS, "hooks.json")
+    readme_path = os.path.join(ROOT, "README.md")
+    if not (os.path.isfile(hooks_path) and os.path.isfile(readme_path)):
+        fail("copy-channel snippet: hooks.json or README.md is missing")
+        return
+    try:
+        with open(hooks_path, encoding="utf-8") as fh:
+            hooks = json.load(fh)
+    except json.JSONDecodeError as exc:
+        fail(f"{GATE_HOOKS}/hooks.json: invalid JSON -- {exc}")
+        return
+    shipped = {
+        (entry.get("matcher") or "")
+        for entry in ((hooks.get("hooks") or {}).get("PreToolUse") or [])
+    }
+
+    with open(readme_path, encoding="utf-8") as fh:
+        readme = fh.read()
+    snippets = []
+    for lineno, block in _fenced_blocks(readme):
+        if "PreToolUse" not in block:
+            continue
+        try:
+            snippets.append((lineno, json.loads(block)))
+        except json.JSONDecodeError as exc:
+            fail(f"README.md:{lineno} -- the copy-channel gate snippet is not valid JSON "
+                 f"({exc}). A reader pastes this into their settings; it has to parse")
+    if not snippets:
+        fail("README.md: no fenced block declares a `PreToolUse` hook -- the copy install "
+             "channels ship no gate and this snippet is the only thing that gives them one. "
+             "An empty corpus makes this check pass everything")
+        return
+    for lineno, snippet in snippets:
+        offered = {
+            (entry.get("matcher") or "")
+            for entry in ((snippet.get("hooks") or {}).get("PreToolUse") or [])
+        }
+        missing = shipped - offered
+        if missing:
+            fail(f"README.md:{lineno} -- the copy-channel snippet registers "
+                 f"{sorted(offered)} and the plugin registers {sorted(shipped)}: a reader "
+                 f"who follows this document cannot refuse {sorted(missing)}. The snippet "
+                 "must be the same gate, not a weaker one")
+        if _has_key(snippet, "if"):
+            fail(f"README.md:{lineno} -- the copy-channel snippet declares `if`. The "
+                 "reference calls that filter best-effort and FAILS OPEN, and the plugin "
+                 "deliberately carries none")
 
 
 # ---------------------------------------------- money fixtures (M-40, M-29)
@@ -846,6 +1181,7 @@ def _squash(text):
     return " ".join(text.split())
 
 
+@check
 def check_money_fixtures():
     """Every money invariant these skills state has a fixture, and every fixture a claim.
 
@@ -1055,9 +1391,409 @@ def check_money_fixtures():
              "modes, and a pack nobody runs is a pack nobody has watched fail")
 
 
-check_money_fixtures()
+
+# ------------------------------------------------------------- the body budget
+#
+# The Agent Skills hard budget and the house working limit, in the numbers
+# `make-skill`'s `audit_skill.py` uses: 5000 tokens / 500 lines is the spec, 4750 tokens is
+# the house limit that leaves room for the next section, and the estimator is
+# `len(body) / 3.9`. Reimplemented here rather than shelled out, because `audit_skill.py`
+# lives in another repository and this gate must run from a bare clone -- and because the
+# whole point is that THIS repo's gate measures it, not that another one might.
+BODY_MAX_TOKENS = 5000
+BODY_MAX_LINES = 500
+BODY_TARGET_TOKENS = 4750
+CHARS_PER_TOKEN = 3.9
 
 
+def _body_of(path):
+    """A SKILL.md with its front matter removed -- what the host loads at level 2."""
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    m = re.match(r"^---\n.*?\n---\n", text, re.S)
+    return text[m.end():] if m else text
+
+
+@check
+def check_body_budget():
+    """Every SKILL.md body is inside the budget AND inside the house working limit.
+
+    The defect, measured 2026-08-20: this repository's gate checked front matter and
+    nothing else, so `crypto-payments/SKILL.md` sat at ~4894 tokens -- past the 4750
+    working limit, `1 GAP` under `audit_skill.py --house` -- and was found by running
+    ANOTHER repository's auditor. A budget enforced only by a tool that ships elsewhere is
+    enforced by whoever remembers to run it, which is board B-95's whole history.
+
+    Both thresholds, and they say different things. Over 5000 tokens or 500 lines the host
+    truncates and nothing errors. Over 4750 the file still loads and the NEXT section
+    breaks it -- so the working limit is where a split is still cheap. The house answer at
+    that point is a split, never a trim: `crypto-payments` shed
+    `references/callback-route-hardening.md` and `references/testing-and-local-dev.md`
+    rather than losing a paragraph.
+
+    `stripe-billing` passes at ~4747 of 4750, which is three tokens of headroom and is
+    stated here rather than discovered: this check is deliberately not set below any value
+    the tree already holds, and the measured numbers print on every failure so the next
+    person sees the distance rather than a verdict.
+    """
+    for name in skill_dirs:
+        path = os.path.join(SKILL_ROOT, name, "SKILL.md")
+        if not os.path.isfile(path):
+            continue  # check_skill_front_matter owns the missing case
+        body = _body_of(path)
+        lines = body.count("\n") + 1
+        est = int(len(body) / CHARS_PER_TOKEN)
+        if lines >= BODY_MAX_LINES:
+            fail(f"{name}/SKILL.md: body is {lines} lines, the budget is < {BODY_MAX_LINES} "
+                 "-- move detail into references/")
+        if est >= BODY_MAX_TOKENS:
+            fail(f"{name}/SKILL.md: body is ~{est} tokens ({len(body)} chars / "
+                 f"{CHARS_PER_TOKEN}), the budget is < {BODY_MAX_TOKENS}. Over this the host "
+                 "truncates silently, which is worse than an error")
+        elif est >= BODY_TARGET_TOKENS:
+            fail(f"{name}/SKILL.md: body is ~{est} tokens, inside the {BODY_MAX_TOKENS} "
+                 f"budget and past the {BODY_TARGET_TOKENS} house working limit "
+                 f"({BODY_TARGET_TOKENS - est} of headroom). The next section breaches it, "
+                 "and the answer then is a split into references/, not a trim")
+
+
+# ------------------------------------------- the numbers documents restate (B-84, B-93)
+#
+# A counted number in a document is a claim about the tree, and a literal nobody
+# recomputes is the claim rotting quietly. Both defects were measured on 2026-08-20:
+# `SECURITY.md` carried four counts that were correct that day and checked by nothing, and
+# `docs/evals/stripe-billing.md` carried four that were three-quarters wrong.
+#
+# Table-driven, so a fifth number is a row rather than a second shape. Each row's pattern
+# must match EXACTLY ONCE: a sentence that moved takes the check blind with it, and that is
+# a failure rather than a pass.
+
+def _payload_files():
+    """Every file under `plugins/` -- the shipped skill payload.
+
+    `os.walk`, not `git ls-files`, so the gate runs from an export with no `.git`. Measured
+    equal on 2026-08-20: both return 52. `SECURITY.md` -> *Verifying for yourself* hands the
+    reader the git command, which is the cross-check.
+    """
+    out = []
+    for dirpath, dirnames, filenames in os.walk(os.path.join(ROOT, "plugins")):
+        dirnames[:] = [d for d in dirnames if d not in ("__pycache__", "node_modules")]
+        for fn in filenames:
+            if fn.endswith(".pyc") or fn == ".DS_Store":
+                continue
+            out.append(os.path.relpath(os.path.join(dirpath, fn), ROOT).replace(os.sep, "/"))
+    return out
+
+
+@check
+def check_security_counts_are_computed():
+    """Every counted number in SECURITY.md is recomputed here, not restated there.
+
+    Board **B-93**, open since 2026-08-19: *"`SECURITY.md` states counted numbers and
+    nothing recomputes them."* All four were correct on the day they were written, which is
+    the point -- the same four were correct at v0.6.0 too, and then a release moved three of
+    them. This change moved all four again (the `crypto-payments` split added two files), so
+    the row closes with the numbers under a check rather than under a habit.
+    """
+    path = os.path.join(ROOT, "SECURITY.md")
+    if not os.path.isfile(path):
+        fail("SECURITY.md is missing")
+        return
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+
+    payload = _payload_files()
+    markdown = [f for f in payload if f.endswith(".md")]
+    tarball = _tarball_paths()
+    references = [f for f in payload if "/references/" in f and f.endswith(".md")]
+
+    rows = (
+        (r"`git ls-files plugins` returns \*\*(\d+) files", len(payload),
+         "files under plugins/"),
+        (r"returns \*\*\d+ files: (\d+) markdown", len(markdown), "markdown files"),
+        (r"# The shipped payload: (\d+) files\.", len(payload), "files under plugins/"),
+        (r"# (\d+) lines: the plugin manifest", len(payload) - len(markdown),
+         "non-markdown files under plugins/"),
+        (r"\| `references/` files, loaded on demand \| (\d+) \|", len(references),
+         "reference documents"),
+        (r"(\d+) files, listed by\s+`npm pack --dry-run`", len(tarball),
+         "files in the published tarball"),
+        (r"# What npm publishes, and nothing else: (\d+) files\.", len(tarball),
+         "files in the published tarball"),
+    )
+    for pattern, computed, what in rows:
+        found = re.findall(pattern, text)
+        if len(found) != 1:
+            fail(f"SECURITY.md: the sentence matching {pattern!r} appears {len(found)} "
+                 "times, expected exactly once -- the number moved or the sentence did, and "
+                 "either way this check went blind (B-93)")
+            continue
+        if int(found[0]) != computed:
+            fail(f"SECURITY.md states {found[0]} {what}; counting them here gives "
+                 f"{computed} (B-93)")
+
+
+@check
+def check_evals_numbers_are_computed():
+    """`docs/evals/stripe-billing.md` quotes this skill's body budget; recompute it.
+
+    Measured 2026-08-20: the record said `4994` tokens, `441` lines and `0 GAP, 13 PASS`
+    against a tree measuring 4747, 409 and `0 GAP, 14 PASS`. Three of four restated numbers
+    were wrong, in the one document whose subject is measurement.
+
+    The `GAP/PASS` pair is NOT checked here and says so in the document instead: it is
+    `audit_skill.py`'s counter, that script lives in another repository, and a number this
+    gate cannot recompute is carried as a dated reading rather than as a claim.
+    """
+    rel = "docs/evals/stripe-billing.md"
+    path = os.path.join(ROOT, rel)
+    skill = os.path.join(SKILL_ROOT, "stripe-billing", "SKILL.md")
+    if not (os.path.isfile(path) and os.path.isfile(skill)):
+        fail(f"{rel} or stripe-billing/SKILL.md is missing")
+        return
+    body = _body_of(skill)
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    rows = (
+        (r"~(\d+) tokens by the house heuristic", int(len(body) / CHARS_PER_TOKEN),
+         "estimated body tokens"),
+        (r"(\d+) lines of body", body.count("\n") + 1, "body lines"),
+    )
+    for pattern, computed, what in rows:
+        found = re.findall(pattern, text)
+        if len(found) != 1:
+            fail(f"{rel}: the sentence matching {pattern!r} appears {len(found)} times, "
+                 "expected exactly once")
+            continue
+        if int(found[0]) != computed:
+            fail(f"{rel} states {found[0]} {what}; measuring stripe-billing/SKILL.md here "
+                 f"gives {computed}")
+
+
+# ----------------------------------------------- the ledger describes what ships
+
+
+@check
+def check_ledger_names_the_shipped_version():
+    """The ledger's shipped block names the version that actually shipped.
+
+    The defect, measured 2026-08-20: `docs/evidence/verification.md:18` headed its shipped
+    block `## Shipped state — v0.6.0` while `v0.7.0` was tagged and on npm. The file's own
+    opening paragraph says a row is verified once watched passing on the SHIPPED artifact,
+    so a heading naming a superseded version makes every row below it a claim about
+    something else. It had happened before: the same heading said `v0.5.0` while npm served
+    `0.5.2`, and the block that records that is three lines under the one that repeated it.
+
+    Two comparands, because one of them is not always available. `git describe --tags` is
+    the authority and is what the release actually cut; `package.json` -> `version` is what
+    this tree claims and is readable from an export with no git. Where git cannot look --
+    a `/tmp` copy of a submodule checkout, for instance -- the version comparison still
+    fires, so a plant is still refused.
+    """
+    rel = "docs/evidence/verification.md"
+    path = os.path.join(ROOT, rel)
+    if not os.path.isfile(path):
+        fail(f"{rel} is missing -- it is the ledger, and its absence read as zero exposure "
+             "once already")
+        return
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    headings = re.findall(r"^## Shipped state — v(\S+)\s*$", text, re.M)
+    if len(headings) != 1:
+        fail(f"{rel}: found {len(headings)} `## Shipped state — vX.Y.Z` headings, expected "
+             "exactly one. One block describes the shipped artifact; a second is two "
+             "answers to the same question")
+        return
+    named = headings[0]
+    if version and named != version:
+        fail(f"{rel}: the shipped block is headed v{named} and this tree declares "
+             f"v{version}. The rows below it claim to be measured against the shipped "
+             "artifact, so the heading has to name it -- move the block and re-measure, or "
+             "the ledger describes something nobody ships")
+    proc = None
+    try:
+        proc = subprocess.run(["git", "-C", ROOT, "describe", "--tags", "--abbrev=0"],
+                              capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError) as exc:
+        _disclose_routing(f"shipped version — could not ask git ({exc})")
+    if proc is None or proc.returncode != 0:
+        if proc is not None:
+            _disclose_routing("shipped version — git cannot look here, so the heading was "
+                              "compared against package.json only")
+        return
+    tag = proc.stdout.strip().lstrip("v")
+    if tag and named != tag:
+        fail(f"{rel}: the shipped block is headed v{named} and `git describe --tags` prints "
+             f"v{tag} -- the ledger describes an artifact nobody ships")
+
+
+@check
+def check_ledger_quotes_the_validator_verdict():
+    """The verdict this validator prints is the one the shipped block quotes.
+
+    REQ-001 quotes the line as its evidence. On 2026-08-20 it read
+    `(12 checks, 6 skill(s), v0.6.0)` while the tree printed `16 checks … v0.7.0`, and the
+    board row that noticed said `13` -- itself two releases stale. Three numbers for one
+    measurement, none of them connected to the thing measured.
+
+    **Only the shipped block.** The unreleased blocks below it quote 13, 14, 15 and 16
+    checks, and each was true at the commit its row was measured at. Rewriting a dated
+    reading to keep a checker quiet is the failure this file exists to prevent.
+    """
+    rel = "docs/evidence/verification.md"
+    path = os.path.join(ROOT, rel)
+    if not os.path.isfile(path):
+        return  # the check above owns the missing case
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    m = re.search(r"^## Shipped state — .*?(?=^## )", text, re.S | re.M)
+    if not m:
+        fail(f"{rel}: no `## Shipped state` section to read REQ-001 out of")
+        return
+    quoted = re.findall(r"`(OK: sheleg-dev structurally valid \([^`]*\))`", m.group(0))
+    if len(quoted) != 1:
+        fail(f"{rel}: the shipped block quotes the validator verdict {len(quoted)} times, "
+             "expected exactly once (REQ-001). An empty corpus makes this check pass "
+             "everything")
+        return
+    if quoted[0] != verdict_line():
+        fail(f"{rel}: REQ-001 quotes {quoted[0]!r}; this run prints {verdict_line()!r}. "
+             "The row's evidence is the line, so the line has to be the one that comes out")
+
+
+# ------------------------------------------------- coordination and the gate line
+
+
+@check
+def check_agent_sync_config_paths_resolve():
+    """Every path in `.claude/agent-sync.json` resolves.
+
+    Measured 2026-08-20: `mergeLog.file` pointed at `docs/MERGES.md`, which did not exist —
+    a configured destination nothing could write to, in the file whose whole job is keeping
+    two agents from overwriting each other. And `guardedFiles` listed
+    `docs/evidence/verification.md` while omitting `docs/evidence/backlog.md`, so the ledger
+    was claimed and the board it cross-references was not.
+
+    Globs are resolved as globs: `plugins/*/.claude-plugin/plugin.json` is a pattern on
+    purpose, and a pattern that matches nothing is as dead as a missing file.
+    """
+    rel = ".claude/agent-sync.json"
+    path = os.path.join(ROOT, rel)
+    if not os.path.isfile(path):
+        fail(f"{rel} is missing -- coordination is on in this repository "
+             "(docs/AGENT_SYNC.md), and the config is what turns it on")
+        return
+    try:
+        with open(path, encoding="utf-8") as fh:
+            cfg = json.load(fh)
+    except json.JSONDecodeError as exc:
+        fail(f"{rel}: invalid JSON -- {exc}")
+        return
+
+    seen = []
+
+    def walk(node, where):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                walk(v, f"{where}.{k}" if where else k)
+        elif isinstance(node, list):
+            for i, v in enumerate(node):
+                walk(v, f"{where}[{i}]")
+        elif isinstance(node, str) and _PATH_TOKEN.match(node):
+            seen.append((where, node))
+
+    walk(cfg, "")
+    if not seen:
+        fail(f"{rel}: names no path at all -- an empty corpus makes this check pass "
+             "everything, and `guardedFiles` is the reason the file exists")
+        return
+    for where, tok in seen:
+        if "*" in tok:
+            if not glob.glob(os.path.join(ROOT, tok)):
+                fail(f"{rel}: {where} = {tok!r} matches nothing here -- a guarded-file "
+                     "pattern that matches nothing guards nothing")
+        elif not os.path.exists(os.path.join(ROOT, tok)):
+            fail(f"{rel}: {where} = {tok!r} does not exist. A coordination config pointing "
+                 "at a file nobody created is a lease over nothing")
+
+    guarded = set(cfg.get("guardedFiles") or [])
+    for required in ("docs/evidence/verification.md", "docs/evidence/backlog.md"):
+        if required not in guarded:
+            fail(f"{rel}: guardedFiles omits {required!r}. The two evidence documents are "
+                 "edited by every run and cross-reference each other by row id; claiming "
+                 "one and not the other is how two agents renumber the same board")
+
+
+@check
+def check_gate_commands_agree():
+    """`npm test` runs three suites, and the documents that name the gate name all three.
+
+    Measured 2026-08-20: `CONTRIBUTING.md:74` described the gate as two suites — the
+    fixture suite, 16 checks, was missing — and `.github/PULL_REQUEST_TEMPLATE.md:10` asked
+    a contributor for the output of `python3 test/validate.py` alone, one third of the gate.
+    A contributor who supplied exactly what was asked for supplied evidence for a third of
+    it, and the reviewer had no way to notice.
+
+    Derived from `package.json` -> `scripts.test`, so adding a fourth suite fails these two
+    documents rather than passing them.
+    """
+    script = ((pkg or {}).get("scripts") or {}).get("test", "")
+    suites = re.findall(r"(test/[A-Za-z0-9_.-]+\.(?:py|js|mjs))", script)
+    if not suites:
+        fail("package.json: `scripts.test` names no suite -- an empty corpus makes this "
+             "check pass everything")
+        return
+    for rel, needle in (("CONTRIBUTING.md", "npm test"),
+                        (".github/PULL_REQUEST_TEMPLATE.md", "npm test")):
+        path = os.path.join(ROOT, rel)
+        if not os.path.isfile(path):
+            fail(f"{rel} is missing")
+            continue
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+        blocks = [b for _ln, b in _fenced_blocks(text) if needle in b]
+        if not blocks:
+            fail(f"{rel}: no fenced block runs `{needle}` -- it is the gate, and a document "
+                 "that describes the gate without naming it sends a contributor somewhere "
+                 "else")
+            continue
+        joined = "\n".join(blocks)
+        for suite in suites:
+            if suite not in joined:
+                fail(f"{rel}: the `{needle}` block does not name {suite}, which "
+                     f"`package.json` -> `scripts.test` runs. The gate is "
+                     f"{len(suites)} suites; a document naming fewer asks for evidence "
+                     "about part of it")
+
+
+@check
+def check_install_channels_name_the_gate():
+    """Both destructive install channels say the gate does not travel with them.
+
+    `bin/sheleg-dev.js` prints the notice; `install.sh` printed nothing, and it is the more
+    dangerous of the two — `rm -rf "$dest"` per skill, then `cp -R`. Board **B-90** is that
+    a printed reminder is a warning and M-30 calls a warning weaker than a precondition;
+    that argument is about whether printing is ENOUGH, and it does not make printing in one
+    channel and not the other coherent. A reader who installs by shell gets the six skills
+    and no hint that the refusals README advertises are not there.
+    """
+    for rel in ("bin/sheleg-dev.js", "install.sh"):
+        path = os.path.join(ROOT, rel)
+        if not os.path.isfile(path):
+            fail(f"{rel} is missing -- it is one of the two install channels")
+            continue
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+        if "manual gate" not in text:
+            fail(f"{rel}: never says `manual gate`. This channel copies skills and carries "
+                 "no hook, so the one honest thing it can do is say so -- "
+                 "`plugins/sheleg-dev/hooks/` travels with the PLUGIN")
+        if "README.md" not in text:
+            fail(f"{rel}: names no document a reader can register the gate from. A notice "
+                 "with no next step is how an operator learns to ignore notices")
+
+
+@check
 def check_routed_triggers_still_advertised():
     """The family's routing hook fires on words this description has to keep.
 
@@ -1089,8 +1825,11 @@ def check_routed_triggers_still_advertised():
         _disclose_routing(f"routed triggers — {(proc.stderr or 'the checker could not look').strip()}")
 
 
-check_routed_triggers_still_advertised()
 
+# ---------------------------------------------------------------- verdict
+
+for _fn in CHECKS:
+    _fn()
 
 if FAILURES:
     print(f"FAIL: {len(FAILURES)} problem(s)", file=sys.stderr)
@@ -1098,5 +1837,4 @@ if FAILURES:
         print(f"  - {f}", file=sys.stderr)
     sys.exit(1)
 
-checks = 10 + len(skill_dirs)
-print(f"OK: sheleg-dev structurally valid ({checks} checks, {len(skill_dirs)} skill(s), v{version})")
+print(verdict_line())

@@ -4,6 +4,68 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+**The self-test that proved the money invariants was measuring one thing and claiming
+another.** `--self-test` deleted a rule, ran an invariant, and asked whether the invariant
+went red. Twelve invariants carried **45 `assert.` calls**, and the verdict line called
+them *"12 assertions, each watched failing"* — so any assertion that was not the sole
+discriminator of a rule could be replaced by `assert.ok(true)` and nothing anywhere would
+notice. Measured against the shipped v0.7.0 pack: three neutered assertions (the
+`clawbacks.map` deepEqual, the `mirror.periodEnd` equality, the `response.body` deepEqual)
+left `--self-test` at exit 0 and `npm test` at 0. The same hole in `ad-tracking`, in the PII
+guard `references/meta-linkedin.md` advertises by name.
+
+The `assert` an invariant receives is now a recorder: a failure is remembered instead of
+thrown, so the assertions after it still run, and each call site is one measurement
+identified by its line. **37 of 45 watched failing, one call site at a time. Eight declared
+`assert.unmutated`** — an assertion no rule in the pack varies — **and measured unbreakable,
+with the reason at the call site.** Both directions: an `unmutated` assertion a mutant does
+break is a failure too, or the escape hatch is the bypass. Four assertions that were being
+pre-empted by a `TypeError` on the line above them became measurable rather than declared
+away. `test/fixtures_test.js` grew three plants, one of them the NON-first assertion inside
+a multi-assert invariant — the plant that used to pass.
+
+Then the sweep that started there and did not stop:
+
+- **The validator's check count did not count checks.** `checks = 10 + len(skill_dirs)`, so
+  adding a skill moved the number and adding a check did not — and five ledger rows read it
+  as evidence a guard had arrived. Every check is registered; the verdict prints the
+  registry's length, and the ledger's quoted copy of that line is compared against it.
+- **The ledger described an artifact nobody ships.** Its shipped block was headed `v0.6.0`
+  while `v0.7.0` was tagged and on npm, and 37 rows read *verified locally · unreleased*
+  under four blocks closing *"Nothing was released."* The heading is now compared against
+  `git describe --tags` and against `package.json`.
+- **The `mcp__.*` half of the manual gate had no guard.** Deleting that entry from
+  `hooks/hooks.json` left all three suites green, while the decision module does refuse
+  `mcp__…__create_refund` by name. And `README.md`'s copy-channel snippet registered one
+  matcher against the plugin's two — a weaker gate handed out by the document that exists
+  because the channel has none. Both are now checked; the snippet by matcher set.
+- **This repository measured no body budget at all**, so `crypto-payments/SKILL.md` sat past
+  the house working limit and was caught by another repository's auditor. Measured here now,
+  and the skill was **split rather than trimmed**: `references/callback-route-hardening.md`
+  and `references/testing-and-local-dev.md`, 4894 → 4387 tokens. All six skills `0 GAP`.
+- **Counted numbers became computed ones.** Seven in `SECURITY.md` (all four correct on the
+  day they were written, three of them moved by this change) and two in
+  `docs/evals/stripe-billing.md`, which restated `4994` tokens / `441` lines / `0 GAP, 13
+  PASS` against a measured 4747 / 409 / `0 GAP, 14 PASS`.
+- **A document that ships now resolves against the tarball, not only against a clone.**
+  `SECURITY.md` sent a reader to two documents `npm pack` does not contain.
+- **`docs/` joined the checked corpus**, with every document in it classified as live or as
+  a dated record — `docs/AGENT_SYNC.md` had been naming six paths this repository does not
+  have.
+- **`.claude/agent-sync.json` pointed at a file that did not exist** and guarded the ledger
+  without guarding the board.
+- **`CONTRIBUTING.md` called the gate two suites and it runs three**; the PR template asked
+  for one third of it. Both derive the list from `package.json` → `scripts.test` now.
+- **`install.sh` — the channel that `rm -rf`s each destination — printed no notice** that
+  the gate does not travel with it, while the npm installer did.
+
+Fourteen negative self-tests were added, one per guard, and all **42** were watched refusing
+their plants on a green tree. CI run `32293489020` at `6f66255` — 39 steps, 39 `success`,
+28 of 28 negatives — retires the *"CI has not seen any of this"* limitation the ledger had
+recorded four separate times.
+
 ## v0.7.0 — 2026-08-19
 
 **The pack that takes money had the weakest controls in the family, and every one of them

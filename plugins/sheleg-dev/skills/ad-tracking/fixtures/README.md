@@ -3,12 +3,13 @@
 **Copy this whole directory into your repository.** It is the executable half of what
 `SKILL.md` → *E-commerce* and `references/meta-linkedin.md` →
 *Deduplication with the Conversions API* state in prose: the three payloads one purchase
-produces, six assertions a correct emitter must pass, and a self-test that breaks the
-emitter one rule at a time so you can watch every assertion fail.
+produces, six invariants a correct emitter must hold — 12 assertions between them — and a
+self-test that breaks the emitter one rule at a time so you can watch each assertion fail
+on its own.
 
 ```bash
-node assert-dedup-contract.mjs              # 6 assertions against the reference emitter
-node assert-dedup-contract.mjs --self-test  # break one rule at a time; every assertion must go red
+node assert-dedup-contract.mjs              # 6 invariants / 12 assertions
+node assert-dedup-contract.mjs --self-test  # break one rule at a time; EACH ASSERTION must go red
 ```
 
 No dependencies, no network, **no access token anywhere in this directory** — the sink

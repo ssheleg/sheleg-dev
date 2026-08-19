@@ -71,8 +71,15 @@ git clone https://github.com/ssheleg/sheleg-dev && cd sheleg-dev
 One command:
 
 ```bash
-npm test          # python3 test/validate.py, then node test/moneygate_test.js
+npm test          # python3 test/validate.py, then node test/moneygate_test.js,
+                  # then node test/fixtures_test.js
 ```
+
+**Three suites, not two.** This line said two until 2026-08-20, and the missing one was
+`test/fixtures_test.js` — the 16 checks that run both money-assertion packs in both modes
+and plant six neutered assertions. `test/validate.py` now derives the list from
+`package.json` → `scripts.test`, so a fourth suite fails this paragraph rather than
+passing it.
 
 It checks the four-way version sync (`package.json`, the plugin manifest, the
 marketplace manifest and the top `CHANGELOG.md` heading — one number, four files, and a
@@ -110,7 +117,7 @@ routing hook fires on. That check needs an `sshlg-skills` checkout above this on
 **discloses instead of passing** when there is none, so a standalone clone prints an
 `unlooked:` line rather than a false green.
 
-CI runs the same validator plus **twenty-eight** negative self-tests, each of which plants
+CI runs the same validator plus **forty-two** negative self-tests, each of which plants
 a real defect — a version drift, an over-long description, a front-matter name that stops
 matching its directory, a dangling reference link, a reference nobody links, a stray
 `SKILL.md`, a release that stops gating on validate, the validator dropped from CI, a

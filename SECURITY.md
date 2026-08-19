@@ -16,7 +16,7 @@ documents name that does not exist here.
 
 ## What ships, and what of it executes
 
-`git ls-files plugins` returns **50 files: 28 markdown, one plugin manifest, three
+`git ls-files plugins` returns **52 files: 30 markdown, one plugin manifest, three
 files of the manual gate, and 18 files of money fixtures.** Two of the six skills now
 ship code you can run — the assertion packs under `fixtures/` — and that is a change
 from every release before v0.7.0, so it is stated here rather than left to be noticed.
@@ -26,19 +26,23 @@ no socket; the greps below prove all three.
 | Component | Count | Runtime behavior |
 |---|---|---|
 | `SKILL.md`, one per skill | 6 | Text. Read by the agent, executes nothing. |
-| `references/` files, loaded on demand | 20 | Text. Same. |
+| `references/` files, loaded on demand | 22 | Text. Same. |
 | `plugins/sheleg-dev/.claude-plugin/plugin.json` | 1 | Manifest read by Claude Code. |
 | `plugins/sheleg-dev/hooks/hooks.json` | 1 | Hook manifest read by Claude Code. Declares one `PreToolUse` hook and no `if` filter. |
 | `plugins/sheleg-dev/hooks/money-gate.js` | 1 | Runs on a tool call, when the plugin is enabled. Requires `path` and its own decision module — nothing else. Reads stdin, writes one JSON line, exits 0 on every path. |
 | `plugins/sheleg-dev/hooks/lib/moneygate.js` | 1 | Pure. Payload and environment in, verdict out. No `require` at all, no filesystem, no clock. |
 | `bin/sheleg-dev.js` — the npm installer | 1 | Runs only when you invoke it. Node built-ins only: `fs`, `path`, `os`. |
-| `install.sh` — the shell installer | 1 | Runs only when you invoke it. Coreutils only: `cd`, `pwd`, `dirname`, `basename`, `mkdir`, `rm`, `cp`, `echo`. |
+| `install.sh` — the shell installer | 1 | **Not in the tarball** — `files` ships `bin/` and `plugins/`, so this one reaches you only through a clone. Runs when you invoke it. Coreutils only: `cd`, `pwd`, `dirname`, `basename`, `mkdir`, `rm`, `cp`, `echo`. It is the destructive channel: `rm -rf` per skill, then `cp -R`. |
 | `plugins/sheleg-dev/skills/*/fixtures/*.json` — webhook payloads | 12 | Data. Placeholder ids only; no key, token, signing secret or real customer id. |
 | `plugins/sheleg-dev/skills/*/fixtures/*.mjs` — the assertion packs and their reference implementations | 4 | Runs only when you invoke it. Reads the JSON beside it with `readFileSync` and nothing else: no `child_process`, no `fetch`, no write, no `process.env`. |
 | `plugins/sheleg-dev/skills/*/fixtures/manifest.json` and its `README.md` | 4 | Text. The invariant-to-fixture-to-document map, which `test/validate.py` reads. |
 
-The published tarball is those plus `README.md`, `CHANGELOG.md`, `SECURITY.md`,
-`LICENSE` and `package.json` — 56 files, listed by `npm pack --dry-run`.
+The published tarball is `bin/` and `plugins/` plus `README.md`, `CHANGELOG.md`,
+`SECURITY.md`, `LICENSE` and `package.json` — 58 files, listed by
+`npm pack --dry-run`. `install.sh`, `test/`, `docs/` and `CONTRIBUTING.md` are **not**
+in it; `test/validate.py` now refuses a path these shipped documents name that the
+tarball does not carry, because resolving in a clone is the wrong question for a
+document that ships.
 
 **The gate can refuse a command and can never run one.** `money-gate.js` requires
 `path` and the decision module; the decision module requires nothing. There is no
@@ -140,8 +144,11 @@ Not the bytes — the advice. These six skills describe Stripe, Heleket and BTCP
 Google Sign-In, Workload Identity Federation, four ad platforms and browser
 defaults, and every one of those changes. **A claim here that a provider has since
 changed is a security defect in this pack**, not merely a stale doc, and it is the
-exposure `docs/evidence/verification.md` names as the largest one this repository
-does not test. `CONTRIBUTING.md` requires a claim about what a provider does
+exposure the verification ledger names as the largest one this repository does not
+test. **Neither that ledger nor the contributor guide is in this tarball** —
+`docs/evidence/verification.md` and `CONTRIBUTING.md` live in the git repository at
+<https://github.com/ssheleg/sheleg-dev>, and until 2026-08-20 this paragraph named
+both as if you had them. The guide requires a claim about what a provider does
 *today* to carry the date it was true. If you find one that has rotted, report it
 with what the correct claim is and what backs it.
 
@@ -161,7 +168,7 @@ git clone https://github.com/ssheleg/sheleg-dev && cd sheleg-dev
 # self-describing documents name -- this file included.
 python3 test/validate.py
 
-# The shipped payload: 50 files.
+# The shipped payload: 52 files.
 git ls-files plugins
 
 # 22 lines: the plugin manifest, the three files of the manual gate, and the 18
@@ -176,11 +183,13 @@ grep -nE "\brequire\(" plugins/sheleg-dev/hooks/money-gate.js plugins/sheleg-dev
 grep -nE "child_process|\bfetch\(|require\('(http|https|net|fs|dns|tls)'\)|spawn\(|execFile|writeFile|appendFile|unlink" \
   plugins/sheleg-dev/hooks/money-gate.js plugins/sheleg-dev/hooks/lib/moneygate.js
 
-# Both directions of the gate, watched: 65 fixtures, refusals and allow-plants.
+# Both directions of the gate, watched: every refusal and every false-positive
+# plant. The command prints its own count -- this document does not restate it.
 node test/moneygate_test.js
 
 # The money fixtures: both assertion packs against their reference implementation, both
-# --self-test runs, and three plants that neuter an assertion. 13 checks.
+# --self-test runs (per ASSERTION, not per invariant), and the plants that neuter one.
+# The command prints its own count.
 node test/fixtures_test.js
 
 # What the assertion packs cannot reach: NO OUTPUT, and grep exits 1 because it
@@ -196,6 +205,6 @@ grep -nE "require|child_process|exec|spawn|fetch|socket|rm -rf|cp -R|copyFileSyn
 # Live-key shapes across the skill payload: one line, and it is a placeholder.
 grep -rnE "sk_live_[A-Za-z0-9]|rk_live_[A-Za-z0-9]|whsec_[A-Za-z0-9]{8}|BEGIN [A-Z ]*PRIVATE KEY" plugins
 
-# What npm publishes, and nothing else: 56 files.
+# What npm publishes, and nothing else: 58 files.
 npm pack --dry-run
 ```

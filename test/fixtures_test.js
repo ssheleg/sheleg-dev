@@ -26,6 +26,15 @@
  *      statement — which is the same defect one level up, and the one SD-03 caught when a
  *      `require` check turned out to be reading a doc comment.
  *
+ * Requirement 3 is the one that had a hole in it, and the plants below are why it no longer
+ * does. Until 2026-08-20 every plant here neutered an invariant's ONLY assertion, because
+ * that was the only kind the packs could catch: their runner returned on the first throw and
+ * their matrix compared one row per invariant, so a NON-FIRST assertion inside a multi-assert
+ * invariant could be replaced by `assert.ok(true)` with `--self-test` still at exit 0 and
+ * `npm test` still green. Measured that day across both packs — three neutered assertions in
+ * `stripe-billing` and the PII guard in `ad-tracking`, all four undetected. The packs now
+ * measure per call site, and the last three plants are the ones that would have caught it.
+ *
  * Plus the placeholder sweep, because these files exist to be copied into other people's
  * repositories.
  */
@@ -86,7 +95,9 @@ for (const { skill, pack, handler } of PACKS) {
     const r = run(dir, pack, ['--self-test']);
     assert.strictEqual(r.status, 0, `exit ${r.status}\n${r.stdout}${r.stderr}`);
     assert.match(r.stdout, /isolation —/, 'the self-test printed no isolation report');
-    assert.match(r.stdout, /each watched failing/, 'the self-test printed no verdict');
+    assert.match(r.stdout, /assertion x mutant/, 'the self-test printed no per-assertion matrix');
+    assert.match(r.stdout, /watched failing ONE CALL SITE AT A TIME/,
+      'the self-test printed no verdict');
   });
 
   check(`${skill}: the pack reads no network, writes no file, spawns nothing`, () => {
@@ -150,6 +161,44 @@ const PLANTS = [
     from: "    if (has('grant-marker') && granted.has(period.start)) {",
     to: "    if (granted.has(period.start)) {",
   },
+  {
+    name: 'a NON-FIRST assertion neutered inside a multi-assert invariant '
+      + '(stripe: the cumulative clawback list)',
+    skill: 'stripe-billing',
+    pack: 'assert-money-invariants.mjs',
+    file: 'assert-money-invariants.mjs',
+    // The third of three assertions in `refund-total-is-cumulative`, and the exact plant
+    // that used to pass: the `total` equality above it discriminates the same rule, so the
+    // invariant still went red and the old per-invariant matrix saw nothing. Per call site,
+    // this assertion is now broken by no mutant, which is the whole finding.
+    from: '      assert.deepEqual(store.clawbacks.map((c) => c.amount), [4000, 5000]);',
+    to: '      assert.ok(true);',
+  },
+  {
+    name: 'a NON-FIRST assertion neutered inside a multi-assert invariant '
+      + '(ad-tracking: the PII guard meta-linkedin.md advertises by name)',
+    skill: 'ad-tracking',
+    pack: 'assert-dedup-contract.mjs',
+    file: 'assert-dedup-contract.mjs',
+    // Second of two in `identifiers-reach-the-server-hashed`. The `assert.match` above it
+    // catches the same mutant, so neutering this one left the pack green while the
+    // reference that names it kept telling a reader it was enforced.
+    from: "      assert.ok(!JSON.stringify(userData).includes('@'),\n"
+      + "        'user_data carries something with an @ in it');",
+    to: '      assert.ok(true);',
+  },
+  {
+    name: 'a live discriminator silenced by declaring it unmutated (stripe: the renewal grant)',
+    skill: 'stripe-billing',
+    pack: 'assert-money-invariants.mjs',
+    file: 'assert-money-invariants.mjs',
+    // The other direction of the same guard. `assert.unmutated` is the escape hatch for an
+    // assertion no rule varies, and an escape hatch nobody checks is how a real
+    // discriminator gets quietly parked in it. Measured breakable while declared
+    // unbreakable has to be a failure, or the hatch is a bypass.
+    from: "      assert.equal(store.grants.length, 1, 'a paid renewal granted nothing');",
+    to: "      assert.unmutated.equal(store.grants.length, 1, 'a paid renewal granted nothing');",
+  },
 ];
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sd04-'));
@@ -188,4 +237,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(`OK: money fixtures — ${passed} checks (both packs, both modes, `
-  + `${PLANTS.length} neutered-assertion plants)`);
+  + `${PLANTS.length} plants: neutered assertions, an unremovable rule, and a live `
+  + 'discriminator parked in the unmutated escape hatch)');

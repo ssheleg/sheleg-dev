@@ -82,8 +82,17 @@ run them before claiming the skill improves anything.
 
 ## Verified at authoring time
 
-- Body budget, both counters: 4522 tokens (cl100k) / 4994 by the house
-  heuristic, 441 lines — `make-skill-audit … --house` reports 0 GAP, 13 PASS.
+- Body budget: ~4747 tokens by the house heuristic, 409 lines of body — both
+  recomputed by `test/validate.py` (`check_evals_numbers_are_computed`), because the
+  three numbers this line used to carry were measured once and restated afterwards:
+  `4994` tokens, `441` lines and `0 GAP, 13 PASS` against a tree that measured 4747,
+  409 and `0 GAP, 14 PASS`. Three of four wrong, in the document whose subject is
+  measurement.
+- The `GAP/PASS` pair is a **dated reading, not a computed one**: `audit_skill.py --house`
+  printed `0 GAP, 14 PASS` for this skill on 2026-08-20, and that script ships with
+  `make-skill` in another repository. There is no tokeniser in this repository's
+  toolchain either, which is why the cl100k count is gone rather than restated — a
+  number nothing here can recompute is a claim, and this file already learned that.
 - Official material read from `docs.stripe.com/agents`, `/skills`, `/mcp` and
   the CLI's own `--help` on 2026-08-11, against Stripe CLI 1.45.2.
 - Neighbour set read from

@@ -10,6 +10,7 @@
     ".claude-plugin/marketplace.json",
     "plugins/*/.claude-plugin/plugin.json",
     "docs/evidence/verification.md",
+    "docs/evidence/backlog.md",
     ".github/workflows/*.yml",
     "test/validate.py"
   ],

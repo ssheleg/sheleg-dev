@@ -606,6 +606,278 @@ jobs:
             echo "OK: the gate notices when it stops being a gate"
           fi
 
+      # ------------------------------------------------------------------ 2026-08-20
+      # Thirteen more, one per guard added the day the check count turned out to be
+      # `10 + len(skill_dirs)` -- a number that moved when a skill was added and stood
+      # still when a check was, quoted in four ledger rows as evidence that a guard had
+      # been added.
+
+      - name: Negative self-test (a check count that does not count the checks must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/countderive && cp -R . /tmp/countderive
+          python3 - <<'PY'
+          p = "/tmp/countderive/test/validate.py"
+          s = open(p, encoding="utf-8").read()
+          old = "@check\ndef check_routed_triggers_still_advertised():"
+          assert old in s, "PLANT DID NOT LAND: the last registered check moved"
+          s = s.replace(old, "@check\ndef check_planted_extra():\n    pass\n\n\n" + old, 1)
+          open(p, "w", encoding="utf-8").write(s)
+          PY
+          if python3 /tmp/countderive/test/validate.py; then
+            echo "ERROR: registering a check did not move the number the ledger quotes"
+            exit 1
+          else
+            echo "OK: the verdict counts the registry, so a new check is visible"
+          fi
+
+      - name: Negative self-test (a SKILL.md body past the house working limit must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/bodybudget && cp -R . /tmp/bodybudget
+          python3 - <<'PY'
+          p = "/tmp/bodybudget/plugins/sheleg-dev/skills/crypto-payments/SKILL.md"
+          s = open(p, encoding="utf-8").read()
+          pad = ("\nA planted paragraph, here only to push this body past the working "
+                 "limit so the gate can be watched refusing it. It says nothing and it "
+                 "costs the same as a paragraph that does.\n") * 12
+          open(p, "w", encoding="utf-8").write(s + pad)
+          PY
+          if python3 /tmp/bodybudget/test/validate.py; then
+            echo "ERROR: validator accepted a body past the 4750 working limit"
+            exit 1
+          else
+            echo "OK: the body budget is measured here, not in another repository"
+          fi
+
+      - name: Negative self-test (a ledger heading naming a version nobody ships must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/ledgerver && cp -R . /tmp/ledgerver
+          python3 - <<'PY'
+          import re
+          p = "/tmp/ledgerver/docs/evidence/verification.md"
+          s = open(p, encoding="utf-8").read()
+          s2, n = re.subn(r"^## Shipped state — v\S+$", "## Shipped state — v0.0.1", s,
+                          count=1, flags=re.M)
+          assert n == 1, "PLANT DID NOT LAND: no shipped-state heading"
+          open(p, "w", encoding="utf-8").write(s2)
+          PY
+          if python3 /tmp/ledgerver/test/validate.py; then
+            echo "ERROR: the ledger may describe an artifact nobody ships"
+            exit 1
+          else
+            echo "OK: the shipped heading has to name what shipped"
+          fi
+
+      - name: Negative self-test (a ledger quoting a verdict the validator does not print must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/ledgerverdict && cp -R . /tmp/ledgerverdict
+          python3 - <<'PY'
+          import re
+          p = "/tmp/ledgerverdict/docs/evidence/verification.md"
+          s = open(p, encoding="utf-8").read()
+          s2, n = re.subn(r"`OK: sheleg-dev structurally valid \((\d+) checks",
+                          "`OK: sheleg-dev structurally valid (99 checks", s, count=1)
+          assert n == 1, "PLANT DID NOT LAND: no quoted verdict in the ledger"
+          open(p, "w", encoding="utf-8").write(s2)
+          PY
+          if python3 /tmp/ledgerverdict/test/validate.py; then
+            echo "ERROR: REQ-001 may quote a verdict nothing prints"
+            exit 1
+          else
+            echo "OK: the quoted verdict is the printed verdict"
+          fi
+
+      - name: Negative self-test (a counted number in SECURITY.md that nothing recomputes must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/seccount && cp -R . /tmp/seccount
+          python3 - <<'PY'
+          p = "/tmp/seccount/SECURITY.md"
+          s = open(p, encoding="utf-8").read()
+          old = "# The shipped payload: 52 files."
+          assert old in s, "PLANT DID NOT LAND: the payload count sentence moved"
+          open(p, "w", encoding="utf-8").write(s.replace(old, "# The shipped payload: 51 files."))
+          PY
+          if python3 /tmp/seccount/test/validate.py; then
+            echo "ERROR: SECURITY.md may state a count nobody recomputes (B-93)"
+            exit 1
+          else
+            echo "OK: every counted number in SECURITY.md is recomputed here"
+          fi
+
+      - name: Negative self-test (a stale body-budget number in the evals record must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/evalnum && cp -R . /tmp/evalnum
+          python3 - <<'PY'
+          import re
+          p = "/tmp/evalnum/docs/evals/stripe-billing.md"
+          s = open(p, encoding="utf-8").read()
+          s2, n = re.subn(r"~\d+ tokens by the house heuristic",
+                          "~4994 tokens by the house heuristic", s, count=1)
+          assert n == 1, "PLANT DID NOT LAND: the token sentence moved"
+          open(p, "w", encoding="utf-8").write(s2)
+          PY
+          if python3 /tmp/evalnum/test/validate.py; then
+            echo "ERROR: the evals record may restate a body-budget number"
+            exit 1
+          else
+            echo "OK: the evals numbers are recomputed from the skill"
+          fi
+
+      - name: Negative self-test (a coordination config pointing at a missing file must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/syncpath && cp -R . /tmp/syncpath
+          python3 - <<'PY'
+          import json
+          p = "/tmp/syncpath/.claude/agent-sync.json"
+          cfg = json.load(open(p, encoding="utf-8"))
+          assert cfg["mergeLog"]["file"], "PLANT DID NOT LAND: no mergeLog.file"
+          cfg["mergeLog"]["file"] = "docs/NOPE.md"
+          open(p, "w", encoding="utf-8").write(json.dumps(cfg, indent=2) + "\n")
+          PY
+          if python3 /tmp/syncpath/test/validate.py; then
+            echo "ERROR: the coordination config may point at a file nobody created"
+            exit 1
+          else
+            echo "OK: every path in .claude/agent-sync.json resolves"
+          fi
+
+      - name: Negative self-test (guardedFiles claiming the ledger and not the board must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/syncguard && cp -R . /tmp/syncguard
+          python3 - <<'PY'
+          import json
+          p = "/tmp/syncguard/.claude/agent-sync.json"
+          cfg = json.load(open(p, encoding="utf-8"))
+          before = len(cfg["guardedFiles"])
+          cfg["guardedFiles"] = [f for f in cfg["guardedFiles"]
+                                 if f != "docs/evidence/backlog.md"]
+          assert len(cfg["guardedFiles"]) == before - 1, "PLANT DID NOT LAND"
+          open(p, "w", encoding="utf-8").write(json.dumps(cfg, indent=2) + "\n")
+          PY
+          if python3 /tmp/syncguard/test/validate.py; then
+            echo "ERROR: the board may be edited unclaimed while the ledger is claimed"
+            exit 1
+          else
+            echo "OK: both evidence documents are guarded"
+          fi
+
+      - name: Negative self-test (a gate line naming fewer suites than npm test runs must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/gateline && cp -R . /tmp/gateline
+          python3 - <<'PY'
+          p = "/tmp/gateline/CONTRIBUTING.md"
+          s = open(p, encoding="utf-8").read()
+          old = "                  # then node test/fixtures_test.js"
+          assert old in s, "PLANT DID NOT LAND: the gate line moved"
+          open(p, "w", encoding="utf-8").write(s.replace(old, "                  #"))
+          PY
+          if python3 /tmp/gateline/test/validate.py; then
+            echo "ERROR: a document may describe two thirds of the gate as the gate"
+            exit 1
+          else
+            echo "OK: the gate line is derived from package.json -> scripts.test"
+          fi
+
+      - name: Negative self-test (an install channel that hides the missing gate must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/installnotice && cp -R . /tmp/installnotice
+          python3 - <<'PY'
+          p = "/tmp/installnotice/install.sh"
+          s = open(p, encoding="utf-8").read()
+          assert "manual gate" in s, "PLANT DID NOT LAND: install.sh says nothing about the gate"
+          open(p, "w", encoding="utf-8").write(s.replace("manual gate", "installer"))
+          PY
+          if python3 /tmp/installnotice/test/validate.py; then
+            echo "ERROR: the destructive copy channel may ship without naming the gate"
+            exit 1
+          else
+            echo "OK: both install channels say the gate does not travel with them"
+          fi
+
+      - name: Negative self-test (an unclassified document under docs/ must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/docsclass && cp -R . /tmp/docsclass
+          printf '# Planted\n\nNames `scripts/nope.py`, which is nowhere.\n' \
+            > /tmp/docsclass/docs/PLANTED.md
+          if python3 /tmp/docsclass/test/validate.py; then
+            echo "ERROR: a document under docs/ may arrive outside the corpus"
+            exit 1
+          else
+            echo "OK: every document under docs/ is checked or declared a dated record"
+          fi
+
+      - name: Negative self-test (a shipped document naming a clone-only path must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/tarpath && cp -R . /tmp/tarpath
+          python3 - <<'PY'
+          p = "/tmp/tarpath/SECURITY.md"
+          s = open(p, encoding="utf-8").read()
+          anchor = "## Reporting a problem"
+          assert anchor in s, "PLANT DID NOT LAND"
+          s = s.replace(anchor, "See `docs/evidence/backlog.md` for the open list.\n\n"
+                        + anchor, 1)
+          open(p, "w", encoding="utf-8").write(s)
+          PY
+          if python3 /tmp/tarpath/test/validate.py; then
+            echo "ERROR: a document that ships may point at a path the tarball lacks"
+            exit 1
+          else
+            echo "OK: a shipped document resolves against the tarball too"
+          fi
+
+      - name: Negative self-test (dropping the mcp__ half of the gate must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/mcpgate && cp -R . /tmp/mcpgate
+          python3 - <<'PY'
+          import json
+          p = "/tmp/mcpgate/plugins/sheleg-dev/hooks/hooks.json"
+          h = json.load(open(p, encoding="utf-8"))
+          pre = h["hooks"]["PreToolUse"]
+          before = len(pre)
+          h["hooks"]["PreToolUse"] = [e for e in pre if "mcp__" not in (e.get("matcher") or "")]
+          assert len(h["hooks"]["PreToolUse"]) == before - 1, "PLANT DID NOT LAND: no mcp matcher"
+          open(p, "w", encoding="utf-8").write(json.dumps(h, indent=2) + "\n")
+          PY
+          if python3 /tmp/mcpgate/test/validate.py; then
+            echo "ERROR: create_refund on an MCP server may bypass the gate unnoticed"
+            exit 1
+          else
+            echo "OK: both doors of the gate are required"
+          fi
+
+      - name: Negative self-test (a copy-channel snippet weaker than the plugin must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/snippetgate && cp -R . /tmp/snippetgate
+          python3 - <<'PY'
+          import re
+          p = "/tmp/snippetgate/README.md"
+          s = open(p, encoding="utf-8").read()
+          pat = r'\n    \{ "matcher": "mcp__\.\*",(?:.|\n)*?"timeout": 15 \} \] \}\n'
+          s2, n = re.subn(pat, "\n", s, count=1)
+          assert n == 1, "PLANT DID NOT LAND: the snippet's mcp entry moved"
+          s2 = s2.replace('"timeout": 15 } ] },', '"timeout": 15 } ] }', 1)
+          open(p, "w", encoding="utf-8").write(s2)
+          PY
+          if python3 /tmp/snippetgate/test/validate.py; then
+            echo "ERROR: the README may hand a copy-channel reader a weaker gate"
+            exit 1
+          else
+            echo "OK: the snippet is compared against the plugin manifest"
+          fi
+
       - name: install.sh syntax check
         run: bash -n install.sh
 

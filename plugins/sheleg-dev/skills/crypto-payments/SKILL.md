@@ -39,15 +39,13 @@ and anything else that issues an invoice and calls you back.
 - [Status mapping — and finality](#status-mapping--and-finality)
 - [Webhook signature verification](#webhook-signature-verification)
 - [Idempotent webhook processing](#idempotent-webhook-processing)
-- [IP allowlisting behind a proxy](#ip-allowlisting-behind-a-proxy)
-- [CSRF exemption for callback routes](#csrf-exemption-for-callback-routes)
+- [Callback route hardening](#callback-route-hardening)
 - [The conversion buffer](#the-conversion-buffer)
 - [Reconciliation fields](#reconciliation-fields)
 - [Crediting: the amount waterfall](#crediting-the-amount-waterfall)
 - [Refunds and AML holds](#refunds-and-aml-holds)
 - [The test/live credential boundary](#the-testlive-credential-boundary)
-- [Local development](#local-development)
-- [Test matrix](#test-matrix)
+- [Local development and the test matrix](#local-development-and-the-test-matrix)
 - [Security checklist](#security-checklist)
 - [Common pitfalls](#common-pitfalls)
 
@@ -192,46 +190,17 @@ the read.
 
 ---
 
-## IP allowlisting behind a proxy
+## Callback route hardening
 
-Signature verification is the real gate; the allowlist is defence in depth and
-cheap. It is also the single most common cause of "webhooks stopped working
-after we moved to a load balancer".
+Two things about the *request* rather than about the money in it, and each one is the
+usual cause of "webhooks stopped working after we moved to a load balancer": reading the
+caller IP from the proxy hop you actually own instead of `x-forwarded-for[0]`, and
+exempting the **one** callback path from CSRF by exact match rather than by prefix — a
+prefix on `/api/payments` exempts the checkout endpoint too, which is where the money is.
 
-```ts
-function callerIp(req): string | null {
-  // Trust ONLY the hop your own infrastructure appends.
-  const xff = req.headers['x-forwarded-for'];
-  if (typeof xff === 'string') {
-    const hops = xff.split(',').map((s) => s.trim());
-    return hops[hops.length - TRUSTED_PROXY_COUNT] ?? null;
-  }
-  return req.socket.remoteAddress ?? null;
-}
-```
-
-Taking `xff[0]` trusts a header the client controls — anyone can claim to be the
-gateway. Count from the right by the number of proxies you actually run, and
-keep that number in configuration, because it changes when infrastructure does.
-
-Allowlist the provider's published callback IPs, log a rejection with the
-observed IP, and **never** fall back to "allow if the header is missing".
-
----
-
-## CSRF exemption for callback routes
-
-A gateway cannot present your CSRF token. Exempt the callback path explicitly
-and narrowly:
-
-```ts
-// middleware.ts (Next.js)
-export const config = { matcher: ['/((?!api/payments/webhook).*)'] };
-```
-
-Exempt the **one** path, by exact match, and make it the only route in your app
-that skips CSRF. A prefix match on `/api/payments` exempts the checkout endpoint
-too, which is where the money is.
+Both, with the code:
+[`references/callback-route-hardening.md`](references/callback-route-hardening.md).
+Signature verification above is the real gate; these are defence in depth.
 
 ---
 
@@ -374,45 +343,13 @@ boundary* and *Residual exposure*.
 
 ---
 
-## Local development
+## Local development and the test matrix
 
-Two paths, and you want both:
-
-**Skip the gateway.** A `SKIP_BILLING=true` branch that credits immediately and
-logs loudly. Everyone building a feature that merely *touches* checkout should
-use this. Make it impossible in production: assert `NODE_ENV !== 'production'`
-at the branch, not just in config.
-
-**Real gateway, tunnelled callback.** Callbacks cannot reach `localhost`:
-
-```bash
-cloudflared tunnel --url http://localhost:3000
-# → https://random-name.trycloudflare.com  →  set as the callback base URL, restart the app
-```
-
-Then keep a **signed mock callback** in your test tooling — a script that builds
-a real payload, signs it with the dev key and POSTs it. This is what makes the
-sad paths (`wrong_amount`, `refund_fail`, `locked`) testable at all; you cannot
-ask a gateway to underpay you on demand.
-
----
-
-## Test matrix
-
-Cover these, and plant a defect against each before believing the green:
-
-| Case | What it catches |
-|---|---|
-| valid signature | the happy path |
-| tampered signature | constant-time compare, 403 not 500 |
-| signature over a payload containing a URL | the escaping trap |
-| duplicate delivery of a settling status | idempotency guard |
-| `paid_over` | crediting the received amount, not the invoiced |
-| `wrong_amount` | no full credit on a partial payment |
-| out-of-order delivery (final, then earlier) | the `notIn` guard, not timestamps |
-| callback from a non-allowlisted IP | proxy-aware extraction |
-| `refund_process` then `refund_fail` | refund is a state machine |
-| `locked` | no credit, no auto-cancel |
+Two development paths you want both of — a `SKIP_BILLING=true` branch that is impossible
+in production, and a real gateway behind a tunnel with a signed mock callback for the sad
+paths a provider will not produce on demand — plus the ten cases to cover before believing
+a green suite, each with the defect it catches:
+[`references/testing-and-local-dev.md`](references/testing-and-local-dev.md).
 
 ---
 

@@ -22,8 +22,9 @@ Each carries its own references and loads them only when the work reaches them.
 
 **Two of them ship a suite rather than a warning.** `stripe-billing` and `ad-tracking`
 carry a `fixtures/` directory — real provider webhook bodies, an assertion pack, and a
-`--self-test` that deletes one rule at a time so you can watch every assertion fail. Copy
-the directory in and run it:
+`--self-test` that deletes one rule at a time so you can watch every assertion fail — one
+call site at a time, which is not the same thing as one invariant at a time. Copy the
+directory in and run it:
 
 ```bash
 node plugins/sheleg-dev/skills/stripe-billing/fixtures/assert-money-invariants.mjs --self-test
@@ -163,11 +164,23 @@ settings, by design.
   `.claude/settings.json`:
 
   ```json
-  { "hooks": { "PreToolUse": [ { "matcher": "Bash",
+  { "hooks": { "PreToolUse": [
+    { "matcher": "Bash",
       "hooks": [ { "type": "command",
         "command": "node \"$HOME/.claude/skills/.sheleg-dev-hooks/money-gate.js\"",
-        "timeout": 15 } ] } ] } }
+        "timeout": 15 } ] },
+    { "matcher": "mcp__.*",
+      "hooks": [ { "type": "command",
+        "command": "node \"$HOME/.claude/skills/.sheleg-dev-hooks/money-gate.js\"",
+        "timeout": 15 } ] }
+  ] } }
   ```
+
+  **Both entries, not just the first.** A refund does not care which door it came
+  through: `create_refund` on an MCP server never touches a shell, and the table above
+  advertises it. Until 2026-08-20 this snippet carried the `Bash` matcher alone — a
+  weaker gate than the plugin's, handed out by the document that exists because the copy
+  channels have no gate at all. `test/validate.py` now compares the two matcher sets.
 
   Copy `plugins/sheleg-dev/hooks/` to that path first. `npx @ssheleg/sheleg-dev` prints
   this reminder; **nothing enforces it**, which is why the plugin channel is the
@@ -219,8 +232,9 @@ matter does not error — hosts truncate it silently, which is worse); and
 dangling link nor a file nobody loads can ship.
 
 Plus, for the money fixtures, that every assertion has been watched failing and that no
-two rules are covering for each other — `test/fixtures_test.js` neuters three assertions
-and requires each pack's `--self-test` to notice.
+two rules are covering for each other — `test/fixtures_test.js` neuters assertions,
+including one that is **not** the first inside a multi-assert invariant, and requires each
+pack's `--self-test` to notice. That last plant is the one that used to pass.
 
 CI plants a defect against every one of those guards and requires the validator
 to fail. A green from a check nobody has watched fail is not evidence.
