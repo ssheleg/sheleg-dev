@@ -1,0 +1,29 @@
+{
+  "description": "sheleg-dev — the manual gate. A PreToolUse hook that refuses money movement, an irreversible action, live production access and the pack's own free-money path unless the authorised person has signed the category off for this session. Deliberately carries NO `if` filter: the reference calls that filter best-effort and says it fails open on a command it cannot parse, so the decision is made in lib/moneygate.js instead. Exits 0 on every path, so a project that never touches payments sees nothing.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/money-gate.js\"",
+            "statusMessage": "manual gate: money movement and live access",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/money-gate.js\"",
+            "statusMessage": "manual gate: money movement and live access",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

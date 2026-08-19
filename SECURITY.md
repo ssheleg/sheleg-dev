@@ -16,19 +16,32 @@ documents name that does not exist here.
 
 ## What ships, and what of it executes
 
-`git ls-files plugins` returns **27 files: 26 markdown and one plugin manifest.**
-There is no runtime code inside the skills.
+`git ls-files plugins` returns **30 files: 26 markdown, one plugin manifest, and
+three files of the manual gate.** There is still no runtime code inside the six
+skills — the gate sits beside them, at plugin level.
 
 | Component | Count | Runtime behavior |
 |---|---|---|
 | `SKILL.md`, one per skill | 6 | Text. Read by the agent, executes nothing. |
 | `references/` files, loaded on demand | 20 | Text. Same. |
 | `plugins/sheleg-dev/.claude-plugin/plugin.json` | 1 | Manifest read by Claude Code. |
+| `plugins/sheleg-dev/hooks/hooks.json` | 1 | Hook manifest read by Claude Code. Declares one `PreToolUse` hook and no `if` filter. |
+| `plugins/sheleg-dev/hooks/money-gate.js` | 1 | Runs on a tool call, when the plugin is enabled. Requires `path` and its own decision module — nothing else. Reads stdin, writes one JSON line, exits 0 on every path. |
+| `plugins/sheleg-dev/hooks/lib/moneygate.js` | 1 | Pure. Payload and environment in, verdict out. No `require` at all, no filesystem, no clock. |
 | `bin/sheleg-dev.js` — the npm installer | 1 | Runs only when you invoke it. Node built-ins only: `fs`, `path`, `os`. |
 | `install.sh` — the shell installer | 1 | Runs only when you invoke it. Coreutils only: `cd`, `pwd`, `dirname`, `basename`, `mkdir`, `rm`, `cp`, `echo`. |
 
 The published tarball is those plus `README.md`, `CHANGELOG.md`, `SECURITY.md`,
-`LICENSE` and `package.json` — 33 files, listed by `npm pack --dry-run`.
+`LICENSE` and `package.json` — 36 files, listed by `npm pack --dry-run`.
+
+**The gate can refuse a command and can never run one.** `money-gate.js` requires
+`path` and the decision module; the decision module requires nothing. There is no
+`child_process`, no `fetch`, no `http`, no `fs` on either path — so the strongest
+thing it can do to your session is print a denial, and the strongest thing a bug
+in it can do is print nothing. It reads `process.env` for one variable pair
+(`SHELEG_DEV_LIVE_AUTHORISED`, `SHELEG_DEV_MONEY_GATE`) and the environment
+declaration a run already carries, and it never writes to any file. `README.md` →
+*The manual gate* is its single home.
 
 **There are no npm lifecycle scripts.** `package.json` declares exactly one
 script, `test`. Installing this package, or reaching it through `npx`, runs
@@ -107,7 +120,9 @@ environment variables, never in source and never in logs:
 
 ## What this pack never does
 
-- It never charges, refunds, rotates or revokes anything. It has no code that could.
+- It never charges, refunds, rotates or revokes anything. It has no code that could
+  — and since 2026-08-19 it ships a hook whose whole purpose is to stop an *agent*
+  from doing so unasked. `README.md` → *The manual gate*.
 - It never asks for a key, and has nowhere to send one.
 - It does not choose your payment processor. Licensing, AML programme and
   sanctions exposure are a business and compliance decision, and `README.md` says
@@ -140,11 +155,23 @@ git clone https://github.com/ssheleg/sheleg-dev && cd sheleg-dev
 # self-describing documents name -- this file included.
 python3 test/validate.py
 
-# The shipped payload: 27 files.
+# The shipped payload: 30 files.
 git ls-files plugins
 
-# One line, the plugin manifest. Everything else in the payload is markdown.
+# Four lines: the plugin manifest and the three files of the manual gate.
+# Everything else in the payload is markdown.
 git ls-files plugins | grep -v '\.md$'
+
+# Every require the gate makes: two lines, both in the hook -- `path`, and its own
+# decision module. The decision module makes none.
+grep -nE "\brequire\(" plugins/sheleg-dev/hooks/money-gate.js plugins/sheleg-dev/hooks/lib/moneygate.js
+
+# What it cannot reach: NO OUTPUT, and grep exits 1 because it matched nothing.
+grep -nE "child_process|\bfetch\(|require\('(http|https|net|fs|dns|tls)'\)|spawn\(|execFile|writeFile|appendFile|unlink" \
+  plugins/sheleg-dev/hooks/money-gate.js plugins/sheleg-dev/hooks/lib/moneygate.js
+
+# Both directions of the gate, watched: 65 fixtures, refusals and allow-plants.
+node test/moneygate_test.js
 
 # The entire I/O surface of the only two executable files: eleven lines. Three
 # built-in requires, the copy/mkdir/remove calls, homedir, and install.sh's
@@ -154,6 +181,6 @@ grep -nE "require|child_process|exec|spawn|fetch|socket|rm -rf|cp -R|copyFileSyn
 # Live-key shapes across the skill payload: one line, and it is a placeholder.
 grep -rnE "sk_live_[A-Za-z0-9]|rk_live_[A-Za-z0-9]|whsec_[A-Za-z0-9]{8}|BEGIN [A-Z ]*PRIVATE KEY" plugins
 
-# What npm publishes, and nothing else: 33 files.
+# What npm publishes, and nothing else: 36 files.
 npm pack --dry-run
 ```

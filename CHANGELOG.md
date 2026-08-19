@@ -25,8 +25,9 @@ directory named `sheleg-dev` that has never existed.
 reader to verify its safety with commands that fail — for a pack whose subject is payment
 credentials and sign-in. **Six dead references** in one document.
 
-Rewritten against what the tree actually returns: 27 files in the skill payload, 26 of them
-markdown and one a plugin manifest; two installers using nothing but Node built-ins and
+Rewritten against what the tree actually returns: 27 files in the skill payload at that
+commit, 26 of them markdown and one a plugin manifest — 30 once the manual gate shipped
+three files beside them, see below; two installers using nothing but Node built-ins and
 coreutils, with no network, no subprocess and no npm lifecycle script; the one destructive
 difference between them (`install.sh` runs `rm -rf` on the destination every time,
 `bin/sheleg-dev.js` skips unless `--force`); credential *names* in examples and no key, with
@@ -109,6 +110,79 @@ same breath as the defect it flags turns the gate red for work this change did n
 other three credential-holding skills were not looked at (B-87), and this reference is now
 a 4× size outlier among references, filed as B-88 with a split rather than a trim as the
 remedy — the precedent this repository set at v0.6.0.
+
+### The four manual-gate categories were prose, and prose stops nothing
+
+`pod-manifesto/manifesto.md:204` names money movement, irreversible action, production
+access and destructive operations as the authorised person's to decide: *"The agent
+prepares the decision and its evidence. The authorised person decides."* And `:200`: *"a
+precondition is stronger than a warning."*
+
+This pack named all four and stopped none. `crypto-payments/SKILL.md:310` said **"Never
+auto-refund from the webhook. Route holds and refunds to a queue a human can see"**;
+`stripe-billing/references/webhook-events.md:170` said a dispute is **"money already gone
+plus a fee … route it to a human — evidence has a deadline"**. The plugin shipped no hooks,
+no permission list and no gate, so both were advice to a reader who could skip it and to an
+agent that never saw it. SD-02's boot assertion was the one real control here, and it runs
+*inside the reader's application* — it cannot see a shell that merely **exports** the same
+live merchant credential before any application starts.
+
+**Shipped: a `PreToolUse` hook, `plugins/sheleg-dev/hooks/`.** Eight refusals, unless the
+authorised person has signed the category off for the session: a live-shaped
+`sk_live_…`/`rk_live_…` key reaching a command; an export of `HELEKET_API_KEY` — the one
+credential SD-02 established has no test variant — in a run declaring `test` or declaring
+nothing; `stripe refunds create` or a POST to a `…/v1/refunds` URL or a `create_refund`
+tool; a payout or transfer, including Heleket's `…/v1/payout`; `stripe disputes close`; an
+explicit `--live` flag; a command setting the gate's **own** switch; and `SKIP_BILLING=true`
+in a run declaring production. The last two are never authorisable, and **no** category is
+authorisable in a run that declares a non-production environment — a run that says it is a
+test and then refunds a real card is incoherent whichever half is true.
+
+Three invariants borrowed from the family umbrella, each one enforced by the validator so
+it cannot be quietly collapsed. **The deciding is a pure module** —
+`hooks/lib/moneygate.js`, payload and environment in, verdict out, no `require` of its own
+and no filesystem — and the hook only moves bytes. **The hook fails silent**: it catches
+everything and exits 0, because a guard that throws breaks every turn in every session,
+including sessions of packs that never asked for this one; and every refusal names its
+remedy, because one without a next step teaches an operator to switch the hook off.
+**There is no `if` filter** on the hook entry: the reference calls that filter best-effort
+and says it fails open on a command it cannot parse, and `Bash(stripe refunds*)` is exactly
+the shape a `bash -c '…'` wrapper defeats.
+
+Two defects this program proved elsewhere shaped the reading. Nothing here decides from
+state the command is about to change (the umbrella's own gate asked "is anything staged?"
+at `PreToolUse`, and an add-then-commit line walked through it). And the gate **reads what
+would run**: a heredoc body fed to `cat` is data while a body fed to `bash` is a script; a
+whole-line comment does not run; an assignment-shaped token is only an assignment in
+command-prefix position, so `grep 'HELEKET_API_KEY=' plugins/` searches rather than
+exports; a money endpoint must be a URL rather than a bare path; and a live key is
+recognised by its **shape**, not its prefix, so `SECURITY.md`'s own sweep for
+`sk_live_[A-Za-z0-9]` still runs.
+
+`node test/moneygate_test.js` — **65 fixtures, both directions**, and the allow-plants are
+real commands from this repository: that sweep, a `.env` heredoc fed to `cat`, a
+commented-out `stripe refunds create`, a test-mode `sk_test_` key, and the non-secret
+`HELEKET_LIVE_MERCHANT_ID` pin `assertHeleketEnv()` *requires* in a test run. `npm test`
+now runs the validator and then the fixtures.
+
+The gate went from 14 checks to 15 with `check_manual_gate()`. Eight negative self-tests
+(15 → 23): five plant a defect in the gate's shipped shape and require the validator to
+refuse, three break its decision module and require its own fixtures to go red. **Two of
+those three were written because the first attempt went uncaught** — every `sk_live_`
+allow-plant was leaning on the reader denylist while every reader allow-plant was leaning
+on the key's shape, so neither mechanism was individually proven. A third plant escaped
+because the validator's "the hook must require the pure module" check was satisfied by the
+hook's own doc comment; it now reads the `require` expression.
+
+**Registration, and what enforces it.** As a Claude Code plugin the hook is live when the
+plugin is enabled, and `claude plugin validate --strict` schema-validates
+`hooks/hooks.json`. Installed by `npx @ssheleg/sheleg-dev`, `install.sh` or `npx skills
+add`, only the six skills are copied and **the gate is absent**: `README.md` → *The manual
+gate* carries the settings snippet, the installer now prints the reminder, and **nothing
+enforces it** — filed as B-90. Nothing writes to a person's settings file; that is the one
+thing this repository must never do unasked. `SECURITY.md`'s counts move with the three new
+files: 27 → **30** in the payload, 33 → **36** in the tarball, and the gate's whole reach is
+two `require` calls with no `child_process`, no `fetch` and no `fs` on either path.
 
 ## v0.6.0 — 2026-08-16
 

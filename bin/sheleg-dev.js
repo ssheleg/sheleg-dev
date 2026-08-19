@@ -93,6 +93,24 @@ function main(argv) {
       force
     );
   }
+
+  // The manual gate does not travel this way, and saying so is the whole of what this
+  // installer can honestly do about it. `plugins/sheleg-dev/hooks/` is a PreToolUse hook
+  // that refuses a refund, a payout, a live key and the free-money path; the plugin
+  // channel loads it from the plugin manifest, this channel copies skills only.
+  //
+  // **It is a notice, not an install.** Writing to a person's `~/.claude/settings.json`
+  // is the one thing this repository must never do unasked: it is a file the operator
+  // owns and did not write, with no version control behind it, and the family umbrella
+  // carries two defects in its own history from doing exactly that. So the step is
+  // printed and left to the reader — README.md, "The manual gate", carries the JSON.
+  if (fs.existsSync(path.join(ROOT, 'plugins/sheleg-dev/hooks/hooks.json'))) {
+    console.log('');
+    console.log('Note: the manual gate (a PreToolUse hook refusing refunds, payouts, live');
+    console.log('keys and SKIP_BILLING in production) ships with the PLUGIN, not with this');
+    console.log('skills copy. To get it here, register it yourself — README.md, section');
+    console.log('"The manual gate", has the settings snippet. Nothing enforces this step.');
+  }
   return 0;
 }
 

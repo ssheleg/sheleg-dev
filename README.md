@@ -95,6 +95,87 @@ Restart your agent afterwards — skills load at session start.
 
 ---
 
+## The manual gate
+
+Four things this pack tells you to route to a human — a refund, a payout, closing a
+dispute, a live credential — used to be **sentences**. `crypto-payments/SKILL.md` says
+"Never auto-refund from the webhook. Route holds and refunds to a queue a human can
+see"; `stripe-billing/references/webhook-events.md` says a dispute is "money already
+gone plus a fee … route it to a human". An agent reading neither, and a shell nobody
+read, were unaffected by both.
+
+So the plugin ships a `PreToolUse` hook. It refuses eight things unless the authorised
+person has signed the category off **for this session**:
+
+| Category | What it stops |
+|---|---|
+| `live-key` | a live-shaped `sk_live_…` / `rk_live_…` reaching a command |
+| `credential` | exporting a credential whose provider issues no test value — `HELEKET_API_KEY` — in a run that declares `test`, or declares nothing |
+| `refund` | `stripe refunds create`, a POST to a `…/v1/refunds` URL, or a `create_refund` tool |
+| `payout` | `stripe payouts\|transfers create`, a POST to `…/v1/payouts`, `…/v1/transfers` or Heleket's `…/v1/payout` |
+| `dispute` | `stripe disputes close`, or `…/v1/disputes/…/close` — closing one accepts the loss |
+| `live-flag` | an explicit `--live` / `--live-mode` flag |
+| `self-authorisation` | a command that sets this gate's own switch. Never authorisable |
+| `skip-billing` | `SKIP_BILLING=true` in a run declaring production — the free-money path. Never authorisable |
+
+**Authorising one.** The authorised person exports the category — or `all` — in the
+shell that starts the session, and starts a new one:
+
+```bash
+SHELEG_DEV_LIVE_AUTHORISED=refund claude
+```
+
+Two properties of that make it a decision rather than a formality. It is read from the
+environment the **hook** was spawned with, so a value exported inside a tool call never
+reaches it — and a command that tries is refused as `self-authorisation`. And **a run
+declaring a non-production environment can never be authorised**: if `SHELEG_DEV_ENV`,
+`HELEKET_ENV`, `STRIPE_ENV`, `PAYMENTS_ENV`, `APP_ENV` or `NODE_ENV` says anything other
+than production, no variable makes a live operation pass. A run that says it is a test and
+then refunds a real card is incoherent whichever half is true.
+
+`SHELEG_DEV_MONEY_GATE=off` disables it. That is deliberate and documented: a gate with no
+off switch gets deleted instead of disabled.
+
+**Registration, and what enforces it.** Nothing in this repository writes to your
+settings, by design.
+
+- **Installed as a Claude Code plugin** — `plugins/sheleg-dev/hooks/hooks.json` travels
+  with the plugin and the hook is live as soon as the plugin is enabled. Nothing further
+  to do, and no per-hook switch: enablement is the whole control.
+- **Installed by `npx @ssheleg/sheleg-dev`, `install.sh` or `npx skills add`** — those
+  copy the six skills into `~/.claude/skills/` and **carry no hook**. The gate is prose
+  again until you register it yourself, in `~/.claude/settings.json` or a project's
+  `.claude/settings.json`:
+
+  ```json
+  { "hooks": { "PreToolUse": [ { "matcher": "Bash",
+      "hooks": [ { "type": "command",
+        "command": "node \"$HOME/.claude/skills/.sheleg-dev-hooks/money-gate.js\"",
+        "timeout": 15 } ] } ] } }
+  ```
+
+  Copy `plugins/sheleg-dev/hooks/` to that path first. `npx @ssheleg/sheleg-dev` prints
+  this reminder; **nothing enforces it**, which is why the plugin channel is the
+  recommended one.
+
+The deciding is a pure function in
+[`plugins/sheleg-dev/hooks/lib/moneygate.js`](plugins/sheleg-dev/hooks/lib/moneygate.js) —
+payload and environment in, verdict out, no filesystem and no `HOME`.
+[`plugins/sheleg-dev/hooks/money-gate.js`](plugins/sheleg-dev/hooks/money-gate.js) only
+moves bytes, catches everything and exits 0: a hook that throws breaks every turn in
+every session, including sessions of packs that never asked for this one. There is
+deliberately **no `if` filter** on the hook entry — the Claude Code reference calls that
+filter best-effort and says it fails open on a command it cannot parse.
+
+Both directions are fixtured in
+[`test/moneygate_test.js`](test/moneygate_test.js), and the allow-plants are real commands
+from this repository: `SECURITY.md`'s own sweep for `sk_live_[A-Za-z0-9]`, a `.env`
+heredoc fed to `cat`, a commented-out `stripe refunds create`, and the non-secret
+`HELEKET_LIVE_MERCHANT_ID` pin that `assertHeleketEnv()` *requires* in a test run. A guard
+that refuses correct input gets switched off, and then there is no gate at all.
+
+---
+
 ## A note on `crypto-payments`
 
 The skill is provider-neutral on purpose. The reusable engineering — signature

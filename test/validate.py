@@ -351,6 +351,10 @@ FOREIGN_BY_DESIGN = {
         "the umbrella's catalogue in ssheleg/sshlg-skills, which re-pins this member",
     ("CONTRIBUTING.md", "agent_sync.py"):
         "ships with the agent-sync skill, which CONTRIBUTING names alongside it",
+    ("README.md", ".claude/settings.json"):
+        "the READER's settings file, where the manual gate is registered when the pack was "
+        "installed by copy rather than as a plugin. It is the one path this repository must "
+        "name and must never write -- SD-03",
 }
 
 _PATH_TOKEN = re.compile(
@@ -612,6 +616,195 @@ def check_credential_boundary():
 check_credential_boundary()
 
 
+# The manual gate. Each entry is a category the hook must be able to refuse AND a fixture
+# file must be able to demonstrate — a list, because a gate whose categories drift out of
+# the fixtures is a gate nobody has watched refuse them.
+MANUAL_GATE_CATEGORIES = (
+    "live-key",             # sk_live_ / rk_live_ reaching a shell
+    "credential",           # a provider credential with no test variant, in a test run
+    "refund",               # money movement, and not undoable
+    "payout",               # money out
+    "dispute",              # closing a dispute accepts the loss
+    "live-flag",            # an explicit request for production access
+    "self-authorisation",   # granting yourself the gate's own switch
+    "skip-billing",         # the free-money path, in production
+)
+
+# The prose this pack shipped for four releases, and the sites that had to stop being only
+# prose. `manifesto.md:200` — "a precondition is stronger than a warning."
+MANUAL_GATE_PROSE = {
+    "crypto-payments/SKILL.md": "Never auto-refund from the webhook",
+    "stripe-billing/references/webhook-events.md": "route it to a human",
+}
+
+GATE_HOOKS = "plugins/sheleg-dev/hooks"
+
+
+def _has_key(node, key):
+    """Is `key` anywhere in this JSON tree?"""
+    if isinstance(node, dict):
+        return key in node or any(_has_key(v, key) for v in node.values())
+    if isinstance(node, list):
+        return any(_has_key(v, key) for v in node)
+    return False
+
+
+def check_manual_gate():
+    """The four manual-gate categories must be refusable, not merely described.
+
+    The defect, measured 2026-08-19 (manifesto program row SD-03, requirement **M-30**):
+    all four categories `manifesto.md:204` names -- ambiguity, external publication,
+    irreversible action, money movement, production access, destructive operations,
+    changes of scope -- were named in this pack's prose and stopped nothing. The plugin
+    shipped no hooks, no permission list and no gate, so
+    `crypto-payments/SKILL.md:309-310` ("Never auto-refund from the webhook. Route holds
+    and refunds to a queue a human can see") and
+    `stripe-billing/references/webhook-events.md:169-170` ("route it to a human --
+    evidence has a deadline") were advice to a reader who could ignore them and an agent
+    that never saw them.
+
+    Seven requirements, each one a way this could quietly stop being a gate:
+
+      1. the hook is SHIPPED -- `hooks/hooks.json` plus the two scripts, inside
+         `plugins/`, which is what npm packs and what the plugin channel loads;
+      2. it fires at `PreToolUse`, the only event that can still prevent something.
+         `manifesto.md:200`: a precondition is stronger than a warning;
+      3. it carries **no `if` filter**. The Claude Code reference calls that filter
+         best-effort and says it FAILS OPEN on a command it cannot parse, so a gate
+         resting on it ships with a documented bypass -- and `Bash(stripe refunds*)` is
+         exactly the shape a `bash -c '...'` wrapper defeats;
+      4. the deciding is in a pure module the hook requires, not in the hook. Enforced by
+         name so the split cannot be quietly collapsed;
+      5. the hook fails silent -- a `catch` and `process.exit(0)`. A guard that throws
+         breaks every turn in every session, including sessions of packs that never asked
+         for this one;
+      6. every category is refusable AND fixtured. A category present in the module and
+         absent from the fixtures is a refusal nobody has watched;
+      7. **both directions are fixtured.** The audit rated a guard nobody has watched
+         failing as no evidence; the converse is that a guard which refuses correct input
+         gets switched off, and then the pack is back to prose. So the fixture file must
+         carry allow-plants as well as deny-plants.
+
+    And the prose sites are required to name the mechanism, because the two documents are
+    where a reader looks for it.
+    """
+    hooks_rel = f"{GATE_HOOKS}/hooks.json"
+    hooks_path = os.path.join(ROOT, hooks_rel)
+    if not os.path.isfile(hooks_path):
+        fail(f"manual gate: {hooks_rel} is missing -- M-30's categories are prose again, and "
+             "prose stops nothing")
+        return
+    try:
+        with open(hooks_path, encoding="utf-8") as fh:
+            hooks = json.load(fh)
+    except json.JSONDecodeError as exc:
+        fail(f"{hooks_rel}: invalid JSON -- {exc}")
+        return
+
+    pre = (hooks.get("hooks") or {}).get("PreToolUse") or []
+    if not pre:
+        fail(f"{hooks_rel}: no PreToolUse entry. A gate at PostToolUse is a report about a "
+             "refund that already cleared -- manifesto.md:200, a precondition is stronger "
+             "than a warning")
+    commands = [
+        h.get("command", "")
+        for entry in pre
+        for h in (entry.get("hooks") or [])
+    ]
+    if not any("money-gate.js" in c for c in commands):
+        fail(f"{hooks_rel}: no PreToolUse hook runs money-gate.js")
+    if not any("Bash" in (entry.get("matcher") or "") for entry in pre):
+        fail(f"{hooks_rel}: no PreToolUse entry matches Bash -- a shell is where a live key "
+             "gets exported and where the CLI runs")
+    if _has_key(hooks, "if"):
+        fail(f"{hooks_rel}: a hook entry declares `if`. The reference calls that filter "
+             "best-effort and FAILS OPEN on a command it cannot parse, so a guard resting "
+             "on it ships with a bypass. Match broadly and decide in the module")
+
+    hook_rel = f"{GATE_HOOKS}/money-gate.js"
+    lib_rel = f"{GATE_HOOKS}/lib/moneygate.js"
+    hook_path = os.path.join(ROOT, hook_rel)
+    lib_path = os.path.join(ROOT, lib_rel)
+    for rel, path in ((hook_rel, hook_path), (lib_rel, lib_path)):
+        if not os.path.isfile(path):
+            fail(f"manual gate: {rel} is missing")
+            return
+
+    with open(hook_path, encoding="utf-8") as fh:
+        hook_src = fh.read()
+    with open(lib_path, encoding="utf-8") as fh:
+        lib_src = fh.read()
+
+    # The REQUIRE, not any mention. A substring search for "moneygate.js" is satisfied by
+    # this hook's own doc comment, which names the module four times -- so the plant that
+    # renames the require passed and this check was reading prose. Watched, 2026-08-19.
+    if not re.search(r"require\([^)]*['\"]moneygate\.js['\"]", hook_src):
+        fail(f"{hook_rel}: does not require {lib_rel}. The invariant is that a guard decides "
+             "in a pure module and the hook only moves bytes -- a decision inlined here "
+             "cannot be fixtured without a session")
+    if "catch" not in hook_src or "process.exit(0)" not in hook_src:
+        fail(f"{hook_rel}: must catch everything and exit 0. A hook that throws breaks every "
+             "turn in every session, including sessions of packs that never asked for this one")
+    if "permissionDecision" not in hook_src or "deny" not in hook_src:
+        fail(f"{hook_rel}: emits no PreToolUse deny decision -- it cannot refuse anything")
+
+    test_rel = "test/moneygate_test.js"
+    test_path = os.path.join(ROOT, test_rel)
+    if not os.path.isfile(test_path):
+        fail(f"manual gate: {test_rel} is missing -- a guard nobody has watched failing is "
+             "not evidence that it works")
+        return
+    with open(test_path, encoding="utf-8") as fh:
+        test_src = fh.read()
+
+    for category in MANUAL_GATE_CATEGORIES:
+        if f"'{category}'" not in lib_src:
+            fail(f"{lib_rel}: nothing refuses the {category!r} category -- M-30 names money "
+                 "movement, irreversible action, production access and destructive "
+                 "operations, and a missing one is the one that gets used")
+        if f"'{category}'" not in test_src:
+            fail(f"{test_rel}: no fixture names the {category!r} category. A refusal nobody "
+                 "has watched is indistinguishable from a refusal that does not happen")
+
+    refusals = test_src.count("\nrefuses(")
+    allowances = test_src.count("\nallows(")
+    if refusals < len(MANUAL_GATE_CATEGORIES):
+        fail(f"{test_rel}: {refusals} deny-plants for {len(MANUAL_GATE_CATEGORIES)} categories")
+    if allowances < refusals // 2:
+        fail(f"{test_rel}: {allowances} allow-plants against {refusals} deny-plants. Both "
+             "directions matter: a guard that refuses correct input gets switched off, and "
+             "this repository's own references quote sk_live_ and hand over a .env heredoc")
+
+    # The suite must actually run it. `npm test` is the gate CONTRIBUTING names.
+    if pkg and "moneygate_test.js" not in (pkg.get("scripts") or {}).get("test", ""):
+        fail("package.json: `npm test` does not run test/moneygate_test.js -- a fixture file "
+             "nothing runs is a file that rots green")
+    ci_path = os.path.join(ROOT, ".github", "workflows", "validate.yml")
+    if os.path.isfile(ci_path):
+        with open(ci_path, encoding="utf-8") as fh:
+            if "moneygate_test.js" not in fh.read():
+                fail("validate.yml: CI never runs test/moneygate_test.js")
+
+    for rel, phrase in MANUAL_GATE_PROSE.items():
+        path = os.path.join(SKILL_ROOT, rel)
+        if not os.path.isfile(path):
+            fail(f"manual gate: {rel} is missing -- it is one of the two documents whose "
+                 "prose this gate exists to back")
+            continue
+        with open(path, encoding="utf-8") as fh:
+            body = fh.read()
+        if phrase not in body:
+            fail(f"{rel}: no longer says {phrase!r}. Either the rule moved and this check went "
+                 "blind, or the rule was dropped while the gate enforcing it stayed")
+        if "money-gate" not in body:
+            fail(f"{rel}: states the rule and never names the mechanism that enforces it. "
+                 "M-30 is that a precondition beats a warning; a reader who cannot find the "
+                 "precondition has only the warning")
+
+
+check_manual_gate()
+
+
 def check_routed_triggers_still_advertised():
     """The family's routing hook fires on words this description has to keep.
 
@@ -652,5 +845,5 @@ if FAILURES:
         print(f"  - {f}", file=sys.stderr)
     sys.exit(1)
 
-checks = 8 + len(skill_dirs)
+checks = 9 + len(skill_dirs)
 print(f"OK: sheleg-dev structurally valid ({checks} checks, {len(skill_dirs)} skill(s), v{version})")

@@ -24,6 +24,12 @@ jobs:
       - name: Structural validator
         run: python3 test/validate.py
 
+      # The manual gate's own fixtures, both directions. They run the pure decision module
+      # with no HOME and then the real hook as a process, because "fails silent" and
+      # "exit 0" are properties of the script rather than of the module.
+      - name: Manual-gate fixtures (refusals, false-positive plants, the hook as a process)
+        run: node test/moneygate_test.js
+
       # Every negative self-test below plants a defect and REQUIRES a failure.
       # A validator nobody has watched fail is not evidence that it works.
 
@@ -268,6 +274,178 @@ jobs:
           PY
           if (cd /tmp/credenv && python3 test/validate.py); then
             echo "the validator accepted a block handing over a live credential with no declared environment"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
+      # ---- SD-03 / M-30: the manual gate. Eight plants, five against the validator that
+      # requires the gate to exist in a working shape, three against the gate's own
+      # decision module. The second group is the one that matters most: a guard whose
+      # fixtures pass after its discriminator is removed is a guard nobody has watched.
+
+      - name: Negative self-test (a gate that reports instead of preventing must fail)
+        run: |
+          set -eu
+          # manifesto.md:200 — "a precondition is stronger than a warning." Moved to
+          # PostToolUse this hook is a report about a refund that already cleared, which is
+          # the whole defect SD-03 closed.
+          rm -rf /tmp/gate-post && cp -R . /tmp/gate-post
+          python3 - <<'PY'
+          p = "/tmp/gate-post/plugins/sheleg-dev/hooks/hooks.json"
+          t = open(p, encoding="utf-8").read()
+          old = '"PreToolUse"'
+          assert old in t, "PLANT DID NOT LAND: hooks.json no longer declares PreToolUse"
+          open(p, "w", encoding="utf-8").write(t.replace(old, '"PostToolUse"', 1))
+          PY
+          if (cd /tmp/gate-post && python3 test/validate.py); then
+            echo "the validator accepted a gate that can only report after the money moved"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
+      - name: Negative self-test (an `if` filter on the gate must fail)
+        run: |
+          set -eu
+          # The Claude Code reference calls a hook entry's `if` best-effort and says it FAILS
+          # OPEN on a command it cannot parse. `Bash(stripe refunds*)` is also exactly the
+          # shape a `bash -c '…'` wrapper defeats, so the filter is a documented bypass
+          # dressed as a narrowing.
+          rm -rf /tmp/gate-if && cp -R . /tmp/gate-if
+          python3 - <<'PY'
+          p = "/tmp/gate-if/plugins/sheleg-dev/hooks/hooks.json"
+          t = open(p, encoding="utf-8").read()
+          old = '        "matcher": "Bash",\n'
+          assert old in t, "PLANT DID NOT LAND: no Bash matcher in hooks.json"
+          open(p, "w", encoding="utf-8").write(
+              t.replace(old, old + '        "if": "Bash(stripe refunds*)",\n', 1))
+          PY
+          if (cd /tmp/gate-if && python3 test/validate.py); then
+            echo "the validator accepted a gate resting on a filter that fails open"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
+      - name: Negative self-test (a decision inlined into the hook must fail)
+        run: |
+          set -eu
+          # "A guard decides in a pure module; the hook only moves bytes." A verdict computed
+          # inside the hook cannot be fixtured without a live session, which is how a guard
+          # ends up shipped with nobody having watched it refuse anything.
+          rm -rf /tmp/gate-inline && cp -R . /tmp/gate-inline
+          python3 - <<'PY'
+          p = "/tmp/gate-inline/plugins/sheleg-dev/hooks/money-gate.js"
+          t = open(p, encoding="utf-8").read()
+          old = "'moneygate.js'"
+          assert old in t, "PLANT DID NOT LAND: the hook no longer requires the pure module"
+          open(p, "w", encoding="utf-8").write(t.replace(old, "'inlined-decision.js'", 1))
+          PY
+          if (cd /tmp/gate-inline && python3 test/validate.py); then
+            echo "the validator accepted a hook that decides for itself"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
+      - name: Negative self-test (a hook that stops failing silent must fail)
+        run: |
+          set -eu
+          # A guard that throws breaks every turn in every session, including sessions of
+          # packs that never asked for this one. That is a worse outcome than the defect the
+          # guard exists to prevent, so the exit is checked rather than trusted.
+          rm -rf /tmp/gate-throw && cp -R . /tmp/gate-throw
+          python3 - <<'PY'
+          p = "/tmp/gate-throw/plugins/sheleg-dev/hooks/money-gate.js"
+          t = open(p, encoding="utf-8").read()
+          old = "process.exit(0)"
+          assert old in t, "PLANT DID NOT LAND: the hook no longer exits 0"
+          open(p, "w", encoding="utf-8").write(t.replace(old, "process.exitCode = 2"))
+          PY
+          if (cd /tmp/gate-throw && python3 test/validate.py); then
+            echo "the validator accepted a hook that can break every turn in every session"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
+      - name: Negative self-test (dropping the false-positive plants must fail)
+        run: |
+          set -eu
+          # The audit rated a guard nobody has watched failing as no evidence. The converse
+          # costs the same: a guard that refuses correct input gets switched off, and this
+          # repository's own commands quote `sk_live_` and hand over a `.env` heredoc. So the
+          # allow-plants are required to exist, not merely encouraged.
+          rm -rf /tmp/gate-oneway && cp -R . /tmp/gate-oneway
+          python3 - <<'PY'
+          p = "/tmp/gate-oneway/test/moneygate_test.js"
+          t = open(p, encoding="utf-8").read()
+          assert t.count("\nallows(") > 4, "PLANT DID NOT LAND: no allow-plants to remove"
+          open(p, "w", encoding="utf-8").write(t.replace("\nallows(", "\nvoid_allows(", 20))
+          PY
+          if (cd /tmp/gate-oneway && python3 test/validate.py); then
+            echo "the validator accepted a one-directional fixture set"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
+      - name: Negative self-test (a live-key rule narrowed to the bare prefix must fail)
+        run: |
+          set -eu
+          # The shape is the discriminator, and it is what separates a credential from a
+          # document quoting one. Narrow it to the prefix and `SECURITY.md`'s own sweep for
+          # `sk_live_[A-Za-z0-9]` is refused — the pack can no longer run its own check.
+          # This plant went UNCAUGHT on the first pass, because every prefix fixture was
+          # being saved by the reader denylist instead. Two overlapping mechanisms, neither
+          # individually proven, is the shape that produced it.
+          rm -rf /tmp/gate-prefix && cp -R . /tmp/gate-prefix
+          python3 - <<'PY'
+          p = "/tmp/gate-prefix/plugins/sheleg-dev/hooks/lib/moneygate.js"
+          t = open(p, encoding="utf-8").read()
+          old = "const LIVE_KEY = /\\b(sk|rk)_live_[A-Za-z0-9]{16,}/;"
+          assert old in t, "PLANT DID NOT LAND: LIVE_KEY no longer reads a key-shaped body"
+          open(p, "w", encoding="utf-8").write(t.replace(old, "const LIVE_KEY = /\\b(sk|rk)_live_/;", 1))
+          PY
+          if node /tmp/gate-prefix/test/moneygate_test.js; then
+            echo "the fixtures passed while the gate refuses this repository's own live-key sweep"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
+      - name: Negative self-test (a heredoc body read as an invocation must fail)
+        run: |
+          set -eu
+          # UM-10's lesson, and B-59's before it: a guard must read what would RUN. A `.env`
+          # block fed to `cat` is data — `heleket-provider.md` hands the reader exactly that
+          # — while a body fed to `bash` is a script and stays readable, because stripping
+          # every heredoc would be a documented bypass.
+          rm -rf /tmp/gate-heredoc && cp -R . /tmp/gate-heredoc
+          python3 - <<'PY'
+          p = "/tmp/gate-heredoc/plugins/sheleg-dev/hooks/lib/moneygate.js"
+          t = open(p, encoding="utf-8").read()
+          old = "      dropping = !HEREDOC_SHELLS.has(cmd);"
+          assert old in t, "PLANT DID NOT LAND: the heredoc rule changed shape"
+          open(p, "w", encoding="utf-8").write(t.replace(old, "      dropping = false;", 1))
+          PY
+          if node /tmp/gate-heredoc/test/moneygate_test.js; then
+            echo "the fixtures passed while a documented .env heredoc is refused"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
+      - name: Negative self-test (a test-declaring run that can be authorised must fail)
+        run: |
+          set -eu
+          # SD-02's rule, one layer out: "Could not prove it was safe" must never read as
+          # "it was safe". A run that declares test and then refunds a real card is
+          # incoherent whichever half is true, so no variable may buy its way past that —
+          # and an authorisation that CAN is the quiet version of having no gate.
+          rm -rf /tmp/gate-authtest && cp -R . /tmp/gate-authtest
+          python3 - <<'PY'
+          p = "/tmp/gate-authtest/plugins/sheleg-dev/hooks/lib/moneygate.js"
+          t = open(p, encoding="utf-8").read()
+          old = "  if (runEnv === 'test') return false;"
+          assert old in t, "PLANT DID NOT LAND: allowedFor no longer refuses a test-declaring run"
+          open(p, "w", encoding="utf-8").write(t.replace(old, "  if (runEnv === 'never') return false;", 1))
+          PY
+          if node /tmp/gate-authtest/test/moneygate_test.js; then
+            echo "the fixtures passed while a test-declaring run can be authorised for a live refund"
             exit 1
           fi
           echo "rejected, as it must be"

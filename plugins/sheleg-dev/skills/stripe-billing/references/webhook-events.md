@@ -169,6 +169,13 @@ knows the first path silently ignores every subscription refund.
 `charge.dispute.created` is money already gone plus a fee. Treat it as a refund
 for entitlement purposes and route it to a human — evidence has a deadline.
 
+"Route it to a human" is a precondition in this pack rather than a sentence: the
+`PreToolUse` gate at `plugins/sheleg-dev/hooks/money-gate.js` refuses
+`stripe refunds create`, `stripe disputes close` and a POST to `…/v1/refunds` unless the
+authorised person has signed that category off for the session. It stops an agent, not
+your handler — the handler still needs the queue. The pack's `README.md` carries the
+categories and how one is authorised.
+
 ## Ordering is not guaranteed
 
 Events can arrive out of order, and Stripe's own docs say so. Two consequences:

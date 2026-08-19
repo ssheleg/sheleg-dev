@@ -118,6 +118,56 @@ exports a live key. A hook refusing a Bash command that sets a production mercha
 credential in a run declaring `test` is the missing half, and it belongs there rather than
 here — the same argument that keeps `sk_live_` out of an agent's hands.
 
+Row **SD-03** of the same program, 2026-08-19, requirement **M-30** (the manual gate: ambiguity,
+external publication, irreversible action, money movement, production access, destructive
+operations and changes of scope are the authorised person's to decide — `manifesto.md:204` — and
+`:200`, a precondition is stronger than a warning). Board rows: `docs/evidence/backlog.md`
+B-89 through B-93.
+
+| REQ | Requirement | Verified by | Result | Observed at | Status |
+|---|---|---|---|---|---|
+| 023 | The defect is what the audit said it was, and the pack shipped no gate of any kind | `git ls-tree -r --name-only 00285e7 plugins` | **27 files, 26 markdown and one manifest — no `hooks/`, no `hooks.json`, no permission list.** The two prose sites were `crypto-payments/SKILL.md:310` ("Never auto-refund from the webhook. Route holds and refunds to a queue a human can see") and `stripe-billing/references/webhook-events.md:170` ("route it to a human — evidence has a deadline"). SD-02's `assertHeleketEnv()` was the one real control and it runs inside the reader's application, so a shell that merely exports the live merchant credential never reaches it | 2026-08-19 | **verified locally · unreleased** |
+| 024 | The gate refuses everything the row requires, and each refusal has been watched | `node test/moneygate_test.js` | **65 fixtures, exit 0** — 27 deny-plants, 25 allow-plants and 13 direct checks of the lexer, the environment reading and the category table. The deny-plants cover all eight categories: a live-shaped `sk_live_`/`rk_live_` key (three shapes, including inside `bash -c '…'`), `HELEKET_API_KEY` exported in a test-declaring run / with nothing declared / through `env(1)` / in a heredoc fed to `bash`, `stripe refunds create` (bare, quoted, via `npx`), a `…/v1/refunds` POST, `stripe payouts create`, `stripe transfers create`, a Heleket `…/v1/payout` POST, `stripe disputes close`, a `…/v1/disputes/…/close` POST, the `create_refund` MCP tool by name, `--live`, `--live-mode`, a command setting the gate's own switch, and `SKIP_BILLING=true` in production | 2026-08-19 | **verified locally · unreleased** |
+| 025 | It does NOT refuse correct input — the direction that decides whether it stays switched on | same command; the allow-plants | **25 allow-plants, all allowed.** Every one is a command this repository or its readers actually run: `SECURITY.md:155`'s own sweep for `sk_live_[A-Za-z0-9]` verbatim; reading and grepping the two references that quote `sk_live_…`; a secret scanner given the bare prefix as its pattern; a `.env` heredoc fed to `cat`; a refund line inside a heredoc fed to `python3`; two whole-line comments; a bare `/v1/refunds` path in a grep and in a route-audit script; `HELEKET_API_KEY=` as an argument to grep; `echo --live`; `stripe refunds list`; the non-secret `HELEKET_LIVE_MERCHANT_ID` pin `assertHeleketEnv()` *requires* in a test run; a `sk_test_` key; `SKIP_BILLING=true` in development; a `Write` tool whose content is a live-shaped key; and an authorised refund in a production-declaring run, because a gate that cannot be passed is a gate that gets removed | 2026-08-19 | **verified locally · unreleased** |
+| 026 | The fixtures can actually see a broken gate — they were mutation-tested | ten targeted mutations of `hooks/lib/moneygate.js`, `node test/moneygate_test.js` in each | **10/10 caught, after two rounds.** The first round caught 8: narrowing `LIVE_KEY` to the bare prefix and deleting the reader denylist both passed, because every prefix allow-plant was leaning on the denylist while every reader allow-plant was leaning on the key's shape — **two overlapping mechanisms, neither individually proven.** Three fixtures were added to isolate them (a non-reader scanner given the prefix; a reader given a full endpoint URL; a non-reader given a bare path) and all ten mutations then failed the suite | 2026-08-19 | **verified locally · unreleased** |
+| 027 | The hook is a byte-mover, fails silent, and exits 0 on every path | five payload shapes driven through `plugins/sheleg-dev/hooks/money-gate.js` as a real process | **exit 0 in all five.** A refund payload → one JSON line, `permissionDecision: "deny"`, the reason naming `refunds create`; an ordinary `npm test` payload → empty stdout; garbage stdin → empty stdout **and empty stderr**; empty stdin → nothing; a payload with no `tool_input` → nothing. `node --check` passes on both files. The decision module `require`s nothing at all and the hook `require`s `path` plus the module — measured, and `child_process`, `fetch`, `http`, `fs`, `spawn`, `writeFile` return **no lines** across both | 2026-08-19 | **verified locally · unreleased** |
+| 028 | The three umbrella invariants are enforced by the gate rather than by intention | `python3 test/validate.py`; `npm test` | both exit **0**, `OK: sheleg-dev structurally valid (15 checks, 6 skill(s), v0.6.0)` — the count moved 14 → 15 with `check_manual_gate()`, which requires a `PreToolUse` entry running `money-gate.js`, a `Bash` matcher, **no `if` key anywhere in the manifest**, the `require` of the pure module, a `catch` and a `process.exit(0)`, every category present in both module and fixtures, allow-plants at least half the deny-plants, `npm test` and CI both running the fixtures, and the two prose sites naming the mechanism | 2026-08-19 | **verified locally · unreleased** |
+| 029 | The new guard has been watched failing, in eight ways | eight plants into `/tmp` copies, then the gate in each | **all eight refused.** Five against the shipped shape — the hook moved to `PostToolUse` ("a gate that can only report after the money moved"), an `if` filter reintroduced, the `require` renamed, `process.exit(0)` removed, the allow-plants deleted — and three against the decision module, which require the *fixtures* to go red: `LIVE_KEY` narrowed to the prefix, the heredoc rule inverted, and `allowedFor` letting a test-declaring run be authorised. **One escaped first**: the require check was satisfied by the hook's own doc comment, which names the module four times, so it read prose; it now reads the `require` expression | 2026-08-19 | **verified locally · unreleased** |
+| 030 | The 15 pre-existing negatives still refuse their plants | every `Negative self-test` step extracted from `validate.yml` and run as a process from the repo root | **23/23 refused.** The eight new ones plus the fifteen SD-01 and SD-02 left, none broken by the edits to `test/validate.py`, `package.json`, `CONTRIBUTING.md`, `SECURITY.md`, `README.md` or the two skill documents | 2026-08-19 | **verified locally · unreleased** |
+| 031 | The registration shape is the one Claude Code accepts | `claude plugin validate . --strict`; `claude plugin validate plugins/sheleg-dev --strict`; then two plants into a copy | both **`✔ Validation passed`**. And the validator genuinely reads the file: a truncated `hooks.json` → `Invalid JSON syntax … At runtime this breaks the entire plugin load`; a valid-JSON manifest declaring `NotAnEvent` → `hooks.NotAnEvent: Invalid key in record`. So `PreToolUse` + `matcher` + `command` + `statusMessage` + `timeout` as written are schema-valid, not merely plausible | 2026-08-19 | **verified locally · unreleased** |
+| 032 | Nothing about the installers regressed, and the new notice does not break their contracts | the CI installer block run verbatim against `HOME=/tmp/fakehome-sd03` | six skills installed; second run `6` `^skip:` lines; `--force` `6` `^Installed` lines; `--wat` refused; `install.sh` last line still `Installed 6 skill(s). Restart your agent — skills load at session start.` The gate notice prints after the six install lines and matches neither grep | 2026-08-19 | **verified locally · unreleased** |
+| 033 | `SECURITY.md`'s moved numbers are computed, not restated | each command in *Verifying for yourself* run from the repo root, verbatim | `git ls-files plugins` → **30** (27 + three gate files); `\| grep -v '.md$'` → **4** lines, the manifest and the three; the `require` grep → **2** lines, both in the hook, `0` in the decision module; the unreachable-API grep → **no output, exit 1**; the installer I/O grep → **11** lines, unchanged; the live-key sweep → **1** line, still the RSA placeholder at `adc-and-service-accounts.md:236`; `npm pack --dry-run` → `total files: 36`. Every key-shaped string in the new fixtures spells `PLACEHOLDER` in its body | 2026-08-19 | **verified locally · unreleased** |
+
+**What is NOT verified in this SD-03 block.**
+
+- **The hook has never fired in a live session.** REQ-027 runs the script as a process and
+  REQ-031 proves the manifest is schema-valid, but nothing here observes Claude Code
+  spawning it, blocking a `Bash` call on its `deny`, or failing to leak a variable exported
+  inside a tool call into the hook's environment. That last assumption is why
+  `SHELEG_DEV_LIVE_AUTHORISED` is an environment variable, and the `self-authorisation`
+  refusal exists so the gate still holds at the payload layer if the assumption is wrong.
+  Filed as **B-92**.
+- **No network call was made to any payment or auth provider**, by constraint. Every claim
+  about a Stripe or Heleket endpoint shape is a reading of this pack's own references.
+- **The gate knows two providers.** `google-auth`, `google-signin` and `ad-tracking` hand
+  the reader service-account keys, OAuth client secrets and CAPI tokens and have **no row**
+  in `NO_TEST_VARIANT` — so exporting a production service-account key in a test-declaring
+  run is not refused. Filed as **B-91**; each row needs the provider's credential model
+  established from the documentation first, the way SD-02 did for Heleket.
+- **Two bounded gaps in the rules, chosen rather than missed.** A money endpoint on
+  `localhost` is allowed (it is the reader's own test server, and refusing it would refuse
+  the sad-path testing the pack asks for). And a live-shaped key inside a reading command
+  IS refused, including in a `git grep` — deliberate, because a real key in a shell history
+  is an incident, and the shape rule is what keeps `SECURITY.md`'s own sweep passing.
+- **The copy install channels carry no hook and nothing enforces registering one** (B-90).
+  A printed reminder is a warning, which is the thing M-30 calls weaker than a precondition.
+  Writing to `~/.claude/settings.json` was not done and must not be.
+- **CI has not seen any of this.** Same gap SD-01 and SD-02 recorded: the step-level
+  conclusions REQ-002 reads do not exist for the eight new negatives or for the fixtures
+  step. The negative count moved from fifteen to **twenty-three** in
+  `.github/workflows/validate.yml` and `CONTRIBUTING.md` now says twenty-three.
+- **Nothing was released**: no tag, no publish, no version bump.
+
 ## What these checks do not cover
 
 Named rather than left to be inferred, because a ledger that lists only its successes

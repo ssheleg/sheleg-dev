@@ -310,6 +310,16 @@ Crypto has no chargeback, which people mistake for "no reversals".
 - **Never auto-refund from the webhook.** Route holds and refunds to a queue a
   human can see.
 
+**And make it a precondition, not a paragraph.** The three lines above were advice for
+four releases: an agent that never read them, and a shell nobody read, were unaffected by
+all three. This pack now ships a `PreToolUse` gate —
+`plugins/sheleg-dev/hooks/money-gate.js` — that refuses a refund, a payout, closing a
+dispute, an export of `HELEKET_API_KEY` in a run declaring `test`, a live `sk_live_…` key
+and `SKIP_BILLING=true` in production, until the authorised person has signed that
+category off for the session. The pack's `README.md` carries the categories and how one is
+authorised. In your application the same rule is a queue and a human; in the agent's
+shell it is the hook.
+
 ---
 
 ## The test/live credential boundary
