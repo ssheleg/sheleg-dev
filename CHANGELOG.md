@@ -4,10 +4,19 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v0.7.0 — 2026-08-19
 
-No version heading yet, deliberately: the version converges at the family level, and a
-`## vX.Y.Z` here would make this the release notes for a tag that does not exist.
+**The pack that takes money had the weakest controls in the family, and every one of them
+was a sentence.** A conformance audit against the Proof of Done manifesto scored this
+member last on both counts it measured — most requirements absent, fewest mechanically
+enforced — and all three of its enforced rows were the artifact layer, none the money
+layer. The manifesto's own test failed here literally: *a credential that cannot reach
+production is stronger than a sentence saying not to use it there.*
+
+Four changes, in the order they were built: the security document stopped describing a
+different skill, the crypto provider gained a credential boundary, the four manual-gate
+categories became a hook that refuses, and the money invariants became fixtures a reader
+runs.
 
 ### The four money invariants were prose, and prose delegates enforcement to the reader
 
