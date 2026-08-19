@@ -201,6 +201,77 @@ jobs:
           fi
           echo "rejected, as it must be"
 
+      - name: Negative self-test (a live credential declared test must be refusable)
+        run: |
+          set -eu
+          # SD-02 / M-06 direction 1. Heleket issues ONE key per merchant, it is also the
+          # webhook signing secret, and "test mode" is a dashboard toggle over the same
+          # key — so the only boundary available is a declared environment plus a boot
+          # assertion that refuses a credential disagreeing with it. Delete the refusal
+          # for the live-key-in-a-test-run direction and the gate must notice.
+          rm -rf /tmp/credtest && cp -R . /tmp/credtest
+          python3 - <<'PY'
+          p = "/tmp/credtest/plugins/sheleg-dev/skills/crypto-payments/references/heleket-provider.md"
+          t = open(p, encoding="utf-8").read()
+          old = "HELEKET_ENV_TEST_HOLDS_LIVE_CREDENTIAL"
+          assert old in t, "PLANT DID NOT LAND: the document no longer names " + old
+          # renamed, not deleted: the document still discusses a boundary, and only the
+          # refusable code is gone. That is what a rewrite quietly does.
+          open(p, "w", encoding="utf-8").write(t.replace(old, "HELEKET_ENV_PROBABLY_FINE"))
+          PY
+          if (cd /tmp/credtest && python3 test/validate.py); then
+            echo "the validator accepted a credential boundary that cannot refuse a live key in a test run"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
+      - name: Negative self-test (a test credential declared live must be refusable)
+        run: |
+          set -eu
+          # SD-02 / M-06 direction 2, and the one people skip. A production key on a dev
+          # machine is the loud failure; a sandbox key in production is the quiet one —
+          # invoices settle to a merchant nobody reconciles and nothing errors until the
+          # revenue is missing. Half a boundary passes every test written for the other
+          # half, which is why both directions are planted separately.
+          rm -rf /tmp/credlive && cp -R . /tmp/credlive
+          python3 - <<'PY'
+          p = "/tmp/credlive/plugins/sheleg-dev/skills/crypto-payments/references/heleket-provider.md"
+          t = open(p, encoding="utf-8").read()
+          old = "HELEKET_ENV_LIVE_HOLDS_TEST_CREDENTIAL"
+          assert old in t, "PLANT DID NOT LAND: the document no longer names " + old
+          open(p, "w", encoding="utf-8").write(t.replace(old, "HELEKET_ENV_PROBABLY_FINE"))
+          PY
+          if (cd /tmp/credlive && python3 test/validate.py); then
+            echo "the validator accepted a boundary that refuses only one direction"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
+      - name: Negative self-test (handing over a credential with no declared environment must fail)
+        run: |
+          set -eu
+          # The measured defect itself, restored verbatim: `heleket-provider.md:1146` set
+          # HELEKET_API_KEY in a copyable block with no environment beside it, while the
+          # next paragraph told the reader to flip a merchant-account toggle. A dev run
+          # held the production credential and the document never said so.
+          rm -rf /tmp/credenv && cp -R . /tmp/credenv
+          python3 - <<'PY'
+          import re
+          p = "/tmp/credenv/plugins/sheleg-dev/skills/crypto-payments/references/heleket-provider.md"
+          t = open(p, encoding="utf-8").read()
+          # drop the declaration out of the Option B block only, leaving the key
+          old = "HELEKET_ENV=test\n"
+          assert old in t, "PLANT DID NOT LAND: no `HELEKET_ENV=test` assignment in a fenced block"
+          t2 = t.replace(old, "", 1)
+          assert t2 != t, "PLANT DID NOT LAND"
+          open(p, "w", encoding="utf-8").write(t2)
+          PY
+          if (cd /tmp/credenv && python3 test/validate.py); then
+            echo "the validator accepted a block handing over a live credential with no declared environment"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
       - name: Negative self-test (a reference nobody links must fail)
         run: |
           set -eu

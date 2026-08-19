@@ -84,14 +84,16 @@ routing hook fires on. That check needs an `sshlg-skills` checkout above this on
 **discloses instead of passing** when there is none, so a standalone clone prints an
 `unlooked:` line rather than a false green.
 
-CI runs the same validator plus **twelve** negative self-tests, each of which plants a
+CI runs the same validator plus **fifteen** negative self-tests, each of which plants a
 real defect — a version drift, an over-long description, a front-matter name that stops
 matching its directory, a dangling reference link, a reference nobody links, a stray
 `SKILL.md`, a release that stops gating on validate, the validator dropped from CI, a
 routing table sending work to a file we do not have, a shipped document naming a path we
-do not have, a `file:line` citation past the end of that file, and an exemption left
-behind after the document stopped naming the path — and requires the gate to reject it.
-A guard nobody has watched fail is not a guard.
+do not have, a `file:line` citation past the end of that file, an exemption left
+behind after the document stopped naming the path, a credential boundary that stops
+refusing a live key declared test, the same boundary refusing only that one direction,
+and a copyable block handing over a credential with no declared environment — and
+requires the gate to reject it. A guard nobody has watched fail is not a guard.
 
 ### The family catalogue moves with the release
 

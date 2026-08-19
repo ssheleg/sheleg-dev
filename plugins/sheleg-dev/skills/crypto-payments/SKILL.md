@@ -45,6 +45,7 @@ and anything else that issues an invoice and calls you back.
 - [Reconciliation fields](#reconciliation-fields)
 - [Crediting: the amount waterfall](#crediting-the-amount-waterfall)
 - [Refunds and AML holds](#refunds-and-aml-holds)
+- [The test/live credential boundary](#the-testlive-credential-boundary)
 - [Local development](#local-development)
 - [Test matrix](#test-matrix)
 - [Security checklist](#security-checklist)
@@ -311,6 +312,58 @@ Crypto has no chargeback, which people mistake for "no reversals".
 
 ---
 
+## The test/live credential boundary
+
+**Establish what the provider actually offers before designing around it.** Card
+processors hand you two parallel worlds — Stripe gives a whole second account and stamps
+the environment into the key itself (`sk_test_` / `sk_live_`). Most crypto gateways do
+not. Answer these three, from the provider's documentation, and write the answers down:
+
+1. **Is there a separate test credential?** Not "a test mode" — a *different secret*.
+2. **Can the environment be read from the key?** A prefix, a scope, anything.
+3. **Does the key also sign webhooks?** If yes, it cannot be scoped down: everything that
+   verifies a callback can also create a charge.
+
+The answers decide the design, and the worst combination is common: one key, no marker,
+"test mode" as a **toggle on the merchant account**. Then the same secret creates play
+invoices before somebody moves a dashboard switch and real ones after — with no deploy and
+no signal to any machine holding it.
+
+**Build the strongest control the provider allows, in this order:**
+
+1. **A separate sandbox account**, so the credential on a dev machine *cannot* reach
+   production. This is the only control that still works after everyone has forgotten why
+   it is there — which is the whole argument for preferring it to a warning in a README.
+2. **A declared environment plus a boot assertion**, when there is no second credential.
+   Keep the declaration in a variable **separate from the secret** (`<PROVIDER>_ENV=test|
+   production`): one variable that both carries the key and names its environment cannot
+   be checked against itself, two can. Pin the production identity with something
+   non-secret — the merchant id, or a truncated hash of the live key — and refuse
+   **both** mismatches at **startup**:
+
+   - a live credential declared test — the obvious loss;
+   - a test credential declared live — the quiet one, where invoices settle to a merchant
+     nobody reconciles and nothing errors until revenue is missing.
+
+   Assert at module load, not in the payment handler: a run that merely *holds* the key
+   must fail too, and it is agent and CI runs that hold keys without ever charging
+   anything. And when the check cannot tell — nothing pinned — refuse on the test side.
+   "Could not prove it was safe" must never read as "it was safe".
+3. **Write down what is left.** Where the provider offers no test credential, a developer
+   holds a production one and the assertion narrows that window without closing it. An
+   unavoidable exposure that is named is a different object from one that is silent: the
+   first gets rotated, monitored and revisited, the second gets rediscovered by an
+   incident.
+
+The same rule applies to the mock path below: `SKIP_BILLING=true` in production is not a
+shortcut, it is a free-money path, and the assertion is what refuses it.
+
+Worked end to end for one gateway with no test credential at all —
+[`references/heleket-provider.md`](references/heleket-provider.md), *The test/live
+boundary* and *Residual exposure*.
+
+---
+
 ## Local development
 
 Two paths, and you want both:
@@ -363,6 +416,9 @@ Cover these, and plant a defect against each before believing the green:
 - [ ] CSRF exempted for exactly one path, by exact match
 - [ ] Entitlement never granted from a client-side redirect
 - [ ] API key and merchant id from environment, never in the repository
+- [ ] A sandbox account is used where the provider offers one, or the reason it cannot be is written down
+- [ ] The declared environment is a variable separate from the secret, and a boot assertion refuses **both** mismatches
+- [ ] The assertion runs at module load, so a run that only holds the key fails too
 - [ ] Callback URL is HTTPS in every environment that is not a local tunnel
 - [ ] `SKIP_BILLING` asserted impossible in production
 - [ ] Reconciliation fields written at settlement time
@@ -382,3 +438,5 @@ Cover these, and plant a defect against each before believing the green:
 | "Paid" users with no product | credited from the browser redirect |
 | Half the payments land as `wrong_amount` | no conversion buffer |
 | Cannot answer "how much did we net" | commission and `merchantAmount` never stored |
+| A dev machine, a CI job or an agent run is holding the production key | no separate credential, and no assertion binding the key to a declared environment |
+| Real invoices in a merchant dashboard nobody watches | a staging credential declared live — the mismatch nothing refused |

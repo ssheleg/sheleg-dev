@@ -59,6 +59,57 @@ run: `.github/PULL_REQUEST_TEMPLATE.md` asked every contributor to paste output 
 inherited from the same copy. Also `CONTRIBUTING.md` named `agent_sync.py` with no owner; it
 now says the script ships with the `agent-sync` skill.
 
+### `crypto-payments` had no test/live credential boundary, in the skill about taking money
+
+There was one `HELEKET_API_KEY`. It is *also* the webhook signing secret, so it cannot be
+scoped down; the key carries no `test`/`live` marker; there is one host; and "test mode" is a
+**toggle in merchant settings** — a property of the account, over the same key. The document
+handed that key to the reader in a local-development block with no environment declared beside
+it and then pointed at the dashboard toggle, so a dev, CI or agent run held the production
+credential and nothing in the pack said so. Manifesto M-06 — *a credential that cannot reach
+production is stronger than a sentence saying not to use it there, because the last control
+still works after context loss* — failed literally, in the one skill whose subject is money.
+
+**Established the provider's model before designing for it**, and it is worse than the brief
+assumed: Heleket offers no separate test credential at all, so the Stripe-shaped fix of
+reading the environment out of the key prefix does not exist here. The boundary is therefore
+built on the two non-secret things Heleket does expose — the merchant UUID, and a 12-hex
+SHA-256 prefix of the live key — pinned as `HELEKET_LIVE_MERCHANT_ID` and
+`HELEKET_LIVE_KEY_FINGERPRINT`. Same shape as the house pattern in
+`stripe-billing/references/price-integrity.md` (*a declaration separate from the secret, so
+the two can be checked against each other*), different comparand.
+
+Shipped: `HELEKET_ENV` with **no default**, because a default is the control disappearing the
+first time somebody copies a `.env`; `assertHeleketEnv()` as a copy-whole snippet that runs at
+module load rather than in the checkout handler, so a run that merely *holds* the key fails
+too; refusals in **both** directions — a live credential declared test, and the quiet one, a
+test credential declared live, where invoices settle to a merchant nobody reconciles and
+nothing errors until the revenue is missing; a refusal for `SKIP_BILLING=true` under
+`HELEKET_ENV=production`, which is a free-money path rather than a shortcut; and a refusal
+when nothing is pinned and a *test* run therefore cannot prove it is not live, because "could
+not prove it was safe" must never read as "it was safe". Named error codes, not sentences, so
+a rewording cannot silently remove a control and an operator can alert on them.
+
+**And the exposure that remains, written down.** The assertion checks the declaration; it does
+not limit the credential. Unless a second merchant account is available — which this document
+cannot confirm and now says so instead of implying it — a developer following Option B holds a
+production key, the verifier cannot be issued without the invoice-creating power attached, and
+rotation is the only revocation. An unavoidable risk that is named is a different object from
+one that is silent.
+
+The gate went from 13 checks to 14: `check_credential_boundary()` requires that every copyable
+block assigning the secret also assigns the declared environment, that the assertion exists to
+be copied, that both refusal codes are present, and that the residual exposure is written.
+Table-driven, one row, and the empty-corpus case fails rather than passing. Three negative
+self-tests (12 → 15), one per direction plus the original defect restored verbatim. The
+assertion's logic was run over 11 cases, 11/11. `stripe-billing` states the same control at
+`references/price-integrity.md:62-64` and asks for it at `testing-and-local-dev.md:210` while
+shipping no assertion — filed as B-86 rather than fixed here, because a guard added in the
+same breath as the defect it flags turns the gate red for work this change did not do. The
+other three credential-holding skills were not looked at (B-87), and this reference is now
+a 4× size outlier among references, filed as B-88 with a split rather than a trim as the
+remedy — the precedent this repository set at v0.6.0.
+
 ## v0.6.0 — 2026-08-16
 
 ### The file that promised the deduplication contract contained none of it

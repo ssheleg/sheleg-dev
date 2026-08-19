@@ -71,6 +71,53 @@ twelve in `.github/workflows/validate.yml` and `CONTRIBUTING.md` says twelve; th
 run on this branch is what turns that into a measurement. Nothing here was released: no
 tag, no publish, no version bump.
 
+Row **SD-02** of the same program, 2026-08-19, requirement **M-06** (a credential that
+cannot reach production is stronger than a sentence saying not to use it there, because
+the last control still works after context loss). Board rows: `docs/evidence/backlog.md`
+B-85 through B-87.
+
+| REQ | Requirement | Verified by | Result | Observed at | Status |
+|---|---|---|---|---|---|
+| 016 | The provider's real credential model is established from the document, not assumed | read `references/heleket-provider.md` §1, §3, §7, §15 | **Heleket offers no separate test credential.** One key per merchant (`:62`), which is *also* the webhook signing secret (`:126`); one host, `api.heleket.com` (`:60`, `:376`); no environment marker in the key, so the Stripe-style prefix read is unavailable; "test mode" is a toggle in merchant settings (`:1155`), a property of the **account** over the same key. The brief's imagined fix — assert the key's declared environment against the key itself — was therefore not buildable as written | 2026-08-19 | **verified locally · unreleased** |
+| 017 | The boundary is built on what the provider actually exposes | read the shipped `assertHeleketEnv()` | it compares the declared `HELEKET_ENV` against the two **non-secret** discriminators Heleket does give: the merchant UUID pinned as `HELEKET_LIVE_MERCHANT_ID`, and a 12-hex SHA-256 prefix of the live key as `HELEKET_LIVE_KEY_FINGERPRINT`. Same shape as the house pattern at `plugins/sheleg-dev/skills/stripe-billing/references/price-integrity.md:62-64` — a declaration separate from the secret — with a different comparand because the key carries no mode | 2026-08-19 | **verified locally · unreleased** |
+| 018 | Both mismatches are refused, and the logic has been run | the shipped snippet transliterated to JS with types stripped, control flow unchanged, driven over 11 cases | **11/11.** A live credential declared test is refused by UUID *and* by fingerprint alone (`HELEKET_ENV_TEST_HOLDS_LIVE_CREDENTIAL`); a test credential declared live is refused (`HELEKET_ENV_LIVE_HOLDS_TEST_CREDENTIAL`); unset refuses rather than defaults; an unpinned *test* run refuses because it cannot prove it is not live; `SKIP_BILLING=true` with `HELEKET_ENV=production` refuses; and the two correct configurations pass — a boundary that refuses everything is switched off within a day | 2026-08-19 | **verified locally · unreleased** |
+| 019 | The control is a snippet and a check, not a paragraph | `python3 test/validate.py`; `npm test` | both exit **0**, `OK: sheleg-dev structurally valid (14 checks, 6 skill(s), v0.6.0)` — the count moved 13 → 14 with `check_credential_boundary()`, which requires that every copyable block assigning `HELEKET_API_KEY` also assigns `HELEKET_ENV`, that `assertHeleketEnv` exists to be copied, that both refusal codes are present, and that the residual exposure is written down | 2026-08-19 | **verified locally · unreleased** |
+| 020 | The new guard has been watched failing, in both directions and on the original defect | three plants into `/tmp` copies, then `python3 test/validate.py` in each | all three refused with exit 1: the live-declared-test code renamed (`the boot assertion cannot refuse HELEKET_ENV_TEST_HOLDS_LIVE_CREDENTIAL`), the test-declared-live code renamed (`… HELEKET_ENV_LIVE_HOLDS_TEST_CREDENTIAL`), and the environment deleted from the Option B block (`heleket-provider.md:1362 — a copyable block sets HELEKET_API_KEY without HELEKET_ENV`). It also refused the **real** defect before anything was fixed: 6 failures on the unmodified tree, naming both credential-handover blocks at `:135` and `:1137` | 2026-08-19 | **verified locally · unreleased** |
+| 021 | The twelve pre-existing negatives still refuse their plants | every `Negative self-test` step extracted from `validate.yml` and run as a process from the repo root | **15/15 refused.** The three new ones plus the twelve SD-01 left, none broken by edits to `test/validate.py` or `crypto-payments/SKILL.md` | 2026-08-19 | **verified locally · unreleased** |
+| 022 | The new cross-references resolve | slugify every heading, then resolve every in-page and relative link in the two edited files | **0 broken** — 15 in-page links against 17 headings in `SKILL.md`, 27 against 37 in `heleket-provider.md`, and both relative links, including the new one to `stripe-billing/references/price-integrity.md` | 2026-08-19 | **verified locally · unreleased** |
+
+**What is NOT verified in this SD-02 block.**
+
+- **Nothing was checked against Heleket.** No network call was made to any payment or auth
+  provider, by constraint. Every statement about the credential model above is a reading of
+  `references/heleket-provider.md`, not of the vendor's current documentation — the same
+  vendor-drift exposure the section below names as this repository's largest.
+- **Whether a second Heleket merchant account is actually available.** The strongest control
+  in the shipped advice — a sandbox merchant, so the dev credential authorises nothing live —
+  is written as *"check whether your account permits one"* precisely because the document
+  does not establish that it does, and confirming it would mean logging into a dashboard.
+- **The assertion has not been run as TypeScript.** REQ-018 ran a transliteration with types
+  stripped; there is no TS toolchain in this repository and adding one to type-check a
+  snippet in a markdown reference is not a trade this row made.
+- **CI has not seen the three new negatives.** Same gap SD-01 recorded: the step-level
+  conclusions REQ-002 reads do not exist for them yet. The negative count moved from twelve
+  to **fifteen** in `.github/workflows/validate.yml` and `CONTRIBUTING.md` now says fifteen.
+- **`stripe-billing` is untouched and still has the same defect** (B-86), and the other three
+  credential-holding skills were not looked at (B-87). Enforcing `CREDENTIAL_BOUNDARIES`
+  over `stripe-billing` in this change would have turned the gate red for work this row did
+  not do.
+- **The reference this row grew is a size outlier** — 1696 lines / ~18.8k tokens against a
+  next-largest reference of ~4.8k. `audit_skill.py` returns `0 GAP` and the 5000-token budget
+  is a `SKILL.md` rule, so nothing is violated; it is filed as B-88 rather than left as an
+  unmeasured consequence, and the fix is a split rather than a trim.
+- **Nothing was released**: no tag, no publish, no version bump.
+
+**Noted for the sibling row SD-03**, which owns the `PreToolUse` hook: the boundary shipped
+here is a boot assertion *in the reader's project*, and it cannot see a shell that merely
+exports a live key. A hook refusing a Bash command that sets a production merchant
+credential in a run declaring `test` is the missing half, and it belongs there rather than
+here — the same argument that keeps `sk_live_` out of an agent's hands.
+
 ## What these checks do not cover
 
 Named rather than left to be inferred, because a ledger that lists only its successes

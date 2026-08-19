@@ -476,6 +476,142 @@ def check_self_describing_docs_resolve():
 check_self_describing_docs_resolve()
 
 
+# ------------------------------------------------ credential boundaries (M-06)
+
+# Manifesto M-06: *a credential that cannot reach production is stronger than a sentence
+# saying not to use it there, because the last control still works after context loss.*
+#
+# A reference document that hands the reader a provider secret is the moment that control
+# is either installed or lost. So: a document may not set a live credential in a copyable
+# block without setting the environment that credential is declared to belong to, and it
+# must ship the boot assertion that refuses the two mismatches -- plus, where the provider
+# offers no test credential at all, the exposure that remains, named.
+#
+# Table-driven so a second provider is a row, not a second shape (M-44). It carries ONE
+# row today, and that is a measurement rather than an oversight: `stripe-billing`
+# prescribes the same control at `references/price-integrity.md:62-64` and asks for it at
+# `references/testing-and-local-dev.md:210` ("something asserts they agree") while
+# shipping no assertion to copy. Filed as board **B-85**, not enforced here, because a
+# guard added in the same breath as the defect it would flag turns the gate red for work
+# this row did not do.
+CREDENTIAL_BOUNDARIES = {
+    "crypto-payments/references/heleket-provider.md": {
+        # the env var that IS the secret
+        "secret": "HELEKET_API_KEY",
+        # the separate declaration of which environment it belongs to. Separate on
+        # purpose: price-integrity.md:62-64 -- "one variable that does both cannot be
+        # checked for consistency; two can."
+        "declared_env": "HELEKET_ENV",
+        # the boot assertion that compares them
+        "assertion": "assertHeleketEnv",
+        # both directions must be refusable, by code rather than by sentence: a code
+        # survives a rewording, and an operator can grep their logs for it
+        "codes": (
+            "HELEKET_ENV_TEST_HOLDS_LIVE_CREDENTIAL",
+            "HELEKET_ENV_LIVE_HOLDS_TEST_CREDENTIAL",
+        ),
+        # the provider offers no separate test credential, so the residual risk is
+        # written down rather than left silent
+        "exposure": "### Residual exposure",
+    },
+}
+
+_ASSIGNS = re.compile(r"^\s*(?:export\s+)?%s\s*=")
+
+
+def _fenced_blocks(text):
+    """Yield (first_line_number, block_text) for every fenced block.
+
+    Blocks, not lines, because the invariant is about what a reader COPIES. A `.env`
+    snippet handing over a key is copied whole; whether the environment is declared
+    beside it is a property of the block, not of the file.
+    """
+    lines = text.splitlines()
+    i = 0
+    while i < len(lines):
+        if lines[i].lstrip().startswith("```"):
+            start = i + 1
+            j = i + 1
+            while j < len(lines) and not lines[j].lstrip().startswith("```"):
+                j += 1
+            yield start + 1, "\n".join(lines[start:j])
+            i = j + 1
+        else:
+            i += 1
+
+
+def check_credential_boundary():
+    """A copyable block that sets a live credential must declare its environment.
+
+    The defect, measured 2026-08-19 (manifesto program row SD-02): `crypto-payments`
+    had no test/live credential boundary of any kind. `HELEKET_API_KEY` was the only
+    credential, it is *also* the webhook signing secret
+    (`heleket-provider.md:126`), and the document's own local-development path handed
+    the reader that key with no environment beside it (`:1146`) while telling them to
+    flip "Test mode" in the merchant dashboard (`:1155`) -- an account-level toggle,
+    not a credential. So a dev or agent run held the production credential, and the
+    document never said so.
+
+    Four requirements, each one a thing that was actually missing:
+
+      1. every block that ASSIGNS the secret also assigns the declared environment --
+         the `:1146` defect, and the only part of this check that reads position
+         rather than presence;
+      2. the boot assertion exists to be copied, so the control is a snippet and not
+         a paragraph;
+      3. both mismatches are refusable by a stable code -- a live credential declared
+         test, and a test credential declared live. One direction is half a boundary:
+         the second is how a staging merchant's key reaches production and settles
+         real money to a wallet nobody reconciles;
+      4. where the provider offers no test credential at all, the exposure is named.
+         Heleket does not offer one -- one key per merchant, no sandbox host, "test
+         mode" a dashboard toggle over the same key. An unavoidable risk that is
+         written down is a different object from one that is silent.
+    """
+    for rel, spec in CREDENTIAL_BOUNDARIES.items():
+        path = os.path.join(SKILL_ROOT, rel)
+        if not os.path.isfile(path):
+            fail(f"credential boundary: {rel} is missing -- it is the document that hands "
+                 f"the reader {spec['secret']}")
+            continue
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+
+        assign_secret = re.compile(_ASSIGNS.pattern % re.escape(spec["secret"]), re.M)
+        assign_env = re.compile(_ASSIGNS.pattern % re.escape(spec["declared_env"]), re.M)
+
+        blocks = 0
+        for lineno, block in _fenced_blocks(text):
+            if not assign_secret.search(block):
+                continue
+            blocks += 1
+            if not assign_env.search(block):
+                fail(f"{rel}:{lineno} — a copyable block sets {spec['secret']} without "
+                     f"{spec['declared_env']}. A credential handed over with no declared "
+                     "environment is the M-06 defect: the run holds production and nothing "
+                     "can tell. Set both in the same block")
+        if not blocks:
+            fail(f"{rel}: no block assigns {spec['secret']} — this guard's corpus is empty, "
+                 "which makes it pass everything. Either the document stopped handing the "
+                 "credential over, or the assignment shape changed and this check went blind")
+
+        if spec["assertion"] not in text:
+            fail(f"{rel}: no {spec['assertion']}() to copy. M-06 is that prose is the "
+                 "weakest control surface — a boundary the reader has to re-derive is a "
+                 "sentence, not a control")
+        for code in spec["codes"]:
+            if code not in text:
+                fail(f"{rel}: the boot assertion cannot refuse {code} — a boundary that "
+                     "refuses one direction only lets the other one through")
+        if spec["exposure"] not in text:
+            fail(f"{rel}: no {spec['exposure']!r} section. This provider issues one "
+                 "credential per merchant and no test key, so a residual risk remains "
+                 "after the assertion; unwritten, it reads as absent")
+
+
+check_credential_boundary()
+
+
 def check_routed_triggers_still_advertised():
     """The family's routing hook fires on words this description has to keep.
 
@@ -516,5 +652,5 @@ if FAILURES:
         print(f"  - {f}", file=sys.stderr)
     sys.exit(1)
 
-checks = 7 + len(skill_dirs)
+checks = 8 + len(skill_dirs)
 print(f"OK: sheleg-dev structurally valid ({checks} checks, {len(skill_dirs)} skill(s), v{version})")

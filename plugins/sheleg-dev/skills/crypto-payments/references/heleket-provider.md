@@ -9,6 +9,9 @@ one provider's wire format looks like when you apply them.
 - [1. What is Heleket and when to use it](#1-what-is-heleket-and-when-to-use-it)
 - [2. Architecture overview](#2-architecture-overview)
 - [3. Environment variables](#3-environment-variables)
+  - [The test/live boundary — and why it cannot be a sentence](#the-testlive-boundary--and-why-it-cannot-be-a-sentence)
+  - [The boot assertion](#the-boot-assertion)
+  - [Residual exposure](#residual-exposure)
 - [4. Database schema (Prisma)](#4-database-schema-prisma)
 - [5. Heleket REST API reference](#5-heleket-rest-api-reference)
 - [6. Webhook (IPN) payload reference](#6-webhook-ipn-payload-reference)
@@ -61,6 +64,7 @@ spot rate and settles to your merchant wallet in your chosen target coin (typica
 | Default webhook IP | `31.133.220.8` (single static IP) |
 | Auth | Per-merchant API key + `merchant` UUID header |
 | Signature | MD5 over base64 of JSON body, suffixed with API key |
+| **Test credential** | **none.** One key per merchant, which is *also* the webhook signing secret; no sandbox host, no restricted scope, no `test`/`live` marker in the key itself. "Test mode" is a toggle on the merchant account — see [Residual exposure](#residual-exposure) |
 | Dashboard | https://heleket.com → Merchant settings |
 | Settles to | USDT, USDC, BTC, ETH, BNB, TRX, etc. (configurable per invoice) |
 | Pricing currency | Any fiat ISO code (USD recommended) |
@@ -123,26 +127,244 @@ is the only authoritative source for status changes; client polling is for UX on
 
 | Variable | Required | Default | Source / Notes |
 |----------|----------|---------|----------------|
-| `HELEKET_API_KEY` | yes | — | Merchant settings → Payment API. Trim whitespace on read. **Never log this value**, it is also the webhook signing secret. |
+| `HELEKET_ENV` | yes | **none, deliberately** | `test` \| `production`. The environment this run *declares*. Separate from the key on purpose — one variable that both carries the secret and names its environment cannot be checked against itself. No default: a default is the control disappearing the first time somebody copies a `.env`. |
+| `HELEKET_API_KEY` | yes | — | Merchant settings → Payment API. Trim whitespace on read. **Never log this value**, it is also the webhook signing secret. There is no test variant of it — see [Residual exposure](#residual-exposure). |
 | `HELEKET_MERCHANT_ID` | yes | — | Merchant settings → Merchant UUID. Sent as `merchant` header on every API call. |
+| `HELEKET_LIVE_MERCHANT_ID` | yes | — | The **production** merchant UUID, pinned. Not a secret (it travels in a header on every call); it is the thing that lets a boot assertion tell a live credential from a sandbox one. |
+| `HELEKET_LIVE_KEY_FINGERPRINT` | no | — | First 12 hex of `sha256(live key)`. The second discriminator, for when the merchant UUID is shared or unset. A one-way 48-bit prefix over a provider-issued high-entropy secret — see the caveat under [the boot assertion](#the-boot-assertion). |
 | `HELEKET_WEBHOOK_IP` | no | `31.133.220.8` | Override only if Heleket changes their callback IP. Localhost (`127.0.0.1` / `::1`) is always allowed for tests. |
-| `SKIP_BILLING` | no | `false` | When `true` the checkout endpoint short-circuits, marks the payment paid immediately, and credits the balance — for local dev / staging without hitting Heleket. |
+| `SKIP_BILLING` | no | `false` | When `true` the checkout endpoint short-circuits, marks the payment paid immediately, and credits the balance — for local dev / staging without hitting Heleket. **Refused when `HELEKET_ENV=production`**: there it is not a shortcut, it is a free-money path. |
 | `NEXTAUTH_URL` or `NEXT_PUBLIC_APP_URL` | yes | — | Public origin used to build `url_callback`, `url_success`, `url_return`. Must be HTTPS in production. |
 
 `.env.example` snippet:
 
 ```bash
 # ── Heleket (crypto payments) ─────────────────────────────────
+# Which environment this run declares. No default; the boot assertion refuses an
+# unset value rather than guessing, and refuses a credential that disagrees with it.
+HELEKET_ENV="test"
 # Payment API key and merchant UUID from Heleket merchant settings (https://heleket.com).
+# In a test run these MUST be the sandbox merchant's, not production's.
 HELEKET_API_KEY=""
 HELEKET_MERCHANT_ID=""
+# The production merchant, pinned so a test run holding it can be refused at startup.
+# Not a secret. Without it, a test run cannot prove it is not live — and is refused.
+HELEKET_LIVE_MERCHANT_ID=""
+# Optional second discriminator: printf %s "$LIVE_KEY" | shasum -a 256 | cut -c1-12
+HELEKET_LIVE_KEY_FINGERPRINT=""
 # Whitelist IP for webhook verification (Heleket callback origin).
 HELEKET_WEBHOOK_IP="31.133.220.8"
 ```
 
-**Security**: rotate the API key quarterly, store in a secret manager (Doppler, Doppler,
+**Security**: rotate the API key quarterly, store in a secret manager (Doppler,
 AWS Secrets Manager, Cloudflare Workers Secret, K8s Secret), never commit `.env`,
 never expose to the client bundle (no `NEXT_PUBLIC_` prefix).
+
+### The test/live boundary — and why it cannot be a sentence
+
+Read the provider's credential model before designing around it, because it is worse
+than Stripe's and the difference decides the design:
+
+| | Stripe | Heleket |
+|---|---|---|
+| Separate test credential | yes, a whole second account | **no** |
+| Environment readable from the key | yes, `sk_test_` / `sk_live_` prefix | **no** — an opaque string with no marker |
+| Sandbox host | no, same host | no, same host (`api.heleket.com`) |
+| What "test mode" is | a property of the key | **a toggle on the merchant account** |
+| Key also signs webhooks | no, a separate `whsec_` | **yes, the same value** |
+
+So the house pattern — declare the environment in a variable separate from the secret,
+then assert at boot that the two agree (the `stripe-billing` skill, `references/price-integrity.md`,
+*Test and live mode*) — applies, but its Stripe implementation does not: there is no key
+prefix to read. The comparison has to be made against something else, and Heleket gives
+exactly two candidates, both non-secret:
+
+- **the merchant UUID** (`HELEKET_MERCHANT_ID`), which is what distinguishes one merchant
+  account from another and travels in a header on every call;
+- **a fingerprint of the key**, for when the UUID is shared or absent.
+
+Pin the production values and the assertion below can refuse a mismatch in **both**
+directions. One direction is half a boundary: a production key in a dev run is the
+obvious loss, and a sandbox key in production is the quiet one — invoices created
+against a merchant nobody reconciles, money settling to the wrong wallet, and no error
+until somebody asks where the week's revenue went.
+
+**Strongest control first.** The assertion is the *second* line. The first is a
+**separate sandbox merchant account**, so the credential a dev machine holds authorises
+nothing on the live merchant — M-06's point exactly: a credential that cannot reach
+production beats a sentence saying not to use it there, because it still works after
+everyone has forgotten the sentence. Check whether your Heleket account permits a second
+merchant before assuming it does; this document cannot confirm it for you, and if it does
+not, the exposure below is what you are left holding.
+
+### The boot assertion
+
+Fails at **startup**, not at the first charge. Copy it whole:
+
+```ts
+// src/lib/heleket-env.ts
+import { createHash } from "node:crypto";
+
+export type HeleketEnv = "test" | "production";
+
+/** Codes, not sentences. A code survives a rewording, greps out of a log, and is what
+ *  an alert should fire on. */
+export type HeleketEnvErrorCode =
+  | "HELEKET_ENV_MISSING"
+  | "HELEKET_ENV_INVALID"
+  | "HELEKET_ENV_UNPINNED"
+  | "HELEKET_ENV_TEST_HOLDS_LIVE_CREDENTIAL"
+  | "HELEKET_ENV_LIVE_HOLDS_TEST_CREDENTIAL"
+  | "HELEKET_ENV_LIVE_WITH_SKIP_BILLING";
+
+export class HeleketEnvError extends Error {
+  constructor(readonly code: HeleketEnvErrorCode, message: string) {
+    super(`${code}: ${message}`);
+    this.name = "HeleketEnvError";
+  }
+}
+
+/**
+ * 48-bit prefix of SHA-256 over the key.
+ *
+ * Safe to keep in configuration ONLY because a Heleket API key is a long
+ * provider-issued random string: the digest is one-way and 12 hex characters carry
+ * nothing recoverable. Never fingerprint a value a human chose — for a guessable
+ * secret this publishes a confirmation oracle. If in doubt, pin the merchant UUID
+ * instead and leave this unset.
+ */
+export function keyFingerprint(key: string): string {
+  return createHash("sha256").update(key.trim()).digest("hex").slice(0, 12);
+}
+
+type Identity = "live" | "not-live" | "unknown";
+
+/** Which credential is this, judged only against pinned non-secret values. */
+function identify(env: NodeJS.ProcessEnv): Identity {
+  const key = env.HELEKET_API_KEY?.trim();
+  const merchant = env.HELEKET_MERCHANT_ID?.trim();
+  const liveMerchant = env.HELEKET_LIVE_MERCHANT_ID?.trim();
+  const liveFinger = env.HELEKET_LIVE_KEY_FINGERPRINT?.trim().toLowerCase();
+
+  if (!liveMerchant && !liveFinger) return "unknown";
+  if (liveMerchant && merchant && merchant === liveMerchant) return "live";
+  if (liveFinger && key && keyFingerprint(key) === liveFinger) return "live";
+  if ((liveMerchant && merchant) || (liveFinger && key)) return "not-live";
+  return "unknown";
+}
+
+export function assertHeleketEnv(env: NodeJS.ProcessEnv = process.env): HeleketEnv {
+  const declared = env.HELEKET_ENV?.trim();
+
+  if (!declared) {
+    throw new HeleketEnvError(
+      "HELEKET_ENV_MISSING",
+      "HELEKET_ENV is unset. It has no default on purpose: a default is the control " +
+        'disappearing the first time somebody copies a .env. Set "test" or "production".',
+    );
+  }
+  if (declared !== "test" && declared !== "production") {
+    throw new HeleketEnvError(
+      "HELEKET_ENV_INVALID",
+      `HELEKET_ENV="${declared}" — expected "test" or "production".`,
+    );
+  }
+
+  if (declared === "production" && env.SKIP_BILLING === "true") {
+    throw new HeleketEnvError(
+      "HELEKET_ENV_LIVE_WITH_SKIP_BILLING",
+      "SKIP_BILLING=true credits balances with no payment behind them. In production " +
+        "that is not a shortcut, it is a free-money path reachable by anyone who can " +
+        "read the checkout URL.",
+    );
+  }
+
+  const identity = identify(env);
+
+  // Direction 1 — a live credential declared test. The dev machine, the CI job and the
+  // agent run all hold a key that creates real invoices the moment the dashboard
+  // toggle moves.
+  if (declared === "test" && identity === "live") {
+    throw new HeleketEnvError(
+      "HELEKET_ENV_TEST_HOLDS_LIVE_CREDENTIAL",
+      "HELEKET_ENV=test but this is the pinned production credential. Heleket has no " +
+        "test key: the same value that signs your webhooks creates real invoices as " +
+        "soon as merchant Test mode is off. Use the sandbox merchant account.",
+    );
+  }
+
+  // Cannot tell is refused, not assumed — on the test side, which is where the control
+  // has to hold. "We could not prove it was safe" must never read as "it was safe".
+  if (declared === "test" && identity === "unknown") {
+    throw new HeleketEnvError(
+      "HELEKET_ENV_UNPINNED",
+      "HELEKET_ENV=test but neither HELEKET_LIVE_MERCHANT_ID nor " +
+        "HELEKET_LIVE_KEY_FINGERPRINT is pinned, so nothing here can prove this " +
+        "credential is not the production one.",
+    );
+  }
+
+  // Direction 2 — a test credential declared live. The quiet one: invoices settle to a
+  // merchant nobody reconciles and no error surfaces until revenue is missing.
+  if (declared === "production" && identity === "not-live") {
+    throw new HeleketEnvError(
+      "HELEKET_ENV_LIVE_HOLDS_TEST_CREDENTIAL",
+      "HELEKET_ENV=production but this credential is not the pinned live merchant's. " +
+        "Invoices would be created against the wrong merchant and settle to a wallet " +
+        "your reconciliation never reads.",
+    );
+  }
+
+  if (declared === "production" && identity === "unknown") {
+    console.warn(
+      "[heleket] HELEKET_ENV=production with no live pin. Set HELEKET_LIVE_MERCHANT_ID " +
+        "— it is what lets a test run be refused.",
+    );
+  }
+
+  return declared;
+}
+```
+
+Wire it at module load of the client library, above every export, so the process cannot
+reach a request handler in a state the assertion would have rejected:
+
+```ts
+// src/lib/heleket.ts — first executable line
+import { assertHeleketEnv } from "./heleket-env";
+
+export const HELEKET_ENV = assertHeleketEnv();
+```
+
+Calling it from the checkout handler instead is a control that only fires once a user is
+already trying to pay, and never at all in the run that merely holds the key.
+
+### Residual exposure
+
+**Named because it does not go away, and an unwritten risk reads as an absent one.**
+
+Heleket issues **one credential per merchant** and it is also the webhook signing secret.
+There is no test key, no sandbox host and no read-only scope. "Test mode" is a toggle in
+merchant settings (Section 15), which means the *same* key creates $1 test invoices before
+the toggle moves and real ones after it — and it moves in a dashboard, by anyone with
+dashboard access, with no deploy and no signal to the machines holding that key.
+
+Three consequences, stated rather than implied:
+
+1. **Unless you hold a second merchant account, a developer following Section 15 Option B
+   holds a production credential.** The assertion above narrows that window — it refuses
+   the run that declares the wrong environment — but it cannot make the key harmless. It
+   is a check on the declaration, not a limit on the credential.
+2. **The key cannot be scoped down.** Because it doubles as the signing secret, you cannot
+   issue a verify-only credential for a service that merely validates callbacks; every
+   holder of the verifier can also create invoices.
+3. **Rotation is the only real revocation.** There is no per-environment key to revoke, so
+   a leak from a dev machine is a production incident: rotate in merchant settings, and
+   re-pin `HELEKET_LIVE_KEY_FINGERPRINT` in the same change or the assertion starts
+   answering about a key that no longer exists.
+
+If the compliance posture in the banner at the top of this document matters to you, this
+credential model is part of the same assessment.
 
 ---
 
@@ -1131,7 +1353,9 @@ balance updated, never touching Heleket. Perfect for E2E tests, demos, and featu
 
 ### Option B — Real Heleket + ngrok / cloudflared
 
-For end-to-end testing against the real provider:
+For end-to-end testing against the real provider. **Use a sandbox merchant account if your
+Heleket account permits one** — that is the control that survives context loss; everything
+below is what to do because the provider gives you nothing stronger.
 
 ```bash
 # Terminal 1
@@ -1143,15 +1367,30 @@ cloudflared tunnel --url http://localhost:3000
 
 # Set in .env.local:
 NEXTAUTH_URL=https://random-name.trycloudflare.com
-HELEKET_API_KEY=...
-HELEKET_MERCHANT_ID=...
+# Declared first, and never "production" on a developer machine.
+HELEKET_ENV=test
+# The SANDBOX merchant's key and UUID. Not production's.
+HELEKET_API_KEY=<sandbox merchant key>
+HELEKET_MERCHANT_ID=<sandbox merchant uuid>
+# The production merchant, pinned. This is what makes the line above checkable:
+# paste the live UUID here and `assertHeleketEnv()` refuses to boot if the two
+# credentials above ever turn out to be it.
+HELEKET_LIVE_MERCHANT_ID=<production merchant uuid>
 HELEKET_WEBHOOK_IP=31.133.220.8
 
 # Restart Next.js so it picks up the public URL
 ```
 
-Use Heleket's "Test mode" (toggle in merchant settings) for free $1 invoices. Pay them
-with any spare USDT.
+Heleket's "Test mode" (toggle in merchant settings) gives free $1 invoices, payable with
+any spare USDT. **It is a property of the merchant account, not of the key** — the same
+credential creates real invoices the moment somebody moves that toggle, so it is not a
+substitute for a separate merchant and it is not what makes this safe. What makes it
+checkable is the pin above plus
+[the boot assertion](#the-boot-assertion); what remains after both is
+[Residual exposure](#residual-exposure).
+
+If your account has only one merchant, prefer **Option A** for everything except the one
+thing that genuinely needs the wire: a real callback arriving from Heleket's IP.
 
 ---
 
@@ -1251,8 +1490,87 @@ expect(res2.status).toBe(200);
 // User's balance must NOT have increased again.
 ```
 
+### Credential-boundary tests (`heleket-env.ts`)
+
+Both directions, and a defect planted against each. A boundary nobody has watched refuse
+is not a boundary — and the direction people skip is the second one.
+
+```ts
+import { describe, it, expect } from "vitest";
+import { assertHeleketEnv, keyFingerprint, HeleketEnvError } from "./heleket-env";
+
+const LIVE_MERCHANT = "11111111-1111-1111-1111-111111111111";
+const SANDBOX_MERCHANT = "22222222-2222-2222-2222-222222222222";
+const LIVE_KEY = "placeholder-live-key-not-a-real-credential";
+
+const base = {
+  HELEKET_LIVE_MERCHANT_ID: LIVE_MERCHANT,
+  HELEKET_LIVE_KEY_FINGERPRINT: keyFingerprint(LIVE_KEY),
+};
+
+function code(env: Record<string, string>): string {
+  try {
+    assertHeleketEnv(env as NodeJS.ProcessEnv);
+    return "PASSED";
+  } catch (e) {
+    return (e as HeleketEnvError).code;
+  }
+}
+
+describe("assertHeleketEnv", () => {
+  it("refuses a live credential declared test — by merchant uuid", () => {
+    expect(code({ ...base, HELEKET_ENV: "test", HELEKET_MERCHANT_ID: LIVE_MERCHANT }))
+      .toBe("HELEKET_ENV_TEST_HOLDS_LIVE_CREDENTIAL");
+  });
+
+  it("refuses a live credential declared test — by key fingerprint alone", () => {
+    // the UUID is the sandbox one, so only the fingerprint can catch this
+    expect(code({ ...base, HELEKET_ENV: "test",
+                  HELEKET_MERCHANT_ID: SANDBOX_MERCHANT, HELEKET_API_KEY: LIVE_KEY }))
+      .toBe("HELEKET_ENV_TEST_HOLDS_LIVE_CREDENTIAL");
+  });
+
+  it("refuses a test credential declared live", () => {
+    expect(code({ ...base, HELEKET_ENV: "production",
+                  HELEKET_MERCHANT_ID: SANDBOX_MERCHANT }))
+      .toBe("HELEKET_ENV_LIVE_HOLDS_TEST_CREDENTIAL");
+  });
+
+  it("refuses an unset environment rather than defaulting", () => {
+    expect(code({ ...base, HELEKET_MERCHANT_ID: SANDBOX_MERCHANT }))
+      .toBe("HELEKET_ENV_MISSING");
+  });
+
+  it("refuses a test run that cannot prove it is not live", () => {
+    expect(code({ HELEKET_ENV: "test", HELEKET_MERCHANT_ID: SANDBOX_MERCHANT }))
+      .toBe("HELEKET_ENV_UNPINNED");
+  });
+
+  it("refuses SKIP_BILLING in production", () => {
+    expect(code({ ...base, HELEKET_ENV: "production",
+                  HELEKET_MERCHANT_ID: LIVE_MERCHANT, SKIP_BILLING: "true" }))
+      .toBe("HELEKET_ENV_LIVE_WITH_SKIP_BILLING");
+  });
+
+  it("admits the two configurations that are actually correct", () => {
+    expect(code({ ...base, HELEKET_ENV: "production",
+                  HELEKET_MERCHANT_ID: LIVE_MERCHANT })).toBe("PASSED");
+    expect(code({ ...base, HELEKET_ENV: "test",
+                  HELEKET_MERCHANT_ID: SANDBOX_MERCHANT })).toBe("PASSED");
+  });
+});
+```
+
+The last case is not padding. A boundary that refuses everything passes every negative
+test and stops anyone deploying, so it gets switched off within a day — which is the
+failure mode a refusal with no working configuration always ends in.
+
 ### Test matrix to cover
 
+- `HELEKET_ENV=test` holding the live merchant credential → refused at boot
+- `HELEKET_ENV=production` holding a non-live credential → refused at boot
+- `HELEKET_ENV` unset → refused, not defaulted
+- `HELEKET_ENV=production` with `SKIP_BILLING=true` → refused at boot
 - Unauthorized checkout → 401
 - Amount below `MIN_AMOUNT` → 400
 - Amount above `MAX_AMOUNT` → 400
@@ -1275,6 +1593,20 @@ Before shipping to production, verify each item:
 
 - [ ] `HELEKET_API_KEY` and `HELEKET_MERCHANT_ID` stored in a secret manager, not in
       `.env` committed to git.
+- [ ] A **separate sandbox merchant account** exists, or the reason it does not is
+      written down where the next person will read it — the credential a dev machine
+      holds is the whole boundary, and `assertHeleketEnv()` only checks the declaration.
+- [ ] `HELEKET_ENV` is set explicitly in every environment, and `HELEKET_LIVE_MERCHANT_ID`
+      is pinned so a test run can be refused.
+- [ ] `assertHeleketEnv()` runs at **module load** of the client library, not inside the
+      checkout handler — a run that merely holds the key must fail too.
+- [ ] Both refusal directions have been watched failing:
+      `HELEKET_ENV_TEST_HOLDS_LIVE_CREDENTIAL` and
+      `HELEKET_ENV_LIVE_HOLDS_TEST_CREDENTIAL`.
+- [ ] `SKIP_BILLING` is refused when `HELEKET_ENV=production`, by the assertion and not
+      by a comment.
+- [ ] The key-rotation runbook re-pins `HELEKET_LIVE_KEY_FINGERPRINT` in the same change,
+      or the assertion begins answering about a key that no longer exists.
 - [ ] Webhook route is in the **CSRF exempt list** of your middleware.
 - [ ] Webhook IP allowlist active (`isAllowedWebhookIp`), proxy-aware
       (`do-connecting-ip` / `cf-connecting-ip` / last hop of `x-forwarded-for`).
@@ -1302,6 +1634,10 @@ Before shipping to production, verify each item:
 
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
+| App refuses to boot with `HELEKET_ENV_TEST_HOLDS_LIVE_CREDENTIAL` | The dev machine is holding the production merchant's key — working as designed | Switch to the sandbox merchant. Do **not** widen the assertion; it caught the thing it exists for. |
+| App refuses to boot with `HELEKET_ENV_LIVE_HOLDS_TEST_CREDENTIAL` in production | A staging key reached the production environment | Fix the secret, not the check: this is the direction that loses money silently. |
+| App refuses to boot with `HELEKET_ENV_UNPINNED` | `HELEKET_LIVE_MERCHANT_ID` is not set, so a test run cannot prove it is not live | Pin the production merchant UUID. It is not a secret. |
+| A real payment arrived but no invoice exists in the dashboard you are looking at | Two merchant accounts; you are reading the sandbox one | Check `HELEKET_MERCHANT_ID` against `HELEKET_LIVE_MERCHANT_ID`. |
 | Every webhook fails signature | Forgot the PHP-escape form | Use the dual `verifyWebhookSignature`. |
 | Webhook returns 403 in production but works locally | Behind a CDN (Cloudflare / DO / Vercel), real IP is in `cf-connecting-ip` / `do-connecting-ip` / `x-forwarded-for` | Implement proxy-aware `extractIp`. |
 | User pays $30, balance shows $29.97 | Crediting `paymentAmountUsd` without buffer | Add 1% buffer in checkout, credit `tokenAmount` (or use the waterfall `paymentAmountUsd ?? tokenAmount ?? amountUsd`). |
@@ -1324,8 +1660,11 @@ When the user says "add crypto payments to this project":
    framework, an existing user model with a balance field of some kind, an authenticated
    session helper.
 2. **Add env vars** to `.env.example` and the secret manager:
-   `HELEKET_API_KEY`, `HELEKET_MERCHANT_ID`, `HELEKET_WEBHOOK_IP=31.133.220.8`,
-   `SKIP_BILLING=false`.
+   `HELEKET_ENV`, `HELEKET_API_KEY`, `HELEKET_MERCHANT_ID`, `HELEKET_LIVE_MERCHANT_ID`,
+   `HELEKET_WEBHOOK_IP=31.133.220.8`, `SKIP_BILLING=false`. Then create
+   `src/lib/heleket-env.ts` (Section 3, copy verbatim) and call `assertHeleketEnv()` at
+   the top of the client library — **before** step 4, so the first run of anything is
+   already inside the boundary rather than being retrofitted into it later.
 3. **Add Prisma model + enum** (Section 4) and run `npx prisma migrate dev --name
    add_crypto_payments`.
 4. **Create the client library** at `src/lib/heleket.ts` (Section 7, copy verbatim).
