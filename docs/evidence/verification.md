@@ -25,6 +25,21 @@ actually prints. Both were watched refusing a plant; see the SD-05 block.
 
 ## Shipped state — v0.8.0
 
+**The first v0.8.0 tag failed its own release, and this is the record of it.** The notice
+`install.sh` gained in this version — that the manual gate does not travel with a skills
+copy — prints after the summary line, and the CI step asserted the summary by POSITION
+(`bash install.sh | tail -1 | grep -q 'Installed 6 skill'`). So the release run went red on
+a step about installers while nothing was wrong with the installers, npm kept serving
+0.7.0, and no artifact shipped under the tag. The assertion now reads the whole output and
+has a second one requiring the notice, so the new behaviour is covered rather than
+tolerated; the tag was re-cut at the fix, which is safe precisely because nothing had been
+published under it. Run `32313338558`, step *Installers run*, exit 1.
+
+That is the shape the umbrella's `B-78` is about — *a release was tagged, failed its gate
+on one step, and nobody noticed*. It was noticed here in under two minutes because the
+release was being watched, which is the only difference.
+
+
 Released: `@ssheleg/sheleg-dev@0.7.0` (npm), tag `v0.7.0` at `6f66255`.
 
 > **This heading has now been wrong twice.** It said `v0.5.0` while npm served `0.5.2`, and

@@ -899,8 +899,18 @@ jobs:
             echo "ERROR: unknown arg accepted"; exit 1
           fi
           rm -rf "$HOME/.claude"
-          bash install.sh | tail -1 | grep -q 'Installed 6 skill'
-          echo "OK: both installers behave"
+          # Read the whole output, not the last line. `tail -1` asserted a POSITION, and
+          # the release of v0.8.0 failed on it: the notice this script gained — that the
+          # manual gate does not travel with a skills copy — prints after the summary, so
+          # the summary stopped being last. The assertion was about the summary existing;
+          # it is written that way now, and the notice has its own assertion so the new
+          # behaviour is covered rather than merely tolerated.
+          out=$(bash install.sh)
+          printf '%s\n' "$out" | grep -q 'Installed 6 skill' \
+            || { echo "install.sh did not report six skills"; printf '%s\n' "$out"; exit 1; }
+          printf '%s\n' "$out" | grep -qi 'manual gate' \
+            || { echo "install.sh stopped warning that the gate does not travel"; exit 1; }
+          echo "OK: both installers behave, and the destructive one says what it cannot carry"
 
       - name: Workflow YAML parses
         run: |
