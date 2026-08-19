@@ -1,0 +1,43 @@
+{
+  "id": "evt_PLACEHOLDER_session_bob_failed",
+  "object": "event",
+  "api_version": "2026-07-29.dahlia",
+  "created": 1767571200,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": {
+    "id": null,
+    "idempotency_key": null
+  },
+  "type": "checkout.session.async_payment_failed",
+  "data": {
+    "object": {
+      "id": "cs_PLACEHOLDER_bob",
+      "object": "checkout.session",
+      "mode": "subscription",
+      "status": "complete",
+      "payment_status": "unpaid",
+      "amount_subtotal": 2900,
+      "amount_total": 2900,
+      "currency": "usd",
+      "customer": "cus_PLACEHOLDER_bob",
+      "customer_details": {
+        "email": "placeholder@example.invalid"
+      },
+      "invoice": "in_PLACEHOLDER_bob",
+      "payment_intent": null,
+      "payment_method_types": [
+        "sepa_debit",
+        "card"
+      ],
+      "subscription": "sub_PLACEHOLDER_bob",
+      "success_url": "https://example.invalid/after?session_id={CHECKOUT_SESSION_ID}",
+      "metadata": {
+        "userId": "usr_PLACEHOLDER_bob",
+        "productId": "prod_PLACEHOLDER_pro",
+        "quantity": "1",
+        "conversionEventId": "evtid_PLACEHOLDER_purchase_bob"
+      }
+    }
+  }
+}

@@ -74,6 +74,11 @@ if (!userId) { log.error("session without userId"); return; }   // 200, but loud
 - A user that no longer exists is a 200 with an error log, not a 500. Retrying
   will not bring them back.
 
+**Proved, not asserted.** `fixtures/checkout-session-completed-paid.json` is the positive
+control: `paid-session-grants-once` fails a handler that answers 200 and writes nothing. It
+exists because without it, a handler refusing *every* session would satisfy
+`unpaid-session-grants-nothing` and this pack would teach the opposite defect.
+
 ## Asynchronous payment methods
 
 Bank debits, vouchers and bank transfers complete the session before the money
@@ -81,6 +86,11 @@ moves. `payment_status: "unpaid"` at `checkout.session.completed` means the
 grant belongs to `async_payment_succeeded`, which may arrive days later — and
 `async_payment_failed` means it never will. Both must be handled or the product
 is either never granted or granted for a payment that failed.
+
+**Proved, not asserted.** `fixtures/checkout-session-completed-async-unpaid.json` and
+`fixtures/checkout-session-async-payment-failed.json` through
+`fixtures/assert-money-invariants.mjs`: `unpaid-session-grants-nothing` fails any handler
+that grants on `checkout.session.completed` without reading `payment_status`.
 
 ## invoice.paid
 
@@ -115,6 +125,15 @@ stores an epoch date — no error, wrong renewal date forever.
 Guard the grant with a marker that survives a replay: a `lastGrantedPeriodStart`
 compared against the new period start, or an audit row keyed by `invoice.id`.
 Check it **inside** the same transaction as the grant.
+
+**Proved, not asserted.** Three assertions in `fixtures/assert-money-invariants.mjs` cover
+this table: `renewal-grants-exactly-once` against
+`fixtures/invoice-paid-subscription-cycle.json`,
+`proration-invoice-grants-nothing` against
+`fixtures/invoice-paid-subscription-update-proration.json` — whose line period starts at the
+change date, so the marker lets it through and only `billing_reason` stops it — and
+`reconciliation-does-not-regrant`, which drives the nightly repair rather than a webhook and
+is the only fixture the event claim cannot save.
 
 ## invoice.payment_failed and dunning
 
@@ -161,7 +180,10 @@ transaction that then rolls back.
 ## charge.refunded and charge.dispute.created
 
 `amount_refunded` is **cumulative**. Compute the increment against your stored
-total under a compare-and-swap; see the `SKILL.md` section. Resolve the target
+total under a compare-and-swap; see the `SKILL.md` section. **Proved, not asserted:**
+`fixtures/charge-refunded-partial.json` then `fixtures/charge-refunded-remainder.json`
+deliver `4000` and then `9000` against a `9000` charge, and `refund-total-is-cumulative`
+fails a handler that reads either as an increment. Resolve the target
 two ways: by `payment_intent` for one-off purchases, and by `charge.invoice` →
 invoice → subscription for subscription refunds. A refund handler that only
 knows the first path silently ignores every subscription refund.
@@ -190,6 +212,12 @@ For a subscription whose state you cannot reconstruct from one event, retrieve
 the subscription fresh inside the handler. One extra API call is cheaper than a
 class of ordering bugs.
 
+**Proved, not asserted.** `fixtures/invoice-paid-subscription-cycle-next-period.json`
+delivered *before* `fixtures/invoice-paid-subscription-cycle.json`:
+`out-of-order-pair-does-not-rewind-state` requires both periods to be granted and the
+mirrored row to still hold February. The two events carry different ids, so idempotency
+cannot mask the defect — which is the only reason this fixture measures the ordering rule.
+
 ## Idempotency store
 
 ```sql
@@ -208,6 +236,13 @@ CREATE INDEX ON processed_webhook_events (processed_at);
   than the retry window, or a late retry reprocesses.
 - A failure to *claim* (database down) is a 503, never an optimistic "probably
   new".
+
+**Proved, not asserted.** `fixtures/invoice-paid-subscription-cycle-redelivery.json` carries
+the same `evt_` as the cycle invoice. `sequential-redelivery-grants-once` requires the second
+delivery to answer `duplicate` and the renewal notice and the conversion to fire once;
+`concurrent-redelivery-grants-once` delivers both **at the same time**, which is the fixture
+that separates this claim from the per-period marker, because the marker reads before it
+writes and the claim does not.
 
 ## What to log
 

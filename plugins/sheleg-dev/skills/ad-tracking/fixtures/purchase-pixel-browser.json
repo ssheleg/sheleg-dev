@@ -1,0 +1,12 @@
+[
+  "track",
+  "Purchase",
+  {
+    "value": 29.0,
+    "currency": "USD",
+    "content_ids": ["prod_PLACEHOLDER_pro"],
+    "content_type": "product",
+    "num_items": 1
+  },
+  { "eventID": "evtid_PLACEHOLDER_purchase_carol" }
+]

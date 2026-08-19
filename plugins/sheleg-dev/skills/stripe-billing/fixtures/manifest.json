@@ -1,0 +1,172 @@
+{
+  "skill": "stripe-billing",
+  "assertionPack": "assert-money-invariants.mjs",
+  "referenceHandler": "reference-handler.mjs",
+  "runbook": "README.md",
+  "note": "The single home of the invariant -> fixture -> document mapping. test/validate.py in this repository reads it: every fixture must be claimed by a row, every row's fixtures must exist, and every claiming document must still carry its phrase, name the invariant id, and name a path under fixtures/. A claim whose fixture is gone and a fixture nobody claims are both failures.",
+  "invariants": [
+    {
+      "id": "renewal-grants-exactly-once",
+      "isolates": "grant-on-renewal",
+      "fixtures": [
+        "invoice-paid-subscription-cycle.json"
+      ],
+      "claimedBy": [
+        {
+          "document": "references/webhook-events.md",
+          "phrase": "| `subscription_cycle` | the renewal | **yes** |"
+        }
+      ]
+    },
+    {
+      "id": "proration-invoice-grants-nothing",
+      "isolates": "billing-reason",
+      "fixtures": [
+        "invoice-paid-subscription-cycle.json",
+        "invoice-paid-subscription-update-proration.json"
+      ],
+      "claimedBy": [
+        {
+          "document": "references/webhook-events.md",
+          "phrase": "mid-cycle proration (quantity or plan change)"
+        }
+      ]
+    },
+    {
+      "id": "sequential-redelivery-grants-once",
+      "isolates": "claim",
+      "fixtures": [
+        "invoice-paid-subscription-cycle.json",
+        "invoice-paid-subscription-cycle-redelivery.json"
+      ],
+      "claimedBy": [
+        {
+          "document": "references/webhook-events.md",
+          "phrase": "- `claimEvent` = `INSERT`; unique violation means duplicate."
+        }
+      ]
+    },
+    {
+      "id": "concurrent-redelivery-grants-once",
+      "isolates": "claim",
+      "fixtures": [
+        "invoice-paid-subscription-cycle.json",
+        "invoice-paid-subscription-cycle-redelivery.json"
+      ],
+      "claimedBy": [
+        {
+          "document": "references/webhook-events.md",
+          "phrase": "A failure to *claim* (database down) is a 503"
+        }
+      ]
+    },
+    {
+      "id": "sequential-redelivery-grants-once-by-count-alone",
+      "isolates": null,
+      "fixtures": [
+        "invoice-paid-subscription-cycle.json",
+        "invoice-paid-subscription-cycle-redelivery.json"
+      ],
+      "claimedBy": [
+        {
+          "document": "references/testing-and-local-dev.md",
+          "phrase": "two mechanisms cover each other"
+        }
+      ]
+    },
+    {
+      "id": "reconciliation-does-not-regrant",
+      "isolates": "grant-marker",
+      "fixtures": [
+        "invoice-paid-subscription-cycle.json"
+      ],
+      "claimedBy": [
+        {
+          "document": "references/webhook-events.md",
+          "phrase": "Guard the grant with a marker that survives a replay"
+        }
+      ]
+    },
+    {
+      "id": "out-of-order-pair-does-not-rewind-state",
+      "isolates": "ordering",
+      "fixtures": [
+        "invoice-paid-subscription-cycle.json",
+        "invoice-paid-subscription-cycle-next-period.json"
+      ],
+      "claimedBy": [
+        {
+          "document": "references/webhook-events.md",
+          "phrase": "**Never derive state from arrival order.**"
+        }
+      ]
+    },
+    {
+      "id": "refund-total-is-cumulative",
+      "isolates": "cumulative-refund",
+      "fixtures": [
+        "charge-refunded-partial.json",
+        "charge-refunded-remainder.json"
+      ],
+      "claimedBy": [
+        {
+          "document": "references/webhook-events.md",
+          "phrase": "`amount_refunded` is **cumulative**."
+        }
+      ]
+    },
+    {
+      "id": "duplicate-refund-claws-back-once",
+      "isolates": null,
+      "fixtures": [
+        "charge-refunded-partial.json"
+      ],
+      "claimedBy": [
+        {
+          "document": "references/testing-and-local-dev.md",
+          "phrase": "two mechanisms cover each other"
+        }
+      ]
+    },
+    {
+      "id": "unpaid-session-grants-nothing",
+      "isolates": "async-gate",
+      "fixtures": [
+        "checkout-session-completed-async-unpaid.json",
+        "checkout-session-async-payment-failed.json"
+      ],
+      "claimedBy": [
+        {
+          "document": "references/webhook-events.md",
+          "phrase": "grant belongs to `async_payment_succeeded`"
+        }
+      ]
+    },
+    {
+      "id": "paid-session-grants-once",
+      "isolates": "grant-on-checkout",
+      "fixtures": [
+        "checkout-session-completed-paid.json"
+      ],
+      "claimedBy": [
+        {
+          "document": "references/webhook-events.md",
+          "phrase": "Uniqueness key: the subscription id for subscriptions, the payment intent id"
+        }
+      ]
+    },
+    {
+      "id": "conversion-id-survives-the-session",
+      "isolates": "conversion-id-from-metadata",
+      "fixtures": [
+        "invoice-paid-subscription-cycle.json"
+      ],
+      "claimedBy": [
+        {
+          "document": "references/testing-and-local-dev.md",
+          "phrase": "the id the browser will reuse"
+        }
+      ]
+    }
+  ]
+}

@@ -16,9 +16,12 @@ documents name that does not exist here.
 
 ## What ships, and what of it executes
 
-`git ls-files plugins` returns **30 files: 26 markdown, one plugin manifest, and
-three files of the manual gate.** There is still no runtime code inside the six
-skills — the gate sits beside them, at plugin level.
+`git ls-files plugins` returns **50 files: 28 markdown, one plugin manifest, three
+files of the manual gate, and 18 files of money fixtures.** Two of the six skills now
+ship code you can run — the assertion packs under `fixtures/` — and that is a change
+from every release before v0.7.0, so it is stated here rather than left to be noticed.
+They run only when you invoke them, read only the JSON fixtures beside them, and open
+no socket; the greps below prove all three.
 
 | Component | Count | Runtime behavior |
 |---|---|---|
@@ -30,9 +33,12 @@ skills — the gate sits beside them, at plugin level.
 | `plugins/sheleg-dev/hooks/lib/moneygate.js` | 1 | Pure. Payload and environment in, verdict out. No `require` at all, no filesystem, no clock. |
 | `bin/sheleg-dev.js` — the npm installer | 1 | Runs only when you invoke it. Node built-ins only: `fs`, `path`, `os`. |
 | `install.sh` — the shell installer | 1 | Runs only when you invoke it. Coreutils only: `cd`, `pwd`, `dirname`, `basename`, `mkdir`, `rm`, `cp`, `echo`. |
+| `plugins/sheleg-dev/skills/*/fixtures/*.json` — webhook payloads | 12 | Data. Placeholder ids only; no key, token, signing secret or real customer id. |
+| `plugins/sheleg-dev/skills/*/fixtures/*.mjs` — the assertion packs and their reference implementations | 4 | Runs only when you invoke it. Reads the JSON beside it with `readFileSync` and nothing else: no `child_process`, no `fetch`, no write, no `process.env`. |
+| `plugins/sheleg-dev/skills/*/fixtures/manifest.json` and its `README.md` | 4 | Text. The invariant-to-fixture-to-document map, which `test/validate.py` reads. |
 
 The published tarball is those plus `README.md`, `CHANGELOG.md`, `SECURITY.md`,
-`LICENSE` and `package.json` — 36 files, listed by `npm pack --dry-run`.
+`LICENSE` and `package.json` — 56 files, listed by `npm pack --dry-run`.
 
 **The gate can refuse a command and can never run one.** `money-gate.js` requires
 `path` and the decision module; the decision module requires nothing. There is no
@@ -155,11 +161,11 @@ git clone https://github.com/ssheleg/sheleg-dev && cd sheleg-dev
 # self-describing documents name -- this file included.
 python3 test/validate.py
 
-# The shipped payload: 30 files.
+# The shipped payload: 50 files.
 git ls-files plugins
 
-# Four lines: the plugin manifest and the three files of the manual gate.
-# Everything else in the payload is markdown.
+# 22 lines: the plugin manifest, the three files of the manual gate, and the 18
+# files of money fixtures. Everything else in the payload is markdown.
 git ls-files plugins | grep -v '\.md$'
 
 # Every require the gate makes: two lines, both in the hook -- `path`, and its own
@@ -173,6 +179,15 @@ grep -nE "child_process|\bfetch\(|require\('(http|https|net|fs|dns|tls)'\)|spawn
 # Both directions of the gate, watched: 65 fixtures, refusals and allow-plants.
 node test/moneygate_test.js
 
+# The money fixtures: both assertion packs against their reference implementation, both
+# --self-test runs, and three plants that neuter an assertion. 13 checks.
+node test/fixtures_test.js
+
+# What the assertion packs cannot reach: NO OUTPUT, and grep exits 1 because it
+# matched nothing. `readFileSync` of the fixtures beside them is their whole I/O.
+grep -rnE "child_process|\bfetch\(|require\('(http|https|net|dns|tls)'\)|spawn\(|execFile|writeFileSync|appendFileSync|unlinkSync|process\.env\." \
+  plugins/sheleg-dev/skills/*/fixtures/*.mjs
+
 # The entire I/O surface of the only two executable files: eleven lines. Three
 # built-in requires, the copy/mkdir/remove calls, homedir, and install.sh's
 # rm -rf + cp -R. No process, no socket, no network.
@@ -181,6 +196,6 @@ grep -nE "require|child_process|exec|spawn|fetch|socket|rm -rf|cp -R|copyFileSyn
 # Live-key shapes across the skill payload: one line, and it is a placeholder.
 grep -rnE "sk_live_[A-Za-z0-9]|rk_live_[A-Za-z0-9]|whsec_[A-Za-z0-9]{8}|BEGIN [A-Z ]*PRIVATE KEY" plugins
 
-# What npm publishes, and nothing else: 36 files.
+# What npm publishes, and nothing else: 56 files.
 npm pack --dry-run
 ```

@@ -1,0 +1,75 @@
+{
+  "skill": "ad-tracking",
+  "assertionPack": "assert-dedup-contract.mjs",
+  "referenceHandler": "reference-emitter.mjs",
+  "runbook": "README.md",
+  "note": "The single home of the invariant -> fixture -> document mapping. test/validate.py in this repository reads it: every fixture must be claimed by a row, every row's fixtures must exist, and every claiming document must still carry its phrase, name the invariant id, and name a path under fixtures/. A claim whose fixture is gone and a fixture nobody claims are both failures.",
+  "invariants": [
+    {
+      "id": "pixel-and-capi-carry-one-event-id",
+      "isolates": "shared-event-id",
+      "fixtures": ["purchase-pixel-browser.json", "purchase-capi-server.json"],
+      "claimedBy": [
+        {
+          "document": "SKILL.md",
+          "phrase": "carry the SAME `event_id` / `transaction_id`, or both are counted."
+        }
+      ]
+    },
+    {
+      "id": "pixel-and-capi-carry-one-event-name",
+      "isolates": "exact-event-name",
+      "fixtures": ["purchase-pixel-browser.json", "purchase-capi-server.json"],
+      "claimedBy": [
+        {
+          "document": "references/meta-linkedin.md",
+          "phrase": "**Two fields must match, not one.**"
+        }
+      ]
+    },
+    {
+      "id": "no-purchase-reported-before-the-charge-cleared",
+      "isolates": "webhook-sourced",
+      "fixtures": ["purchase-capi-from-thank-you-page.json"],
+      "claimedBy": [
+        {
+          "document": "SKILL.md",
+          "phrase": "**A purchase is not a browser event, and that decides where it comes from.**"
+        }
+      ]
+    },
+    {
+      "id": "the-browser-event-is-kept",
+      "isolates": "keep-browser-event",
+      "fixtures": ["purchase-pixel-browser.json"],
+      "claimedBy": [
+        {
+          "document": "SKILL.md",
+          "phrase": "**The browser event stays, and it stays subordinate.**"
+        }
+      ]
+    },
+    {
+      "id": "identifiers-reach-the-server-hashed",
+      "isolates": "hashed-identifiers",
+      "fixtures": ["purchase-capi-server.json"],
+      "claimedBy": [
+        {
+          "document": "references/meta-linkedin.md",
+          "phrase": "SHA-256 does **not** make a value safe to send"
+        }
+      ]
+    },
+    {
+      "id": "the-shipped-capi-fixture-is-what-a-correct-emitter-sends",
+      "isolates": null,
+      "fixtures": ["purchase-capi-server.json", "purchase-pixel-browser.json"],
+      "claimedBy": [
+        {
+          "document": "references/meta-linkedin.md",
+          "phrase": "the fixtures are the reference output rather than an illustration"
+        }
+      ]
+    }
+  ]
+}

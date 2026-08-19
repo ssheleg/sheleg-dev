@@ -20,6 +20,21 @@ Part of the [ssheleg skill family](https://github.com/ssheleg/sshlg-skills).
 
 Each carries its own references and loads them only when the work reaches them.
 
+**Two of them ship a suite rather than a warning.** `stripe-billing` and `ad-tracking`
+carry a `fixtures/` directory — real provider webhook bodies, an assertion pack, and a
+`--self-test` that deletes one rule at a time so you can watch every assertion fail. Copy
+the directory in and run it:
+
+```bash
+node plugins/sheleg-dev/skills/stripe-billing/fixtures/assert-money-invariants.mjs --self-test
+node plugins/sheleg-dev/skills/ad-tracking/fixtures/assert-dedup-contract.mjs --self-test
+```
+
+That covers the invariants whose failure is money rather than an error page: the webhook is
+the payment and the redirect only proves a browser, one `event_id` on both sides or the
+revenue counts twice, a refund total that arrives cumulative, and delivery that is not
+ordered. Each skill's `fixtures/README.md` is the map.
+
 **`stripe-billing`** — Stripe's own agent toolchain first (CLI, `stripe agent
 setup`, a sandbox without an account, the MCP implementation planner), then the
 seam it cannot help with: a pinned API version and SDK retries instead of a loop
@@ -194,7 +209,7 @@ correctly. It does not tell you which one to trust.
 ## Verify
 
 ```bash
-python3 test/validate.py
+npm test    # the validator, the manual gate's 65 fixtures, the money fixtures' 13 checks
 ```
 
 One version across `package.json`, `plugin.json`, `marketplace.json` and the top
@@ -202,6 +217,10 @@ One version across `package.json`, `plugin.json`, `marketplace.json` and the top
 matter does not error — hosts truncate it silently, which is worse); and
 `SKILL.md` ↔ `references/` agreement in **both** directions, so neither a
 dangling link nor a file nobody loads can ship.
+
+Plus, for the money fixtures, that every assertion has been watched failing and that no
+two rules are covering for each other — `test/fixtures_test.js` neuters three assertions
+and requires each pack's `--self-test` to notice.
 
 CI plants a defect against every one of those guards and requires the validator
 to fail. A green from a check nobody has watched fail is not evidence.

@@ -42,7 +42,7 @@ Deep material, loaded on demand:
 | [`references/webhook-events.md`](references/webhook-events.md) | writing or reviewing the handler — event catalogue, payload shapes, ordering, failure semantics |
 | [`references/subscription-lifecycle.md`](references/subscription-lifecycle.md) | implementing checkout, verify, renewal, seats, plan change, trials, cancellation, clawback |
 | [`references/price-integrity.md`](references/price-integrity.md) | pricing lives in more than one file, or an advertised price must be proved against Stripe |
-| [`references/testing-and-local-dev.md`](references/testing-and-local-dev.md) | local webhooks, fixtures, mocks, and a suite that would actually catch a money defect |
+| [`references/testing-and-local-dev.md`](references/testing-and-local-dev.md) | local webhooks and mocks, and the shipped `fixtures/` — the suite, already written |
 | [`references/provider-concentration.md`](references/provider-concentration.md) | growing revenue, opening a second market, separating involuntary churn, or asking what happens if the payment account is limited |
 
 ---

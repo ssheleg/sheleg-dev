@@ -261,9 +261,13 @@ schema and the full purchase / add_to_cart / begin_checkout set.
 
 **Deduplication is the part that silently doubles revenue.** A purchase fired
 from both the browser and the server (Conversions API, server-side GA4) must
-carry the SAME `event_id` / `transaction_id`, or both are counted. Test it by
-reloading the thank-you page: a purchase that increments twice is a
-deduplication bug, not a tracking success.
+carry the SAME `event_id` / `transaction_id`, or both are counted. Run
+`fixtures/assert-dedup-contract.mjs` rather than reloading the thank-you page:
+`pixel-and-capi-carry-one-event-id` and `pixel-and-capi-carry-one-event-name` fail an
+emitter that shares one field and not the other,
+`no-purchase-reported-before-the-charge-cleared` fails one that reports from the redirect,
+and `the-browser-event-is-kept` fails one that drops the pixel. `--self-test` deletes each
+rule and watches the matching assertion go red.
 
 **A purchase is not a browser event, and that decides where it comes from.**
 Every other event on the list is something a person did in a tab, so the browser

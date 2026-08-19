@@ -97,12 +97,20 @@ mechanism instead of only the rule.
 module with no `HOME`, plus the real hook run as a process, because *fails silent* and
 *exit 0* are properties of the script rather than of the module.
 
+`node test/fixtures_test.js` is the money fixtures: 13 checks over the two assertion packs
+under `plugins/sheleg-dev/skills/*/fixtures/`, run as processes from their own directories
+the way a reader who copied them would. It runs each pack twice — once against its
+reference implementation, once with `--self-test`, which deletes one rule at a time and
+requires every assertion to go red — and then plants three neutered assertions and requires
+`--self-test` to notice. **An assertion nobody has watched failing is the thing this row
+existed to remove**, so a check that cannot fail is a failure here.
+
 It also asks the family umbrella whether this repository still advertises every word the
 routing hook fires on. That check needs an `sshlg-skills` checkout above this one and
 **discloses instead of passing** when there is none, so a standalone clone prints an
 `unlooked:` line rather than a false green.
 
-CI runs the same validator plus **twenty-three** negative self-tests, each of which plants
+CI runs the same validator plus **twenty-eight** negative self-tests, each of which plants
 a real defect — a version drift, an over-long description, a front-matter name that stops
 matching its directory, a dangling reference link, a reference nobody links, a stray
 `SKILL.md`, a release that stops gating on validate, the validator dropped from CI, a
@@ -114,10 +122,13 @@ a copyable block handing over a credential with no declared environment, a manua
 moved to `PostToolUse` where it can only report, an `if` filter reintroduced onto it, the
 decision inlined into the hook, a hook that stops exiting 0, the false-positive plants
 deleted, a live-key rule narrowed to the bare prefix, a heredoc body read as an
-invocation, and a test-declaring run that can buy its way past the gate — and requires
-the gate to reject it. A guard nobody has watched fail is not a guard.
+invocation, a test-declaring run that can buy its way past the gate, a claimed money
+invariant whose fixture is gone, a fixture no invariant claims, a reference pointing at a
+fixture that is not there, a claim reworded away from the fixture that proves it, and an
+assertion that can no longer fail — and requires the gate to reject it. A guard nobody has
+watched fail is not a guard.
 
-**Both directions, always.** The last three of those plants break the gate's *decision
+**Both directions, always.** Three of those plants break the gate's *decision
 module* and require its own fixtures to go red, because a guard that refuses correct input
 gets switched off and then there is no guard. Two of them were written after the first
 attempt went **uncaught**: every `sk_live_` allow-plant was leaning on the reader denylist

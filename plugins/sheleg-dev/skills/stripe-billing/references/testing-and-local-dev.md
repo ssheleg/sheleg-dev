@@ -11,6 +11,7 @@ deciding whether an existing suite would actually catch a money defect.
 - [Test cards](#test-cards)
 - [What to mock](#what-to-mock)
 - [A webhook idempotency test](#a-webhook-idempotency-test)
+- [The shipped fixtures and the assertion pack](#the-shipped-fixtures-and-the-assertion-pack)
 - [Mutation testing — the only proof that counts](#mutation-testing--the-only-proof-that-counts)
 - [Asserting on source](#asserting-on-source)
 - [Staging verification by hand](#staging-verification-by-hand)
@@ -154,9 +155,42 @@ it("credits exactly once when the same event is delivered twice", async () => {
 Drive the **real** exported handler. A test that calls a private helper proves
 the helper works and says nothing about the route Stripe posts to.
 
+## The shipped fixtures and the assertion pack
+
+Everything above tells you what to write. `fixtures/` is that suite already written:
+nine Stripe event bodies, twelve assertions, and the mutants that prove each assertion can
+fail. Copy the directory into your repository and run it.
+
+```bash
+node fixtures/assert-money-invariants.mjs              # the assertions
+node fixtures/assert-money-invariants.mjs --self-test  # every one of them, watched failing
+```
+
+Point it at your handler by replacing the two imports at the top of
+`fixtures/assert-money-invariants.mjs`; the assertions do not change.
+`fixtures/README.md` is the map, and `fixtures/manifest.json` is the machine-readable one —
+each invariant, the fixtures that prove it, and the paragraph in this pack that claims it.
+
+Three of the twelve exist because of a measurement rather than a plan, and they are the ones
+worth reading before you write your own:
+
+- **`sequential-redelivery-grants-once-by-count-alone`.** A redelivery judged only by the
+  grant count is refused by the event claim OR by the per-period marker, so no single
+  missing rule turns it red. Where **two mechanisms cover each other**, neither is tested,
+  and a suite built on that fixture would ship with no idempotency and stay green. The claim's
+  real fixture is the **concurrent** delivery; the marker's is the reconciliation path.
+- **`duplicate-refund-claws-back-once`.** The same pair one layer over: the claim stops a
+  duplicate refund, and `increment <= 0` stops it without the claim. The arithmetic is
+  measured by the two-step refund, whose events carry *different* ids.
+- **`conversion-id-survives-the-session`.** The conversion id is read out of
+  `subscription_data.metadata`, so a renewal a year later still carries **the id the browser
+  will reuse** — the deduplication contract `ad-tracking` states, tested from the side that
+  emits it.
+
 ## Mutation testing — the only proof that counts
 
-For every guard, delete it and re-run. A test that still passes is decoration.
+For every guard the pack does **not** ship, delete it and re-run. A test that still passes
+is decoration.
 
 | Delete this | A real test fails with |
 |---|---|
@@ -169,7 +203,9 @@ For every guard, delete it and re-run. A test that still passes is decoration.
 | the non-Stripe guard in reconciliation | comped subscriptions cancelled |
 
 Do this once per guard, write down what failed, and you have a suite you can
-believe. Skip it and you have a green build.
+believe. Skip it and you have a green build. For the nine rules `fixtures/` covers, the
+deletion is already written: `--self-test` performs it and prints which fixture isolates
+each rule.
 
 ## Asserting on source
 

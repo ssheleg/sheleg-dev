@@ -1,0 +1,52 @@
+{
+  "id": "evt_PLACEHOLDER_refund_first",
+  "object": "event",
+  "api_version": "2026-07-29.dahlia",
+  "created": 1770076800,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": {
+    "id": "req_PLACEHOLDER",
+    "idempotency_key": null
+  },
+  "type": "charge.refunded",
+  "data": {
+    "object": {
+      "id": "ch_PLACEHOLDER_creditpack",
+      "object": "charge",
+      "amount": 9000,
+      "amount_captured": 9000,
+      "amount_refunded": 4000,
+      "captured": true,
+      "paid": true,
+      "refunded": false,
+      "status": "succeeded",
+      "currency": "usd",
+      "customer": "cus_PLACEHOLDER_alice",
+      "invoice": null,
+      "payment_intent": "pi_PLACEHOLDER_creditpack",
+      "metadata": {
+        "userId": "usr_PLACEHOLDER_alice",
+        "productId": "prod_PLACEHOLDER_credits_90"
+      },
+      "refunds": {
+        "object": "list",
+        "has_more": false,
+        "total_count": 1,
+        "data": [
+          {
+            "id": "re_PLACEHOLDER_first",
+            "object": "refund",
+            "amount": 4000,
+            "charge": "ch_PLACEHOLDER_creditpack",
+            "created": 1770076800,
+            "currency": "usd",
+            "payment_intent": "pi_PLACEHOLDER_creditpack",
+            "reason": "requested_by_customer",
+            "status": "succeeded"
+          }
+        ]
+      }
+    }
+  }
+}

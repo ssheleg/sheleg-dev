@@ -805,6 +805,259 @@ def check_manual_gate():
 check_manual_gate()
 
 
+# ---------------------------------------------- money fixtures (M-40, M-29)
+
+# Manifesto M-29: *a test is stronger than an instruction.* M-40: evidence *proves no more
+# than it observed*, and the property green dashboards routinely lose.
+#
+# The defect, measured 2026-08-19 (program row SD-04): this pack already KNEW the four
+# invariants that cost real money -- the webhook is the payment and the redirect only
+# proves a browser, one `event_id` on both sides or the revenue counts twice, a refund
+# total that arrives cumulative, and delivery that is not ordered -- and shipped every one
+# of them as prose that delegated enforcement to the reader. The giveaway was in the
+# testing reference itself: *"For every guard, delete it and re-run."* An instruction to
+# perform the mutation testing, in the document whose subject is proving a money defect
+# would be caught.
+#
+# `fixtures/` is the answer, and this check is what stops it rotting. Two directions, both
+# of which have been watched failing:
+#
+#   * a claimed invariant with no fixture -- the paragraph still states the rule and the
+#     file that proved it is gone;
+#   * a fixture nobody claims, or a document pointing at a fixture that does not exist --
+#     the same M-07 defect B-79 fixed in the self-describing documents, one layer in. This
+#     is the bounded widening B-82 asked for: the corpus is the documents a manifest NAMES,
+#     and the tokens are the ones under `fixtures/`, so a skill reference naming the
+#     reader's `src/lib/stripe.ts` is still none of its business.
+#
+# The mapping lives in each `fixtures/manifest.json` -- one home, shipped to the reader,
+# machine-readable -- rather than in a table here, so there is nothing to drift.
+
+FIXTURE_SKILLS = ("stripe-billing", "ad-tracking")
+FIXTURE_TEST = "test/fixtures_test.js"
+
+_ID_IN_PACK = re.compile(r"^\s+id: '([a-z0-9][a-z0-9-]*)',", re.M)
+_RULES_BLOCK = re.compile(r"RULES = Object\.freeze\(\[(.*?)\]\)", re.S)
+_FIXTURE_TOKEN = re.compile(r"fixtures/([A-Za-z0-9._-]+)")
+
+
+def _squash(text):
+    """Markdown wraps; a phrase does not stop being present because a newline fell in it."""
+    return " ".join(text.split())
+
+
+def check_money_fixtures():
+    """Every money invariant these skills state has a fixture, and every fixture a claim.
+
+    Nine requirements, each one a way this could quietly stop being a test:
+
+      1. both skills that state a money invariant SHIP a `fixtures/` directory. Named, so
+         deleting one is a failure rather than a smaller check;
+      2. the manifest parses, names itself correctly, and its assertion pack, reference
+         handler and runbook all exist -- a manifest pointing at a missing pack is the
+         B-79 defect with a different extension;
+      3. the manifest and the assertion pack declare the SAME invariant ids. A row with no
+         assertion is a claim; an assertion with no row is unfindable;
+      4. every fixture a row names exists and is valid JSON. This is the "claimed invariant
+         with no fixture" direction;
+      5. every `*.json` beside the manifest is claimed by some row. This is the "fixture
+         nobody claims" direction -- an orphan is a file that rots without going red;
+      6. every claiming document still carries its phrase, names the invariant id, and
+         names a path under `fixtures/`. A reworded paragraph fails here rather than
+         drifting away from the fixture that proves it;
+      7. every `fixtures/...` token in a claiming document resolves inside that skill;
+      8. the runbook names every fixture and every invariant -- the completeness check the
+         per-section pointers cannot give, because a pointer only proves one direction;
+      9. `npm test` and CI both run the suite. A fixture file nothing runs rots green.
+
+    Placeholder discipline is checked too: nothing key-shaped may appear in a payload whose
+    whole purpose is to be copied into somebody else's repository.
+    """
+    for skill in FIXTURE_SKILLS:
+        fdir = os.path.join(SKILL_ROOT, skill, "fixtures")
+        rel = f"{skill}/fixtures"
+        if not os.path.isdir(fdir):
+            fail(f"money fixtures: {rel}/ is missing -- the invariants it proves are back to "
+                 "prose, and manifesto.md:200 is that a test is stronger than an instruction")
+            continue
+
+        manifest_rel = f"{rel}/manifest.json"
+        manifest_path = os.path.join(fdir, "manifest.json")
+        if not os.path.isfile(manifest_path):
+            fail(f"{manifest_rel} is missing -- it is the single home of the invariant-to-"
+                 "fixture-to-document mapping, and without it neither direction is checkable")
+            continue
+        try:
+            with open(manifest_path, encoding="utf-8") as fh:
+                manifest = json.load(fh)
+        except json.JSONDecodeError as exc:
+            fail(f"{manifest_rel}: invalid JSON -- {exc}")
+            continue
+
+        if manifest.get("skill") != skill:
+            fail(f"{manifest_rel}: declares skill {manifest.get('skill')!r}, but it sits in "
+                 f"{skill!r}")
+
+        pack_name = manifest.get("assertionPack")
+        handler_name = manifest.get("referenceHandler")
+        runbook_name = manifest.get("runbook")
+        missing_part = False
+        for label, name in (("assertionPack", pack_name),
+                            ("referenceHandler", handler_name),
+                            ("runbook", runbook_name)):
+            if not name or not os.path.isfile(os.path.join(fdir, name)):
+                fail(f"{manifest_rel}: {label} names {name!r}, which is not in {rel}/")
+                missing_part = True
+        if missing_part:
+            continue
+
+        with open(os.path.join(fdir, pack_name), encoding="utf-8") as fh:
+            pack_src = fh.read()
+        with open(os.path.join(fdir, handler_name), encoding="utf-8") as fh:
+            handler_src = fh.read()
+        with open(os.path.join(fdir, runbook_name), encoding="utf-8") as fh:
+            runbook_src = fh.read()
+
+        rows = manifest.get("invariants") or []
+        if not rows:
+            fail(f"{manifest_rel}: no invariants -- an empty manifest passes every other rule "
+                 "in this check, which is exactly why this one is here")
+            continue
+
+        declared = [row.get("id") for row in rows]
+        in_pack = _ID_IN_PACK.findall(pack_src)
+        for only_manifest in sorted(set(declared) - set(in_pack)):
+            fail(f"{manifest_rel}: claims invariant {only_manifest!r}, and "
+                 f"{rel}/{pack_name} asserts nothing by that name -- a claim, not a test")
+        for only_pack in sorted(set(in_pack) - set(declared)):
+            fail(f"{rel}/{pack_name}: asserts {only_pack!r}, which {manifest_rel} does not "
+                 "claim -- an assertion no document points at is one a reader never finds")
+
+        rules_block = _RULES_BLOCK.search(handler_src)
+        rules = set(re.findall(r"'([a-z0-9][a-z0-9-]*)'", rules_block.group(1))) if rules_block else set()
+        if not rules:
+            fail(f"{rel}/{handler_name}: no RULES list -- the mutants the pack deletes are "
+                 "what makes each assertion evidence")
+
+        on_disk = {f for f in os.listdir(fdir) if f.endswith(".json") and f != "manifest.json"}
+        claimed = set()
+
+        for row in rows:
+            rid = row.get("id")
+            isolates = row.get("isolates")
+            if isolates is not None and rules and isolates not in rules:
+                fail(f"{manifest_rel}: {rid} says it isolates {isolates!r}, which is not a rule "
+                     f"{handler_name} can remove")
+            row_fixtures = row.get("fixtures") or []
+            if not row_fixtures:
+                fail(f"{manifest_rel}: {rid} names no fixture -- the invariant is claimed and "
+                     "nothing observes it (M-40: evidence proves no more than it observed)")
+            for name in row_fixtures:
+                path = os.path.join(fdir, name)
+                if not os.path.isfile(path):
+                    fail(f"{manifest_rel}: {rid} claims {rel}/{name}, which does not exist")
+                    continue
+                claimed.add(name)
+                try:
+                    with open(path, encoding="utf-8") as fh:
+                        json.load(fh)
+                except json.JSONDecodeError as exc:
+                    fail(f"{rel}/{name}: invalid JSON -- {exc}. A reader is told to feed this "
+                         "to their handler")
+
+            for claim in row.get("claimedBy") or []:
+                doc = claim.get("document")
+                phrase = claim.get("phrase") or ""
+                doc_path = os.path.join(SKILL_ROOT, skill, doc or "")
+                if not doc or not os.path.isfile(doc_path):
+                    fail(f"{manifest_rel}: {rid} says {doc!r} claims it, and {skill} has no "
+                         "such document")
+                    continue
+                with open(doc_path, encoding="utf-8") as fh:
+                    body = fh.read()
+                flat = _squash(body)
+                if _squash(phrase) not in flat:
+                    fail(f"{skill}/{doc}: no longer says {phrase!r}, which {manifest_rel} "
+                         f"records as the claim {rid} proves. Either the rule moved and this "
+                         "check went blind, or it was dropped while its fixture stayed")
+                if rid not in body:
+                    fail(f"{skill}/{doc}: states the rule and never names {rid} -- M-29 is "
+                         "that a test beats an instruction, and a reader who cannot find the "
+                         "test has only the instruction")
+                if not _FIXTURE_TOKEN.search(body):
+                    fail(f"{skill}/{doc}: names no path under fixtures/ -- the pointer from "
+                         "the claim to the thing that proves it is missing")
+
+        for orphan in sorted(on_disk - claimed):
+            fail(f"{rel}/{orphan} is claimed by no invariant in {manifest_rel} -- a fixture "
+                 "nothing points at is a file that rots without ever going red")
+
+        # The runbook is the completeness check: a per-section pointer proves one direction,
+        # and only a list of every fixture and every invariant proves the other.
+        for name in sorted(on_disk):
+            if name not in runbook_src:
+                fail(f"{rel}/{runbook_name}: never names {name} -- the map a reader copies "
+                     "the directory with is incomplete")
+        for rid in declared:
+            if rid and rid not in runbook_src:
+                fail(f"{rel}/{runbook_name}: never names the invariant {rid!r}")
+
+        # The entry point has to be findable from the skill's own markdown.
+        reachable = False
+        for dirpath, _dirnames, filenames in os.walk(os.path.join(SKILL_ROOT, skill)):
+            if os.path.basename(dirpath) == "fixtures":
+                continue
+            for name in filenames:
+                if not name.endswith(".md"):
+                    continue
+                with open(os.path.join(dirpath, name), encoding="utf-8") as fh:
+                    if pack_name in fh.read():
+                        reachable = True
+        if not reachable:
+            fail(f"{skill}: no SKILL.md or reference names {pack_name} -- a suite the reader "
+                 "cannot find is prose again")
+
+        # Every `fixtures/...` token in the skill's markdown must resolve. The reverse
+        # pointer, and the reason a renamed fixture cannot leave a dead address behind.
+        for dirpath, _dirnames, filenames in os.walk(os.path.join(SKILL_ROOT, skill)):
+            for name in sorted(filenames):
+                if not name.endswith(".md"):
+                    continue
+                doc_rel = os.path.relpath(os.path.join(dirpath, name), os.path.join(SKILL_ROOT, skill))
+                with open(os.path.join(dirpath, name), encoding="utf-8") as fh:
+                    text = fh.read()
+                for lineno, line in enumerate(text.splitlines(), 1):
+                    for token in set(_FIXTURE_TOKEN.findall(line)):
+                        if not os.path.exists(os.path.join(fdir, token)):
+                            fail(f"{skill}/{doc_rel}:{lineno} points at fixtures/{token}, "
+                                 "which is not there (B-79's defect, one layer in)")
+
+        # A payload whose purpose is to be copied must carry nothing key-shaped.
+        for name in sorted(on_disk):
+            with open(os.path.join(fdir, name), encoding="utf-8") as fh:
+                blob = fh.read()
+            for shape in (r"\b(sk|rk|pk)_(live|test)_[A-Za-z0-9]{8,}", r"\bwhsec_[A-Za-z0-9]{8,}",
+                          r"BEGIN [A-Z ]*PRIVATE KEY", r"\bEAA[A-Za-z0-9]{20,}"):
+                if re.search(shape, blob):
+                    fail(f"{rel}/{name}: carries something key-shaped ({shape}). These files "
+                         "are copied into other people's repositories -- placeholders only")
+
+    if pkg and "fixtures_test.js" not in (pkg.get("scripts") or {}).get("test", ""):
+        fail(f"package.json: `npm test` does not run {FIXTURE_TEST} -- the fixtures would "
+             "prove nothing about this repository's own gate")
+    ci_path = os.path.join(ROOT, ".github", "workflows", "validate.yml")
+    if os.path.isfile(ci_path):
+        with open(ci_path, encoding="utf-8") as fh:
+            if "fixtures_test.js" not in fh.read():
+                fail(f"validate.yml: CI never runs {FIXTURE_TEST}")
+    if not os.path.isfile(os.path.join(ROOT, FIXTURE_TEST)):
+        fail(f"{FIXTURE_TEST} is missing -- it is what runs both assertion packs in both "
+             "modes, and a pack nobody runs is a pack nobody has watched fail")
+
+
+check_money_fixtures()
+
+
 def check_routed_triggers_still_advertised():
     """The family's routing hook fires on words this description has to keep.
 
@@ -845,5 +1098,5 @@ if FAILURES:
         print(f"  - {f}", file=sys.stderr)
     sys.exit(1)
 
-checks = 9 + len(skill_dirs)
+checks = 10 + len(skill_dirs)
 print(f"OK: sheleg-dev structurally valid ({checks} checks, {len(skill_dirs)} skill(s), v{version})")

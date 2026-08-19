@@ -100,7 +100,10 @@ export function setFbAdvancedMatching(data: { em?: string; fn?: string }) {
 Advanced Matching is the one place a tracking integration can breach Meta's terms
 by accident, because the wrapper accepts whatever you hand it and hashes it
 without judgement. SHA-256 does **not** make a value safe to send: hashing is a
-matching mechanism, not a permission.
+matching mechanism, not a permission. That the wrapper receives a hash at all is checkable:
+`identifiers-reach-the-server-hashed` in `fixtures/assert-dedup-contract.mjs` requires every
+`user_data.em` entry to be 64 hex characters and refuses anything with an `@` in it. What may
+be hashed in the first place is the table below, and no assertion decides it.
 
 Meta's Business Tools Terms prohibit sharing data that "includes or is based on"
 any of these, and the prohibition covers the Pixel, the Conversions API, the
@@ -183,6 +186,15 @@ the server event usually arrives first, and this method then does nothing. Use
 
 Neither method deduplicates within a single source: two pixel fires of the same
 purchase are two conversions no matter what.
+
+**Proved, not asserted.** `fixtures/purchase-pixel-browser.json` and
+`fixtures/purchase-capi-server.json` are the two payloads one purchase produces, and
+`fixtures/assert-dedup-contract.mjs` compares them: `pixel-and-capi-carry-one-event-name`
+fails an emitter that sends `Purchase` from the browser and a lowercased variant from the
+server, which is the half of this contract that gets missed. The shape itself is a ratchet —
+`the-shipped-capi-fixture-is-what-a-correct-emitter-sends` requires the emitted body to equal
+the fixture byte for byte, so **the fixtures are the reference output rather than an
+illustration**.
 
 Source: [Deduplicate pixel and Conversions API
 events](https://developers.facebook.com/docs/marketing-api/conversions-api/deduplicate-pixel-and-server-events),

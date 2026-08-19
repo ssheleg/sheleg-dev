@@ -1,0 +1,26 @@
+{
+  "data": [
+    {
+      "event_name": "Purchase",
+      "event_time": 1767398400,
+      "event_id": "evtid_PLACEHOLDER_purchase_carol",
+      "event_source_url": "https://example.invalid/after",
+      "action_source": "website",
+      "user_data": {
+        "em": ["34aeb9fb3be8b407bdd0beb712d571974bbddbb5bfc0e41cb666331ee5fcc47b"],
+        "external_id": ["usr_PLACEHOLDER_carol"],
+        "client_ip_address": "203.0.113.10",
+        "client_user_agent": "Mozilla/5.0 (PLACEHOLDER user agent)",
+        "fbp": "fb.1.1767398400.1234567890",
+        "fbc": "fb.1.1767398400.PLACEHOLDERCLICKID"
+      },
+      "custom_data": {
+        "value": 29.0,
+        "currency": "USD",
+        "content_ids": ["prod_PLACEHOLDER_pro"],
+        "content_type": "product",
+        "num_items": 1
+      }
+    }
+  ]
+}

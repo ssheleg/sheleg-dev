@@ -1,0 +1,70 @@
+{
+  "id": "evt_PLACEHOLDER_cycle_jan",
+  "object": "event",
+  "api_version": "2026-07-29.dahlia",
+  "created": 1767225600,
+  "livemode": false,
+  "pending_webhooks": 0,
+  "request": {
+    "id": null,
+    "idempotency_key": null
+  },
+  "type": "invoice.paid",
+  "data": {
+    "object": {
+      "id": "in_PLACEHOLDER_jan",
+      "object": "invoice",
+      "status": "paid",
+      "billing_reason": "subscription_cycle",
+      "collection_method": "charge_automatically",
+      "currency": "usd",
+      "customer": "cus_PLACEHOLDER_alice",
+      "amount_due": 2900,
+      "amount_paid": 2900,
+      "amount_remaining": 0,
+      "attempt_count": 1,
+      "charge": "ch_PLACEHOLDER_jan",
+      "period_start": 1767225600,
+      "period_end": 1769904000,
+      "parent": {
+        "type": "subscription_details",
+        "subscription_details": {
+          "subscription": "sub_PLACEHOLDER_alice",
+          "metadata": {
+            "userId": "usr_PLACEHOLDER_alice",
+            "productId": "prod_PLACEHOLDER_pro",
+            "quantity": "1",
+            "conversionEventId": "evtid_PLACEHOLDER_purchase_jan"
+          }
+        }
+      },
+      "lines": {
+        "object": "list",
+        "has_more": false,
+        "total_count": 1,
+        "data": [
+          {
+            "id": "il_PLACEHOLDER_jan",
+            "object": "line_item",
+            "amount": 2900,
+            "currency": "usd",
+            "quantity": 1,
+            "proration": false,
+            "subscription_item": "si_PLACEHOLDER_alice",
+            "period": {
+              "start": 1767225600,
+              "end": 1769904000
+            },
+            "pricing": {
+              "type": "price_details",
+              "price_details": {
+                "price": "price_PLACEHOLDER_pro_monthly",
+                "product": "prod_PLACEHOLDER_pro"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

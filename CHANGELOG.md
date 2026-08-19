@@ -9,6 +9,73 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 No version heading yet, deliberately: the version converges at the family level, and a
 `## vX.Y.Z` here would make this the release notes for a tag that does not exist.
 
+### The four money invariants were prose, and prose delegates enforcement to the reader
+
+This pack already knew the invariants a generated integration gets wrong in the ways no
+screen shows — the webhook is the payment and the redirect only proves a browser, the same
+`event_id` on both sides or the revenue counts twice, `amount_refunded` arrives cumulative,
+delivery is not ordered — and shipped every one of them as a paragraph. The giveaway was in
+the document whose whole subject is proving a money defect would be caught: *Mutation testing
+— the only proof that counts* (`references/testing-and-local-dev.md:157` at `90e9621`), whose
+method was the sentence **"For every guard, delete it and re-run."** An instruction where a
+test belongs, in the section arguing that tests are what count.
+
+`manifesto.md:200` is that a test is stronger than an instruction, and `:289` that evidence
+proves no more than it observed. So the invariants ship as something a reader runs.
+
+**`stripe-billing/fixtures/` and `ad-tracking/fixtures/`** — copy either directory in and run
+it. Twelve provider webhook bodies shaped the way the provider sends them: the January
+renewal, the same `evt_` re-delivered, a mid-cycle proration invoice with two proration lines,
+the February renewal (delivered *first*, it is the out-of-order pair), a `4000`-then-`9000`
+cumulative refund against a `9000` charge, a bank-debit session that completed `unpaid` and
+the `async_payment_failed` that followed it, a card session that cleared, and the pixel
+arguments plus the Conversions API body one purchase produces. Plus one payload that must
+never exist, kept as a fixture: the CAPI body a thank-you-page-sourced emitter sends for a
+charge that never cleared.
+
+**Eighteen assertions across two packs, and every one has been watched failing.**
+`node assert-money-invariants.mjs --self-test` deletes one rule at a time from the reference
+handler and requires the matching assertion to go red; it fails if the measured set differs
+from the declared one in *either* direction. Nine rules on the Stripe side, five on the
+tracking side, each with a fixture that isolates it.
+
+**Isolating them is the whole engineering, and three masking pairs were found by the tool
+rather than by inspection.** SD-03's mutation sweep reached 10/10 only on its second attempt
+because two mechanisms were each leaning on the other's fixtures; the same shape appeared
+three times here. A redelivery judged by the grant count alone is refused by the event claim
+**or** by the per-period grant marker, so it proves neither — the fixture is kept, declares
+`claim+grant-marker` as a multi-rule mutant, and the claim's real isolator is a **concurrent**
+delivery (the marker reads before it writes, and a read is a round trip) while the marker's is
+the **reconciliation** entry point, which carries no event id at all. A duplicate
+`charge.refunded` is stopped by the claim and by `increment <= 0` alike, so the arithmetic is
+measured by the two-step pair, whose events carry different ids. And in `ad-tracking`, reading
+both sides out of one emitter meant deleting the browser event turned the id *and* name
+assertions red — fixed by comparing the server's output against the shipped pixel fixture, a
+boundary the server does not control.
+
+**The fixtures cannot rot.** `check_money_fixtures()` in `test/validate.py` (15 → 16 checks)
+reads each `fixtures/manifest.json` and requires both directions: every claimed invariant has
+a fixture that exists and an assertion by that name, every fixture is claimed by a row, every
+claiming document still carries its recorded phrase and names both the invariant and a path
+under `fixtures/`, and every `fixtures/…` token in the skill's markdown resolves — the bounded
+widening of the B-79 path guard that B-82 asked for. `test/fixtures_test.js` (13 checks) runs
+both packs as processes in both modes and then neuters three assertions to prove `--self-test`
+notices, because a self-test that cannot fail is the same defect one level up.
+
+Five negative self-tests, 23 → **28**: a claimed invariant whose fixture is gone, a fixture no
+invariant claims, a reference pointing at a fixture that is not there, a claim reworded away
+from its fixture, and an assertion that can no longer fail. The guard's own first run found a
+real orphan — `checkout-session-completed-paid.json`, claimed by nothing — which is why
+`paid-session-grants-once` exists: without a positive control, a handler refusing *every*
+checkout session would have satisfied `unpaid-session-grants-nothing`.
+
+`SECURITY.md` moved with it, including one claim this change **falsified**: *"There is still
+no runtime code inside the six skills"* stopped being true, because two of them now ship
+runnable `.mjs`. It is replaced by what that code does and by the grep that proves the
+boundary — no `child_process`, no `fetch`, no socket, no write, and no `process.env` read at
+all; `readFileSync` of the JSON beside it is the entire I/O surface. Recounted: 30 → **50**
+files in the payload, 4 → **22** non-markdown, 36 → **56** in the tarball.
+
 ### `SECURITY.md` described a different skill, in the published tarball
 
 The document was a wholesale copy of `seo-aeo-audit`'s. It opened *"documentation plus one

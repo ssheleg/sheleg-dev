@@ -30,6 +30,12 @@ jobs:
       - name: Manual-gate fixtures (refusals, false-positive plants, the hook as a process)
         run: node test/moneygate_test.js
 
+      # The money fixtures: both assertion packs against their reference implementation,
+      # both `--self-test` runs (every assertion watched failing, every rule isolated), and
+      # three plants that neuter an assertion and require the self-test to notice.
+      - name: Money fixtures (both packs, both modes, neutered-assertion plants)
+        run: node test/fixtures_test.js
+
       # Every negative self-test below plants a defect and REQUIRES a failure.
       # A validator nobody has watched fail is not evidence that it works.
 
@@ -446,6 +452,99 @@ jobs:
           PY
           if node /tmp/gate-authtest/test/moneygate_test.js; then
             echo "the fixtures passed while a test-declaring run can be authorised for a live refund"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
+      - name: Negative self-test (a claimed invariant whose fixture is gone must fail)
+        run: |
+          set -eu
+          # SD-04, direction one. `references/webhook-events.md` states that
+          # `amount_refunded` is cumulative and points at the pair that proves it. Delete a
+          # fixture and the paragraph is back to being advice — which is the state the whole
+          # row exists to end.
+          rm -rf /tmp/fx-missing && cp -R . /tmp/fx-missing
+          rm -f /tmp/fx-missing/plugins/sheleg-dev/skills/stripe-billing/fixtures/charge-refunded-remainder.json
+          if (cd /tmp/fx-missing && python3 test/validate.py); then
+            echo "the validator accepted a claimed invariant with no fixture"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
+      - name: Negative self-test (a fixture nobody claims must fail)
+        run: |
+          set -eu
+          # SD-04, direction two. An orphan fixture rots without ever going red, and this
+          # one was not hypothetical: the guard's first run found
+          # `checkout-session-completed-paid.json` claimed by nothing, which is why there is
+          # now a `paid-session-grants-once` assertion using it.
+          rm -rf /tmp/fx-orphan && cp -R . /tmp/fx-orphan
+          cp /tmp/fx-orphan/plugins/sheleg-dev/skills/ad-tracking/fixtures/purchase-capi-server.json \
+             /tmp/fx-orphan/plugins/sheleg-dev/skills/ad-tracking/fixtures/nobody-claims-me.json
+          if (cd /tmp/fx-orphan && python3 test/validate.py); then
+            echo "the validator accepted a fixture no invariant claims"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
+      - name: Negative self-test (a dead fixture pointer in a reference must fail)
+        run: |
+          set -eu
+          # B-79's defect one layer in, and the bounded widening B-82 asked for: the corpus
+          # is the documents a manifest NAMES and the tokens are the ones under `fixtures/`,
+          # so a reference naming the reader's own `src/lib/stripe.ts` is still none of its
+          # business.
+          rm -rf /tmp/fx-deadptr && cp -R . /tmp/fx-deadptr
+          python3 - <<'PY'
+          p = "/tmp/fx-deadptr/plugins/sheleg-dev/skills/stripe-billing/references/webhook-events.md"
+          t = open(p, encoding="utf-8").read()
+          old = "fixtures/charge-refunded-partial.json"
+          assert old in t, "PLANT DID NOT LAND: the refund pointer moved"
+          open(p, "w", encoding="utf-8").write(t.replace(old, "fixtures/charge-refunded-renamed.json", 1))
+          PY
+          if (cd /tmp/fx-deadptr && python3 test/validate.py); then
+            echo "the validator accepted a reference pointing at a fixture that is not there"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
+      - name: Negative self-test (a reworded claim that leaves its fixture behind must fail)
+        run: |
+          set -eu
+          # The MANUAL_GATE_PROSE shape, one row over: a rule whose wording moves while the
+          # fixture stays is how a suite ends up proving something the document no longer
+          # says. The phrase is recorded in the manifest, which ships to the reader.
+          rm -rf /tmp/fx-reworded && cp -R . /tmp/fx-reworded
+          python3 - <<'PY'
+          p = "/tmp/fx-reworded/plugins/sheleg-dev/skills/stripe-billing/references/webhook-events.md"
+          t = open(p, encoding="utf-8").read()
+          old = "**Never derive state from arrival order.**"
+          assert old in t, "PLANT DID NOT LAND: the ordering rule moved"
+          open(p, "w", encoding="utf-8").write(t.replace(old, "**Do not trust the order events arrive in.**", 1))
+          PY
+          if (cd /tmp/fx-reworded && python3 test/validate.py); then
+            echo "the validator accepted a claim reworded away from the fixture that proves it"
+            exit 1
+          fi
+          echo "rejected, as it must be"
+
+      - name: Negative self-test (an assertion that can no longer fail must fail the suite)
+        run: |
+          set -eu
+          # The one that matters most, and the reason `test/fixtures_test.js` exists beside
+          # the structural guard: every path above can be green while the assertions
+          # discriminate nothing. Neuter one and the pack's own `--self-test` must notice.
+          rm -rf /tmp/fx-neutered && cp -R . /tmp/fx-neutered
+          python3 - <<'PY'
+          p = ("/tmp/fx-neutered/plugins/sheleg-dev/skills/ad-tracking/fixtures/"
+               "assert-dedup-contract.mjs")
+          t = open(p, encoding="utf-8").read()
+          old = "      assert.equal(serverId, pixelId,"
+          assert old in t, "PLANT DID NOT LAND: the shared-id assertion moved"
+          open(p, "w", encoding="utf-8").write(t.replace(old, "      assert.equal(serverId, serverId,", 1))
+          PY
+          if node /tmp/fx-neutered/test/fixtures_test.js; then
+            echo "the suite passed while an assertion could no longer fail"
             exit 1
           fi
           echo "rejected, as it must be"
