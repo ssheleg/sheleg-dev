@@ -2,6 +2,16 @@ name: validate
 
 on:
   push:
+    # A TAG push must not start this workflow. `release.yml` calls it through
+    # `workflow_call`, and both runs land in the same concurrency group
+    # (`validate-${{ github.ref }}`) — so the push-triggered one cancels the
+    # release's own call, `release` and `publish` are SKIPPED for a `needs:` that
+    # was cancelled rather than failed, and the tag ships nothing while the run
+    # list shows a green validate beside it. Measured 2026-08-20 on
+    # `agent-stack v0.13.0`: validate green, release cancelled at 2s, npm still
+    # serving the previous version. It is a race, which is why the two siblings
+    # with the same shape happened to publish.
+    tags-ignore: ['**']
   pull_request:
   # Callable, so `release.yml` can gate a publish on THIS suite instead of a copy of
   # it. The negatives live here as steps; running them from the release workflow any
