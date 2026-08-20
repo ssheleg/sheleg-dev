@@ -1,4 +1,4 @@
-<!-- agent-sync:generated source=sheleg-dev@5494aa8 cfg=a929c8f355da at=2026-08-14T14:30:31Z — regenerate with `agent_sync.py setup`, do not hand-edit -->
+<!-- agent-sync:generated source=sheleg-dev@7e0a6c9 cfg=d49570f2f12c at=2026-08-20T02:44:03Z — regenerate with `agent_sync.py setup`, do not hand-edit -->
 
 # How documentation and coordination work in sheleg-dev
 
@@ -32,6 +32,7 @@ None declared here. Ids live in the parent repository; reserve them there.
 - `.claude-plugin/marketplace.json`
 - `plugins/*/.claude-plugin/plugin.json`
 - `docs/evidence/verification.md`
+- `docs/evidence/backlog.md`
 - `.github/workflows/*.yml`
 - `test/validate.py`
 
@@ -51,6 +52,7 @@ None declared here. Ids live in the parent repository; reserve them there.
 | What was actually built, with its commit | as-built log | permanent, append-only |
 | Cross-repo dependency state | signal log | permanent, append-only |
 | Who holds a task right now | claims log | expires by TTL |
+| A lock left by a run that stopped | the lease directory | until it is reported and reaped |
 | Per-run narrative | that run's journal | permanent |
 | The board and these pages | generated | replaced on every regeneration |
 
@@ -82,6 +84,10 @@ board       → regenerate the shared view
 merge --key → land the branch: conflicts checked first, the merge recorded,
               that lease released. Without a branch, `release ID` by hand
               — on every path, including failure
+residue     → what this run leaves on disk. Expiry ends a lease and leaves
+              the file, so `status` and `finish` enumerate them; `reap`
+              clears only what THIS run can prove it owns and has spent,
+              and reports foreign or ambiguously owned locks untouched
 ```
 
 This project's integration branch is `main`.
