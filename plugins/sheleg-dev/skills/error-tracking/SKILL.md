@@ -14,7 +14,7 @@ description: >-
   uptime vendor.
 license: MIT
 metadata:
-  version: 0.9.0
+  version: 0.9.1
 ---
 
 # error-tracking — Sentry wired so it does not leak, and so a stack trace names a commit

@@ -6,6 +6,7 @@ commits, or when a service reports healthy while serving nobody.
 ## Contents
 
 - [The version contract](#the-version-contract)
+  - [The Heroku trap](#the-heroku-trap-the-variable-is-absent-unless-you-turned-it-on)
 - [The four release commands](#the-four-release-commands)
 - [In a deploy script, non-fatally](#in-a-deploy-script-non-fatally)
 - [What set-commits --auto needs](#what-set-commits---auto-needs)
@@ -24,7 +25,7 @@ Pick one source and use it on both sides.
 
 | Platform | The value | Read in the app as |
 |---|---|---|
-| Heroku | slug commit | `os.getenv("HEROKU_SLUG_COMMIT")` |
+| Heroku | slug commit | `os.getenv("HEROKU_SLUG_COMMIT")` — **see the trap below** |
 | Vercel | commit SHA | `os.getenv("VERCEL_GIT_COMMIT_SHA")` |
 | GitHub Actions | `github.sha` | `os.getenv("GITHUB_SHA")` |
 | Anywhere | `git rev-parse HEAD` | inject it at build time |
@@ -40,6 +41,40 @@ VERSION="$(git rev-parse HEAD)"    # the same string, on the other side
 
 `sentry release propose-version` will invent one, which is convenient and
 exactly the thing that drifts. Prefer an explicit value both sides can derive.
+
+### The Heroku trap: the variable is absent unless you turned it on
+
+`HEROKU_SLUG_COMMIT` is **not a config var**. It is dyno metadata, injected into
+the dyno only when the `runtime-dyno-metadata` labs feature is enabled, and
+absent in silence otherwise. Three consequences, all measured on 2026-08-24:
+
+- `heroku config:get HEROKU_SLUG_COMMIT` prints nothing **even when it is
+  working** — it is never a config var. Read it from inside a dyno instead.
+- With the feature off, `release=os.getenv("HEROKU_SLUG_COMMIT")` is `None`, so
+  the SDK reports no release at all while Sentry holds a release with a deploy
+  that nothing will ever attach to. Nothing errors.
+- Enabling it takes effect on the **next release**, not on a restart.
+
+```bash
+heroku labs -a <app> | grep runtime-dyno-metadata      # is it on?
+heroku labs:enable runtime-dyno-metadata -a <app>
+heroku run -a <app> -- printenv HEROKU_SLUG_COMMIT     # from INSIDE a dyno
+```
+
+Do not depend on it alone. Set the value from the deploy itself, which needs no
+platform feature and cannot drift because one command produces both sides:
+
+```bash
+heroku config:set RELEASE="$(git rev-parse HEAD)" -a "$APP"   # inside the down window
+```
+
+Then read `HEROKU_SLUG_COMMIT or RELEASE`: the platform's answer when it is
+available, because it names the commit actually running, and the deploy's answer
+otherwise.
+
+**And create the Sentry release for the DEPLOYED commit, not for local HEAD.**
+They differ the moment you have commits pushed but not deployed — the same
+mistake one level up, and it produces a release nobody's events belong to.
 
 ## The four release commands
 

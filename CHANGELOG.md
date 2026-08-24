@@ -4,6 +4,31 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.9.1 — 2026-08-24
+
+### The skill was wrong at the exact place its author then tripped
+
+`error-tracking` shipped telling readers to take the release version from
+`HEROKU_SLUG_COMMIT`. Using it on a real project the same evening produced the
+failure it exists to prevent: that variable is **not a config var** — it is dyno
+metadata, injected only when the `runtime-dyno-metadata` labs feature is on, and
+absent in silence otherwise. With the feature off, the SDK reported no release at
+all while Sentry held a release with a deploy nothing would ever attach to.
+Nothing errored.
+
+Two more measurements from the same hour: `heroku config:get` never prints it,
+even when it is working, because it is never a config var; and enabling the
+feature takes effect on the next **release**, not on a restart.
+
+`references/releases.md` now names the trap, gives the three commands that tell
+you which state you are in, and recommends not depending on the variable alone —
+set `RELEASE` from the deploy, which needs no platform feature and cannot drift
+because one command produces both sides.
+
+Also added, from the same mistake one level up: create the Sentry release for the
+**deployed** commit, not for local HEAD. They differ the moment commits are
+pushed but not deployed, and the result is a release nobody's events belong to.
+
 ## v0.9.0 — 2026-08-24
 
 ### The pack that wires integrations had nothing about knowing when they break
