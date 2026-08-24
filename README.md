@@ -222,6 +222,10 @@ correctly. It does not tell you which one to trust.
 
 ## Verify
 
+<!-- commands-run-in: a clone -->
+These run **in a clone of this repository**. The published npm package ships no
+`test/` directory, so from an install they are names, not commands.
+
 ```bash
 npm test    # the validator, the manual gate's 65 fixtures, the money fixtures' 13 checks
 ```

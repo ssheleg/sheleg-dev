@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.9.2 — the README stops claiming a command the package cannot run
+
+The README told a reader to run commands the published package cannot run: it ships no
+`test/` directory, so `npm test` resolves in a clone and nowhere else. Measured against the
+published tarball on 2026-08-25. Shipping the suite does not fix it — the plants live in
+`.github/workflows/`, which no packaging npm can express puts in a tarball — so the document
+now names where the command runs instead of claiming it, beside a marker the umbrella's
+validator reads. Naming a dead command is this family's own rule; claiming one is the defect.
+
+
 ## v0.9.1 — 2026-08-24
 
 ### The skill was wrong at the exact place its author then tripped
