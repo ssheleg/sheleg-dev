@@ -7,7 +7,7 @@ Part of the [ssheleg skill family](https://github.com/ssheleg/sshlg-skills).
 
 ---
 
-## The six skills
+## The seven skills
 
 | Skill | Answers |
 |---|---|
@@ -17,6 +17,7 @@ Part of the [ssheleg skill family](https://github.com/ssheleg/sshlg-skills).
 | **`google-signin`** | how do I let people sign in with Google without handing someone their account |
 | **`google-auth`** | how does my *server* authenticate to Google — OAuth, ADC, service accounts, federation |
 | **`frontend-performance`** | why is the Lighthouse score bad and which fix actually moves it |
+| **`error-tracking`** | how do I know it broke, without mailing my own credentials to Sentry |
 
 Each carries its own references and loads them only when the work reaches them.
 

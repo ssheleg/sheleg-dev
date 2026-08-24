@@ -23,7 +23,7 @@ actually prints. Both were watched refusing a plant; see the SD-05 block.
 
 ---
 
-## Shipped state — v0.8.0
+## Shipped state — v0.9.0
 
 **The first v0.8.0 tag failed its own release, and this is the record of it.** The notice
 `install.sh` gained in this version — that the manual gate does not travel with a skills
@@ -52,14 +52,19 @@ CI: `validate` run `32293489020` at `6f66255` — the commit the tag names — �
 **39 steps, 39 `success`**, including **28 of 28** negative self-tests. That run is what
 makes the rows below shipped rather than local: the whole gate ran against the tagged tree.
 
-Six skills ship: `ad-tracking`, `crypto-payments`, `frontend-performance`, `google-auth`,
-`google-signin`, `stripe-billing`.
+Seven skills ship: `ad-tracking`, `crypto-payments`, `error-tracking`,
+`frontend-performance`, `google-auth`, `google-signin`, `stripe-billing`.
 
 | REQ | Requirement | Verified by | Result | Status |
 |---|---|---|---|---|
-| 001 | The structural validator passes on the shipped tree | `python3 test/validate.py` | `OK: sheleg-dev structurally valid (23 checks, 6 skill(s), v0.8.0)` — and the check count is now the length of the registry, so adding a check moves it. It used to be `10 + len(skill_dirs)`: adding a **skill** moved the number and adding a check did not, and four rows of this file read it as evidence that a guard had been added. `check_ledger_quotes_the_validator_verdict` compares this quoted string against the line the run prints, so it cannot drift again | **verified** |
+| 001 | The structural validator passes on the shipped tree | `python3 test/validate.py` | `OK: sheleg-dev structurally valid (23 checks, 7 skill(s), v0.9.0)` — and the check count is now the length of the registry, so adding a check moves it. It used to be `10 + len(skill_dirs)`: adding a **skill** moved the number and adding a check did not, and four rows of this file read it as evidence that a guard had been added. `check_ledger_quotes_the_validator_verdict` compares this quoted string against the line the run prints, so it cannot drift again | **verified** |
 | 002 | Every guard has been watched failing against a planted defect | CI run `32293489020` at `6f66255`, step-level conclusions of every `Negative self-test` step | **28 of 28 `success`**, 39 of 39 steps `success`, 0 failed steps in the run. This retires the *"CI has not seen any of this"* limitation that SD-01 through SD-04 each recorded separately: the four blocks below all ran in that one run, against the tagged tree | **verified** |
 | 003 | Version is synchronised across every surface | read back from `package.json`, `.claude-plugin/marketplace.json`, `plugins/sheleg-dev/.claude-plugin/plugin.json`, the top `## vX.Y.Z` in `CHANGELOG.md` | all four → `0.7.0` | **verified** |
+| 056 | `error-tracking` meets the Agent Skills standard and the house canon | `python3 audit_skill.py plugins/sheleg-dev/skills/error-tracking --house` (make-skill 0.23.0) | `0 GAP, 14 PASS` — description 943/970 chars, body 242 lines / ~2777 tokens against a 500/4750 working limit, every relative link resolves | **verified** |
+| 057 | The skill's central claim is a measurement, not a recollection | `python3 -c "from sentry_sdk.scrubber import EventScrubber; e={'message':'postgresql://u:SUPERSECRET@h/db'}; EventScrubber().scrub_event(e); print('SUPERSECRET' in str(e))"` on `sentry-sdk` 2.19.2 | `True` — the default scrubber matches key names and does not inspect string values, so a credential inside a URL survives it. `dsn` and `database_url` are absent from the 32-entry default denylist | **verified** |
+| 058 | The 403 the skill documents is an org policy, not an auth failure | `sentry project create sshlg/tg-boutique-bot:python --team sshlg`; `sentry api "/" --json`; `sentry org view sshlg --json` | `Your organization has disabled this feature for members.` with the caller holding `orgRole: owner` and a token carrying `project:admin`/`team:write` but no `org:write`; `allowMemberProjectCreation: false`. `POST /teams/sshlg/sshlg/projects/` fails identically | **verified** |
+| 059 | The Sentry MCP is OAuth, so it belongs in an agent config rather than a shared gateway | `curl -si https://mcp.sentry.dev/mcp \| grep -i www-authenticate` | `401` carrying `www-authenticate: Bearer realm="OAuth", …, resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp"` — the documented test for OAuth on this machine | **verified** |
+| 060 | Every reference file is linked, and every link resolves | the bidirectional check in `test/validate.py` | three references, three links, no orphan and no dangling | **verified** |
 | 004 | A release cannot publish over a red suite | `grep -c workflow_call .github/workflows/validate.yml`; `grep -n` in `release.yml` | `workflow_call` 2; `uses: ./.github/workflows/validate.yml` at line 29, `needs: validate` at line 32. This is the repository where the failure was observed: v0.4.1 was tagged while its own validate run for that tag failed, and npm served it four minutes later | **verified** |
 | 005 | Every reference a skill links resolves, and none is orphaned | walk each `SKILL.md` for `](references/…)` and each `references/*.md` for a mention | **0 unresolved, 0 orphans** across all six skills; the count moved with `references/provider-concentration.md`, which the check requires to be linked **and** the link to resolve | **verified** |
 | 006 | The installer installs all six skills into a fresh HOME | `HOME=/tmp/fakehome-sd node bin/sheleg-dev.js`, then list `$HOME/.claude/skills/` | six directories: `ad-tracking crypto-payments frontend-performance google-auth google-signin stripe-billing` | **verified** |

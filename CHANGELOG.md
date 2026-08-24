@@ -4,6 +4,58 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.9.0 — 2026-08-24
+
+### The pack that wires integrations had nothing about knowing when they break
+
+Six skills covered taking money, tracking conversions, signing people in and
+page speed. None covered the layer that says any of it stopped working: a `grep`
+for `sentry` across the whole family returned two incidental mentions.
+
+`error-tracking` is written from a measured baseline rather than an imagined
+one. An agent solving this exact task without the skill, in one session, made
+four failures that were recorded as they happened:
+
+- **Called "get a DSN" a manual step needing an account.** The account existed
+  and the CLI was already authenticated. Error tracking stayed off for no reason.
+- **Wrote a `before_send` scrubber without knowing `EventScrubber` exists** and
+  runs by default — so it could not say which layer covered what, or whether its
+  own code was redundant or load-bearing.
+- **Did not know the MCP is OAuth**, and would have declared it in the machine's
+  shared gateway, where an OAuth flow cannot complete.
+- **Would have set a DSN and stopped**, leaving every issue attached to a release
+  with no commits and suspect-commit attribution permanently dead.
+
+### The measurement the skill is built on
+
+`sentry-sdk` 2.19.2, run 2026-08-24. The built-in `EventScrubber` is enabled by
+default and matches on KEY NAMES against a 32-entry denylist. It does not inspect
+string values, and neither `dsn` nor `database_url` is on that list.
+
+```python
+event = {"message": "could not connect to postgresql://u:SUPERSECRET@host/db"}
+EventScrubber().scrub_event(event)
+assert "SUPERSECRET" in str(event)   # passes — not scrubbed
+```
+
+A service that writes a database URL near an error therefore starts forwarding
+that password to a third party the moment Sentry is added, with wider reach than
+the log had. The skill ships both layers — and, more usefully, the test that
+asserts layer one alone still leaks, so the day Sentry starts scrubbing values a
+red test says the second layer may now be redundant.
+
+### Also in this release
+
+- The 403 that reads as an auth failure and is not: `allowMemberProjectCreation:
+  false` blocks `project create` **even for an org owner**, because the policy is
+  evaluated against the token's scopes and the device-flow token carries no
+  `org:write`. The team-scoped endpoint fails identically. Measured, with the
+  three ways out ranked.
+- Two different tools are called `sentry`. Commands from one silently do not
+  exist in the other, and they install into prefixes where the older copy tends
+  to win — 0.38.0 shadowing 0.43.0, observed here. The shadow check is one line.
+- `$schema` was missing from `plugin.json` and from the marketplace entry. Added.
+
 ## v0.8.0 — 2026-08-20
 
 **The self-test that proved the money invariants was measuring one thing and claiming

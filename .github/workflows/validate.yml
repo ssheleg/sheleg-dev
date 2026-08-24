@@ -705,11 +705,16 @@ jobs:
           set -eu
           rm -rf /tmp/seccount && cp -R . /tmp/seccount
           python3 - <<'PY'
+          import re
           p = "/tmp/seccount/SECURITY.md"
           s = open(p, encoding="utf-8").read()
-          old = "# The shipped payload: 52 files."
-          assert old in s, "PLANT DID NOT LAND: the payload count sentence moved"
-          open(p, "w", encoding="utf-8").write(s.replace(old, "# The shipped payload: 51 files."))
+          # Derive the number rather than hardcode it: this plant used to carry a
+          # literal count, so adding one file to the repository broke the test that
+          # exists to catch exactly that class of drift.
+          m = re.search(r"# The shipped payload: (\d+) files\.", s)
+          assert m, "PLANT DID NOT LAND: the payload count sentence moved"
+          old, n = m.group(0), int(m.group(1))
+          open(p, "w", encoding="utf-8").write(s.replace(old, f"# The shipped payload: {n - 1} files."))
           PY
           if python3 /tmp/seccount/test/validate.py; then
             echo "ERROR: SECURITY.md may state a count nobody recomputes (B-93)"
