@@ -90,7 +90,7 @@ a Lighthouse score.
 /plugin install sheleg-dev@sheleg-dev
 ```
 
-**npm installer** — copies all six skills into `~/.claude/skills/`:
+**npm installer** — copies all seven skills into `~/.claude/skills/`:
 
 ```bash
 npx @ssheleg/sheleg-dev
@@ -160,7 +160,7 @@ settings, by design.
   with the plugin and the hook is live as soon as the plugin is enabled. Nothing further
   to do, and no per-hook switch: enablement is the whole control.
 - **Installed by `npx @ssheleg/sheleg-dev`, `install.sh` or `npx skills add`** — those
-  copy the six skills into `~/.claude/skills/` and **carry no hook**. The gate is prose
+  copy the seven skills into `~/.claude/skills/` and **carry no hook**. The gate is prose
   again until you register it yourself, in `~/.claude/settings.json` or a project's
   `.claude/settings.json`:
 

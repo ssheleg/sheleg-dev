@@ -122,7 +122,7 @@ jobs:
       - name: Post-release smoke test (npx from a clean cwd — the verify gate)
         run: |
           set -eu
-          # This repo ships SIX skills under their own names and no /commands.
+          # This repo ships its skills under their own names and no /commands.
           # The assertions here were inherited from a single-skill template and
           # looked for skills/sheleg-dev/SKILL.md and commands/sheleg-dev.md —
           # neither of which this installer has ever produced. Nothing caught it

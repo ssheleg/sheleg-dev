@@ -1,9 +1,10 @@
 # Security
 
-`sheleg-dev` is six skills about the layer a product reaches once it has users.
+`sheleg-dev` is seven skills about the layer a product reaches once it has users.
 Five of them touch other people's money or identity — Stripe billing, crypto
 payments, ad and conversion tracking, Google sign-in, server-side Google auth —
-and the sixth is front-end performance. That subject is the reason this document
+the sixth is front-end performance and the seventh is error tracking. Money is the
+reason this document
 has to be exact about the pack itself.
 
 Everything below is checkable from a clone, and the commands at the end are the
@@ -17,7 +18,7 @@ documents name that does not exist here.
 ## What ships, and what of it executes
 
 `git ls-files plugins` returns **56 files: 34 markdown, one plugin manifest, three
-files of the manual gate, and 18 files of money fixtures.** Two of the six skills now
+files of the manual gate, and 18 files of money fixtures.** Two of the seven skills now
 ship code you can run — the assertion packs under `fixtures/` — and that is a change
 from every release before v0.7.0, so it is stated here rather than left to be noticed.
 They run only when you invoke them, read only the JSON fixtures beside them, and open
@@ -59,11 +60,11 @@ nothing but the CLI you typed.
 
 ## What the installers read and write
 
-Both do one thing: copy the six skill directories out of the package into
+Both do one thing: copy the seven skill directories out of the package into
 `~/.claude/skills/<name>`.
 
 - **Read:** only files inside the package.
-- **Write:** only `~/.claude/skills/` — six directories, named for the six skills.
+- **Write:** only `~/.claude/skills/` — seven directories, named for the seven skills.
   Nothing else on the filesystem, nothing outside `$HOME`.
 - **Network: none.** Neither file opens a socket or resolves a hostname.
   `bin/sheleg-dev.js` requires `fs`, `path` and `os` and nothing else — no
@@ -75,7 +76,7 @@ Both do one thing: copy the six skill directories out of the package into
 
 **One destructive difference between the two installers.** `bin/sheleg-dev.js`
 skips a skill that is already installed and says so, unless you pass `--force`
-(`bin/sheleg-dev.js:45-46`). `install.sh` does not ask: for each of the six names
+(`bin/sheleg-dev.js:45-46`). `install.sh` does not ask: for each of the seven names
 it runs `rm -rf` on the destination and re-copies, every time
 (`install.sh:21-22`). If you have hand-edited an installed skill, the shell
 installer deletes your edits and the node installer does not.
@@ -140,7 +141,7 @@ environment variables, never in source and never in logs:
 
 ## Where the real risk is
 
-Not the bytes — the advice. These six skills describe Stripe, Heleket and BTCPay,
+Not the bytes — the advice. These seven skills describe Stripe, Heleket and BTCPay,
 Google Sign-In, Workload Identity Federation, four ad platforms and browser
 defaults, and every one of those changes. **A claim here that a provider has since
 changed is a security defect in this pack**, not merely a stale doc, and it is the

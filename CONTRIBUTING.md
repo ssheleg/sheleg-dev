@@ -1,8 +1,8 @@
 # Contributing
 
-Thanks for taking the time. This repository ships **six skills** — `stripe-billing`,
-`crypto-payments`, `ad-tracking`, `google-signin`, `google-auth` and
-`frontend-performance` — and they are almost entirely **knowledge**: twenty reference
+Thanks for taking the time. This repository ships **seven skills** — `stripe-billing`,
+`crypto-payments`, `ad-tracking`, `google-signin`, `google-auth`,
+`frontend-performance` and `error-tracking` — and they are almost entirely **knowledge**: twenty reference
 files an agent reads on demand. That shapes what a good contribution looks like.
 
 **Almost, not entirely.** Since 2026-08-19 the pack also ships a **manual gate** — a

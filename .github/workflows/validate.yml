@@ -896,20 +896,28 @@ jobs:
       - name: install.sh syntax check
         run: bash -n install.sh
 
-      - name: Installers run — all six skills, fresh / rerun-skip / --force / bad arg
+      - name: Installers run — every skill, fresh / rerun-skip / --force / bad arg
         run: |
           set -eu
           export HOME=/tmp/fakehome
           mkdir -p "$HOME"
+          # Derive the roster from the repository. This step used to name six skills
+          # and assert the number four times; adding a seventh broke it, which is the
+          # second release this file has failed for carrying a hand-written count
+          # (v0.8.0 died here too, on a different literal). A count that is computed
+          # cannot go stale.
+          SKILLS=$(ls -1 plugins/sheleg-dev/skills)
+          N=$(printf '%s\n' "$SKILLS" | wc -l | tr -d ' ')
+          echo "roster: $N skills — $(printf '%s ' $SKILLS)"
           node bin/sheleg-dev.js
-          for s in ad-tracking crypto-payments frontend-performance google-auth google-signin stripe-billing; do
+          for s in $SKILLS; do
             test -f "$HOME/.claude/skills/$s/SKILL.md" || { echo "missing $s"; exit 1; }
           done
           test -f "$HOME/.claude/skills/crypto-payments/references/heleket-provider.md"
           test -f "$HOME/.claude/skills/google-auth/references/workload-identity.md"
           test -f "$HOME/.claude/skills/stripe-billing/references/webhook-events.md"
-          test "$(node bin/sheleg-dev.js | grep -c '^skip:')" = 6
-          test "$(node bin/sheleg-dev.js --force | grep -c '^Installed')" = 6
+          test "$(node bin/sheleg-dev.js | grep -c '^skip:')" = "$N"
+          test "$(node bin/sheleg-dev.js --force | grep -c '^Installed')" = "$N"
           if node bin/sheleg-dev.js --wat; then
             echo "ERROR: unknown arg accepted"; exit 1
           fi
@@ -921,8 +929,8 @@ jobs:
           # it is written that way now, and the notice has its own assertion so the new
           # behaviour is covered rather than merely tolerated.
           out=$(bash install.sh)
-          printf '%s\n' "$out" | grep -q 'Installed 6 skill' \
-            || { echo "install.sh did not report six skills"; printf '%s\n' "$out"; exit 1; }
+          printf '%s\n' "$out" | grep -q "Installed $N skill" \
+            || { echo "install.sh did not report $N skills"; printf '%s\n' "$out"; exit 1; }
           printf '%s\n' "$out" | grep -qi 'manual gate' \
             || { echo "install.sh stopped warning that the gate does not travel"; exit 1; }
           echo "OK: both installers behave, and the destructive one says what it cannot carry"

@@ -1789,7 +1789,7 @@ def check_install_channels_name_the_gate():
     dangerous of the two — `rm -rf "$dest"` per skill, then `cp -R`. Board **B-90** is that
     a printed reminder is a warning and M-30 calls a warning weaker than a precondition;
     that argument is about whether printing is ENOUGH, and it does not make printing in one
-    channel and not the other coherent. A reader who installs by shell gets the six skills
+    channel and not the other coherent. A reader who installs by shell gets the skills
     and no hint that the refusals README advertises are not there.
     """
     for rel in ("bin/sheleg-dev.js", "install.sh"):
