@@ -7,7 +7,8 @@ accurate than recalling the API from training data.
 
 *Read from `docs.stripe.com/agents`, `/skills`, `/mcp` and the CLI's own
 `--help` on 2026-08-11, against Stripe CLI 1.45.2 and the Claude Code plugin
-`stripe@claude-plugins-official` 0.5.1. Re-check before quoting a version.*
+`stripe@claude-plugins-official` 0.5.1; the plugin re-read at 0.6.1 on
+2026-08-25. Re-check before quoting a version.*
 
 ## Contents
 
@@ -99,6 +100,12 @@ tax, dynamic payment methods, Metronome for new usage-based billing, key
 hygiene). `stripe-docs` looks things up. This skill covers what happens on
 *your* side of the boundary — reconciling Stripe's state into your database.
 When they disagree about anything Stripe-side, Stripe's skill wins.
+
+What Stripe's own skills do **not** cover, measured over plugin 0.6.1 on
+2026-08-25: a grep for `retention`, `coupon` and `churn` across all eight returns
+nothing about cancellation deflection. The save offer is this skill's ground by
+absence, not by preference — see
+[`cancellation-and-retention.md`](cancellation-and-retention.md).
 
 ## MCP server
 

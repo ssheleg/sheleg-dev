@@ -43,6 +43,10 @@ const REFUND_REMAINDER = 'charge-refunded-remainder.json';
 const SESSION_UNPAID = 'checkout-session-completed-async-unpaid.json';
 const SESSION_FAILED = 'checkout-session-async-payment-failed.json';
 const SESSION_PAID = 'checkout-session-completed-paid.json';
+const DISCOUNT_CREATED = 'customer-discount-created-retention.json';
+const DISCOUNT_CONSUMED = 'customer-subscription-updated-discount-consumed.json';
+const CANCEL_FLEXIBLE = 'customer-subscription-updated-cancel-flexible.json';
+const CANCEL_CLASSIC = 'customer-subscription-updated-cancel-classic.json';
 
 /** A fresh store and handler per invariant: no assertion inherits another's state. */
 function harness(without = []) {
@@ -283,6 +287,68 @@ export const INVARIANTS = [
       assert.equal(conversion.source, 'webhook');
       assert.equal(conversion.value, 29);
       assert.equal(conversion.currency, 'USD');
+    },
+  },
+  {
+    id: 'retention-offer-is-consumed-once',
+    fixtures: [DISCOUNT_CREATED, DISCOUNT_CONSUMED],
+    states: 'a customer who took the save offer is not offered it again after the '
+      + 'duration=once discount has left subscription.discounts',
+    breaks: ['retention-eligibility'],
+    async run({ store, handler, assert }) {
+      const before = { id: 'sub_PLACEHOLDER_alice', status: 'active', discounts: [] };
+
+      const first = await handler.offerRetention('cus_PLACEHOLDER_alice', before);
+      // unmutated, and the positive control: every mutant here still makes the FIRST
+      // offer. Without it, a handler that offers nobody anything would pass the rest.
+      assert.unmutated.equal((first || {}).offerId, 'cancel-50-once');
+      assert.equal(store.retentionOffers.length, 1,
+        'the offer was shown and no row recorded it — an offer nobody wrote down cannot '
+        + 'be counted, and the count is the only thing that stops the loop');
+
+      await handler.deliver(fixture(DISCOUNT_CREATED));
+      assert.equal(store.saves.length, 1,
+        'the redemption was not recorded as a save — there is no portal event for a '
+        + 'completed flow, so nothing else will ever say the cancellation was deflected');
+      assert.equal((store.retentionOffers[0] || {}).redeemedAt, 1767225000);
+
+      // The discounted invoice finalizes and Stripe REMOVES the discount from the array.
+      const consumed = fixture(DISCOUNT_CONSUMED);
+      await handler.deliver(consumed);
+      const mirror = store.subscriptions.get('sub_PLACEHOLDER_alice') || {};
+      assert.unmutated.deepEqual(mirror.discountIds, [],
+        'the fixture is the moment the duration=once discount leaves the subscription');
+
+      const second = await handler.offerRetention('cus_PLACEHOLDER_alice', consumed.data.object);
+      assert.equal(second, null,
+        'the offer was made a second time — one cancel-flow visit per cycle then rides '
+        + 'half price forever, and every renewal looks ordinary in the logs');
+      assert.equal(store.retentionOffers.length, 1, 'a second offer row was opened');
+    },
+  },
+  {
+    id: 'scheduled-cancellation-survives-billing-mode',
+    fixtures: [CANCEL_FLEXIBLE, CANCEL_CLASSIC],
+    states: 'a portal cancellation is stored under BOTH billing modes — flexible sets '
+      + 'cancel_at and leaves cancel_at_period_end false',
+    breaks: ['cancellation-timestamp'],
+    async run({ store, handler, assert }) {
+      await handler.deliver(fixture(CANCEL_FLEXIBLE));
+      const flexible = store.subscriptions.get('sub_PLACEHOLDER_alice') || {};
+      // unmutated: no rule here varies the mode or the reason the customer gave.
+      assert.unmutated.equal(flexible.billingMode, 'flexible');
+      assert.unmutated.equal(flexible.cancellationFeedback, 'too_expensive');
+      assert.equal(flexible.cancelAt, 1769904000,
+        'a cancellation scheduled under flexible billing_mode was stored as "not '
+        + 'cancelling": the banner tells a customer who cancelled ten seconds ago that '
+        + 'their plan renews, and nothing errors');
+
+      await handler.deliver(fixture(CANCEL_CLASSIC));
+      const classic = store.subscriptions.get('sub_PLACEHOLDER_bob') || {};
+      // unmutated, and deliberately so: this is the control. Both readings agree on a
+      // classic row, which is exactly why the flag alone survived until flexible mode.
+      assert.unmutated.equal(classic.billingMode, 'classic');
+      assert.unmutated.equal(classic.cancelAt, 1769904000);
     },
   },
 ];

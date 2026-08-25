@@ -1,0 +1,47 @@
+{
+  "id": "evt_PLACEHOLDER_discount_created",
+  "object": "event",
+  "api_version": "2026-07-29.dahlia",
+  "created": 1767225000,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": { "id": null, "idempotency_key": null },
+  "type": "customer.discount.created",
+  "data": {
+    "object": {
+      "id": "di_PLACEHOLDER_save50",
+      "object": "discount",
+      "customer": "cus_PLACEHOLDER_alice",
+      "customer_account": null,
+      "subscription": "sub_PLACEHOLDER_alice",
+      "subscription_item": null,
+      "invoice": null,
+      "invoice_item": null,
+      "checkout_session": null,
+      "promotion_code": null,
+      "start": 1767225000,
+      "end": null,
+      "source": {
+        "type": "coupon",
+        "coupon": {
+          "id": "cpn_PLACEHOLDER_save50",
+          "object": "coupon",
+          "name": "50% off your next invoice",
+          "percent_off": 50,
+          "amount_off": null,
+          "currency": null,
+          "duration": "once",
+          "duration_in_months": null,
+          "max_redemptions": null,
+          "times_redeemed": 1,
+          "redeem_by": null,
+          "applies_to": null,
+          "valid": true,
+          "livemode": false,
+          "created": 1767224000,
+          "metadata": {}
+        }
+      }
+    }
+  }
+}

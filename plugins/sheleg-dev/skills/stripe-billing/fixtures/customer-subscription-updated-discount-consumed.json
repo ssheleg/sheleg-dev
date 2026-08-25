@@ -1,0 +1,57 @@
+{
+  "id": "evt_PLACEHOLDER_discount_consumed",
+  "object": "event",
+  "api_version": "2026-07-29.dahlia",
+  "created": 1769904100,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": { "id": null, "idempotency_key": null },
+  "type": "customer.subscription.updated",
+  "data": {
+    "object": {
+      "id": "sub_PLACEHOLDER_alice",
+      "object": "subscription",
+      "customer": "cus_PLACEHOLDER_alice",
+      "status": "active",
+      "currency": "usd",
+      "billing_mode": { "type": "flexible" },
+      "cancel_at": null,
+      "cancel_at_period_end": false,
+      "canceled_at": null,
+      "cancellation_details": { "comment": null, "feedback": null, "reason": null },
+      "collection_method": "charge_automatically",
+      "discounts": [],
+      "metadata": {
+        "userId": "usr_PLACEHOLDER_alice",
+        "productId": "prod_PLACEHOLDER_pro",
+        "quantity": "1"
+      },
+      "items": {
+        "object": "list",
+        "has_more": false,
+        "total_count": 1,
+        "data": [
+          {
+            "id": "si_PLACEHOLDER_alice",
+            "object": "subscription_item",
+            "quantity": 1,
+            "current_period_start": 1769904000,
+            "current_period_end": 1772323200,
+            "discounts": [],
+            "price": {
+              "id": "price_PLACEHOLDER_pro_monthly",
+              "object": "price",
+              "product": "prod_PLACEHOLDER_pro",
+              "currency": "usd",
+              "unit_amount": 2900,
+              "recurring": { "interval": "month", "interval_count": 1 }
+            }
+          }
+        ]
+      }
+    },
+    "previous_attributes": {
+      "discounts": ["di_PLACEHOLDER_save50"]
+    }
+  }
+}

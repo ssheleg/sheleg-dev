@@ -167,6 +167,34 @@
           "phrase": "the id the browser will reuse"
         }
       ]
+    },
+    {
+      "id": "retention-offer-is-consumed-once",
+      "isolates": "retention-eligibility",
+      "fixtures": [
+        "customer-discount-created-retention.json",
+        "customer-subscription-updated-discount-consumed.json"
+      ],
+      "claimedBy": [
+        {
+          "document": "references/cancellation-and-retention.md",
+          "phrase": "**The ledger is the source of truth, Stripe is the second opinion.**"
+        }
+      ]
+    },
+    {
+      "id": "scheduled-cancellation-survives-billing-mode",
+      "isolates": "cancellation-timestamp",
+      "fixtures": [
+        "customer-subscription-updated-cancel-flexible.json",
+        "customer-subscription-updated-cancel-classic.json"
+      ],
+      "claimedBy": [
+        {
+          "document": "references/cancellation-and-retention.md",
+          "phrase": "Store the timestamp, not the boolean."
+        }
+      ]
     }
   ]
 }

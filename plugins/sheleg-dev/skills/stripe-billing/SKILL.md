@@ -2,18 +2,19 @@
 name: stripe-billing
 description: >-
   Use when connecting a product to Stripe, or auditing a live integration:
-  checkout sessions, subscriptions and renewals, seats, proration, refunds, the
-  portal, and the webhook that turns a payment into an entitlement in the
-  application's own database. Covers Stripe's agent toolchain (CLI, MCP,
-  skills), the pinned API version and SDK retries, product-to-price resolution
-  across test and live, the get-or-create customer race, metadata written
-  twice, claim-first webhook idempotency, what invoice billing_reason decides,
-  cumulative refund totals, write ordering across two systems with compensating
-  reverts, reconciliation, and price drift only customers see. Triggers - "add
+  checkout, renewals, seats, proration, refunds, cancellation and the
+  coupon offered at the cancel step, the portal, and the webhook that
+  turns a payment into an entitlement in your database. Covers Stripe's
+  agent toolchain, the pinned API version and SDK retries, price
+  resolution across modes, claim-first webhook idempotency, what invoice
+  billing_reason decides, cumulative refunds, the cancellation field
+  flexible billing_mode moved, retention eligibility Stripe cannot
+  express, and write ordering with compensating reverts. Triggers - "add
   Stripe", "Stripe checkout", "subscription billing", "webhook signature",
-  "invoice.paid", "proration", "seats", "refund", "подключить Stripe", "оплата
-  подпиской", "вебхук Stripe", "биллинг". Not for choosing between Stripe
-  products (stripe-best-practices) or reading Stripe docs (stripe-docs).
+  "invoice.paid", "proration", "refund", "cancel subscription", "retention
+  coupon", "подключить Stripe", "оплата подпиской", "вебхук Stripe",
+  "скидка при отмене", "биллинг". Not for choosing between Stripe products
+  (stripe-best-practices) or reading Stripe docs (stripe-docs).
 license: MIT
 ---
 
@@ -28,8 +29,7 @@ callback that arrived twice, the renewal that granted a month of product for a
 $0.40 proration invoice, the upgrade that charged the card and then failed to
 write the row.
 
-This skill is that seam. For **which** Stripe primitive to use (Checkout vs
-PaymentIntents, Connect, Tax, usage-based billing) the official
+This skill is that seam. For **which** Stripe primitive to use, the official
 `stripe-best-practices` skill is the authority and wins any disagreement; for
 lookups, `stripe-docs`. Examples are TypeScript; the rules are
 language-neutral.
@@ -38,12 +38,13 @@ Deep material, loaded on demand:
 
 | Read | When |
 |---|---|
-| [`references/stripe-agent-toolchain.md`](references/stripe-agent-toolchain.md) | starting from nothing, or about to guess an API shape — CLI, MCP tools, skills index, key handling |
+| [`references/stripe-agent-toolchain.md`](references/stripe-agent-toolchain.md) | starting from nothing, or about to guess an API shape — CLI, MCP, skills index, key handling |
 | [`references/webhook-events.md`](references/webhook-events.md) | writing or reviewing the handler — event catalogue, payload shapes, ordering, failure semantics |
-| [`references/subscription-lifecycle.md`](references/subscription-lifecycle.md) | implementing checkout, verify, renewal, seats, plan change, trials, cancellation, clawback |
+| [`references/subscription-lifecycle.md`](references/subscription-lifecycle.md) | implementing checkout, verify, renewal, seats, plan change, trials, clawback |
+| [`references/cancellation-and-retention.md`](references/cancellation-and-retention.md) | implementing cancel or reactivation, or offering a coupon at the cancel step |
 | [`references/price-integrity.md`](references/price-integrity.md) | pricing lives in more than one file, or an advertised price must be proved against Stripe |
 | [`references/testing-and-local-dev.md`](references/testing-and-local-dev.md) | local webhooks and mocks, and the shipped `fixtures/` — the suite, already written |
-| [`references/provider-concentration.md`](references/provider-concentration.md) | growing revenue, opening a second market, separating involuntary churn, or asking what happens if the payment account is limited |
+| [`references/provider-concentration.md`](references/provider-concentration.md) | growing revenue, opening a second market, separating involuntary churn, or if the payment account is limited |
 
 ---
 
@@ -130,25 +131,12 @@ replaced when you reprice; products are stable.
 ## Get-or-create customer is a race
 
 Two tabs, two requests, two customers, and the second silently owns the
-subscription the first is charging.
-
-```ts
-const customer = await stripe.customers.create({ email, metadata: { userId } });
-
-const { count } = await db.user.updateMany({          // write only if nobody did
-  where: { id: userId, stripeCustomerId: null },
-  data: { stripeCustomerId: customer.id },
-});
-
-if (count === 0) {                                    // lost the race
-  await stripe.customers.del(customer.id).catch(log); // delete the orphan
-  return (await db.user.findUnique({ where: { id: userId } }))!.stripeCustomerId!;
-}
-return customer.id;
-```
-
-Before creating, retrieve the stored id and treat `resource_missing` or
-`deleted: true` as "create a new one" — the normal state after a key rotation.
+subscription the first is charging. Create, then claim the id with a conditional
+update; if the update matched no row you lost the race, so delete the orphan
+customer and read the winner's id. Before creating, retrieve the stored id and
+treat `resource_missing` or `deleted: true` as "create a new one" — the normal
+state after a key rotation. The code is in
+[`references/subscription-lifecycle.md`](references/subscription-lifecycle.md).
 
 ---
 
@@ -291,28 +279,22 @@ Stripe creates every subscription in one of two billing modes. The choice is mad
 at `subscriptions.create` (or `subscription_data` on a Checkout session), **cannot
 be reversed**, and Stripe recommends **flexible** for new subscriptions.
 
-It is in the body rather than a reference because it changes the arithmetic the
-next two sections teach: under flexible mode a credit proration is computed from
-the amount **originally debited**, so one change can emit **several** credit
-prorations where classic emitted one. Code that takes `[0]` of the proration lines,
-or assumes one credit per change, breaks quietly in the refund clawback path — the
-one place here where a wrong number is money. The detail is in
-`references/subscription-lifecycle.md`; choosing between the modes is a product
-decision that `stripe-best-practices` owns.
+It is in the body because it changes arithmetic the next sections teach: under
+flexible mode a credit proration is computed from the amount **originally
+debited**, so one change can emit **several** credit prorations where classic
+emitted one. Code that takes `[0]` of the proration lines breaks quietly in the
+clawback path — the one place here where a wrong number is money. It also decides
+which field records a scheduled cancellation. Choosing between the modes is a
+product decision `stripe-best-practices` owns.
 
 ## Seats and proration
 
-```ts
-await stripe.subscriptions.update(subId, {
-  items: [{ id: itemId, quantity: newQuantity }],
-  proration_behavior: "always_invoice",     // charge the difference now
-  payment_behavior: "error_if_incomplete",  // a declined card FAILS this call
-});
-```
 
 - `proration_behavior`: `always_invoice` bills now, `create_prorations` defers
   to the next invoice, `none` adjusts nothing — the right choice for a *revert*.
-- **`error_if_incomplete` on upgrades.** Without it a declined card leaves the
+  The call, with its compensating revert, is in
+  [`references/subscription-lifecycle.md`](references/subscription-lifecycle.md).
+- **`payment_behavior: "error_if_incomplete"` on upgrades.** Without it a declined card leaves the
   subscription upgraded and unpaid while your database agrees with the upgrade.
   Catch `StripeCardError` and answer 402.
 - **Write ordering:** Stripe first, then your database. If the database write
@@ -326,65 +308,56 @@ await stripe.subscriptions.update(subId, {
 
 ---
 
-## Cancellation
+## Cancellation, and the offer that deflects it
 
-- **`cancel_at_period_end: true`** is the default — the user keeps what they
-  paid for. `status` stays `active`; a separate flag drives the UI.
+- **At period end is the default** — the user keeps what they paid for and
+  `status` stays `active`. Under **flexible** `billing_mode` a portal
+  cancellation sets `cancel_at` and leaves `cancel_at_period_end` **false**, so a
+  banner reading that boolean tells a customer who cancelled ten seconds ago that
+  their plan renews. Store the timestamp, derived from both fields.
 - **Do the teardown in `customer.subscription.deleted`**, never beside the API
   call, so one path serves your UI, the portal and dunning alike.
-- **The portal is a second writer.** Everything a user does there reaches you
-  only as a webhook; a billing page that assumes otherwise goes stale in a week.
 - On `invoice.payment_failed`, mark `past_due` and notify — do not cancel.
-  Stripe's dunning decides the retries and the terminal state; cancelling early
-  cancels customers whose next attempt would have cleared.
+  Stripe's dunning decides the retries and the terminal state.
+- **A save offer's eligibility is yours.** Stripe's cancel page shows a coupon
+  card when you pass `flow_data.subscription_cancel.retention`, but a coupon
+  cannot be restricted to one customer and a `duration=once` discount leaves
+  `subscription.discounts` once its invoice finalizes. Ask Stripe whether this
+  customer was already discounted and the answer is no, every month, forever.
 
----
+Both, with the code:
+[`references/cancellation-and-retention.md`](references/cancellation-and-retention.md).
 
 ## Refunds arrive cumulative
 
 `charge.amount_refunded` is **the total refunded so far**, not this refund. Two
-partial refunds deliver `4000` then `9000`; read as an increment, that claws
-back $130 against a $90 charge.
-
-```ts
-const totalRefunded = charge.amount_refunded / 100;
-const increment = totalRefunded - stored.refundedTotal;
-if (increment <= 0) return;                     // replay or reorder
-
-const { count } = await db.purchase.updateMany({
-  where: { id: stored.id, refundedTotal: stored.refundedTotal },   // compare-and-swap
-  data:  { refundedTotal: totalRefunded },
-});
-if (count === 0) return;                        // a concurrent delivery won
-await clawBack(increment);                      // clamp at zero; log if it would go negative
-```
+partial refunds deliver `4000` then `9000`; read as an increment, that claws back
+$130 against a $90 charge. Compute the increment against a stored total and write
+it with a compare-and-swap, so a concurrent delivery loses rather than clawing
+back twice — the code is in
+[`references/subscription-lifecycle.md`](references/subscription-lifecycle.md).
 
 A refund belongs either to a one-off payment (find it by `payment_intent`) or to
 a subscription invoice (no purchase row — resolve `charge.invoice` → invoice →
 subscription). Handle both, or subscription refunds silently leave the customer
 holding the product.
 
----
-
 ## Reconciliation
 
-Webhooks are best-effort and outages are not hypothetical. Run a job that asks
-Stripe what is true and repairs the difference:
+Webhooks are best-effort and outages are not hypothetical. Run a job that lists
+subscriptions with `status: "all"`, creates what is missing, and updates status,
+period, quantity and price where they differ — sequentially, because each
+iteration opens a transaction and may call an external API. Any grant it performs
+reuses the webhook's idempotency marker, or a nightly job becomes a nightly gift.
 
-- list subscriptions with `status: "all"`; create what is missing, update
-  status, period, quantity and price where they differ;
-- mark local rows canceled when Stripe has no such subscription — **excluding
-  rows that were never Stripe's**. Comped, manual and other-provider plans carry
-  synthetic ids, and cancelling them is a self-inflicted outage;
-- keep the loop **sequential**: each iteration opens a transaction and may call
-  an external API, and `Promise.all` exhausts the connection pool under exactly
-  the conditions you wrote the job for;
-- any grant it performs reuses the webhook's idempotency marker, or a nightly
-  job becomes a nightly gift.
+The guard that matters: mark local rows canceled when Stripe has no such
+subscription, **excluding rows that were never Stripe's**. Comped, manual and
+other-provider plans carry synthetic ids, and cancelling them is a self-inflicted
+outage. The code, and the "Sync now" button it doubles as, are in
+[`references/subscription-lifecycle.md`](references/subscription-lifecycle.md).
 
-The same function is the "Sync now" button on the billing page. Money is minor
-units: convert once, at the boundary, and compare in integer cents —
-`Math.abs(20.83 - 20.84) > 0.01` is `true` in floating point.
+Money is minor units: convert once, at the boundary, and compare in integer cents
+— `Math.abs(20.83 - 20.84) > 0.01` is `true` in floating point.
 
 ---
 
@@ -392,10 +365,10 @@ units: convert once, at the boundary, and compare in integer cents —
 
 One provider for card payments is a single point of failure for revenue, and the
 decision belongs to the business rather than to this skill. What the code owes it
-is a seam: keep the charge behind an interface, keep the customer id yours rather
-than Stripe's, and never let a Stripe object id be the only key to a paying
-account. The full argument, the migration shapes and what a second provider costs
-are in `references/provider-concentration.md`.
+is a seam: keep the charge behind an interface, keep the customer id yours, and
+never let a Stripe object id be the only key to a paying account. The argument,
+the migration shapes and the cost are in
+[`references/provider-concentration.md`](references/provider-concentration.md).
 
 ## Local development and the test matrix
 

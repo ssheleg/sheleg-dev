@@ -7,6 +7,7 @@ shape that survived production; the reasoning for each is in `SKILL.md`.
 ## Contents
 
 - [Data model](#data-model)
+- [Get-or-create customer](#get-or-create-customer)
 - [Creating the checkout session](#creating-the-checkout-session)
 - [The verify fallback](#the-verify-fallback)
 - [Granting on renewal](#granting-on-renewal)
@@ -51,6 +52,29 @@ export function mapStatus(s: string): Status {
   return m ?? "incomplete";
 }
 ```
+
+## Get-or-create customer
+
+Two tabs, two requests, two customers, and the second silently owns the
+subscription the first is charging. The conditional update is the whole guard:
+
+```ts
+const customer = await stripe.customers.create({ email, metadata: { userId } });
+
+const { count } = await db.user.updateMany({          // write only if nobody did
+  where: { id: userId, stripeCustomerId: null },
+  data: { stripeCustomerId: customer.id },
+});
+
+if (count === 0) {                                    // lost the race
+  await stripe.customers.del(customer.id).catch(log); // delete the orphan
+  return (await db.user.findUnique({ where: { id: userId } }))!.stripeCustomerId!;
+}
+return customer.id;
+```
+
+Before creating, retrieve the stored id and treat `resource_missing` or
+`deleted: true` as "create a new one" — the normal state after a key rotation.
 
 ## Creating the checkout session
 
@@ -197,21 +221,11 @@ converts, `invoice.paid` arrives with `billing_reason: "subscription_cycle"`.
 
 ## Cancellation and reactivation
 
-```ts
-await stripe.subscriptions.update(subId, { cancel_at_period_end: true });
-// local: cancelAtPeriodEnd = true, status stays "active"
-```
-
-If the local write fails after Stripe succeeded, say so honestly ("submitted,
-syncing shortly") and let reconciliation fix it. Reverting Stripe here would
-un-cancel a subscription the user asked to end.
-
-Reactivation is `cancel_at_period_end: false`, and is only meaningful while the
-period is still running. Past that, it is a new subscription.
-
-Immediate cancellation (`stripe.subscriptions.cancel`) is for refunds and abuse.
-Everything it must clean up belongs in the
-`customer.subscription.deleted` handler, not next to the API call.
+Its own file, because the save offer that now sits on the cancel page changes what
+the code around it has to do:
+[`cancellation-and-retention.md`](cancellation-and-retention.md) — the call, the
+timestamp that has to be derived from two fields since flexible `billing_mode`,
+reactivation, immediate cancellation, and the eligibility ledger behind the coupon.
 
 ## The customer portal
 
@@ -229,6 +243,13 @@ invariant you enforce in your own UI (seat minimums, plan eligibility) must be
 configured in the portal too, or it can be violated there.
 
 Users with no `stripeCustomerId` get a 400 with a plain message, not a crash.
+
+`flow_data` turns the same session into a **deep link** to one action —
+`payment_method_update`, `subscription_cancel`, `subscription_update`,
+`subscription_update_confirm` — with the rest of the portal's navigation hidden. The
+cancel flow and the coupon it can carry are in
+[`cancellation-and-retention.md`](cancellation-and-retention.md); note that a session
+expires 5 minutes after creation if unused, so mint it in the request that redirects.
 
 ## Refund clawback
 

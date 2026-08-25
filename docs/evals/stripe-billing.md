@@ -82,14 +82,18 @@ run them before claiming the skill improves anything.
 
 ## Verified at authoring time
 
-- Body budget: ~4747 tokens by the house heuristic, 409 lines of body — both
+- Body budget: ~4683 tokens by the house heuristic, 381 lines of body — both
   recomputed by `test/validate.py` (`check_evals_numbers_are_computed`), because the
   three numbers this line used to carry were measured once and restated afterwards:
-  `4994` tokens, `441` lines and `0 GAP, 13 PASS` against a tree that measured 4747,
-  409 and `0 GAP, 14 PASS`. Three of four wrong, in the document whose subject is
-  measurement.
+  `4994` tokens and `441` lines against a tree that measured 4747 and 409, plus
+  `0 GAP, 13 PASS` against `0 GAP, 14 PASS`. Three of four wrong, in the document
+  whose subject is measurement. The numbers fell in v0.10.0, when cancellation moved
+  into `references/cancellation-and-retention.md` — the house answer at the working
+  limit is a split, and this is what one looks like from the outside.
 - The `GAP/PASS` pair is a **dated reading, not a computed one**: `audit_skill.py --house`
-  printed `0 GAP, 14 PASS` for this skill on 2026-08-20, and that script ships with
+  printed `0 GAP, 14 PASS` for this skill on 2026-08-20 (make-skill 0.23.0) and again on
+  2026-08-25 at v0.10.0 (make-skill 0.23.1), after the description had to be trimmed from
+  967 to 963 chars to pay for the four cancellation triggers. The script ships with
   `make-skill` in another repository. There is no tokeniser in this repository's
   toolchain either, which is why the cl100k count is gone rather than restated — a
   number nothing here can recompute is a claim, and this file already learned that.

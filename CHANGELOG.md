@@ -4,6 +4,75 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.10.0 — the cancel flow that offers a discount, and the two ways it leaks money
+
+Cursor's cancel page — "Before you go… 50% off your next invoice" — is Stripe's
+customer portal with `flow_data[subscription_cancel][retention]`, and `stripe-billing`
+said nothing about it. Verified against the Stripe OpenAPI spec at `2026-07-29.dahlia`
+and `docs.stripe.com` on 2026-08-25.
+
+### Two defects that no screen shows
+
+**A `duration=once` discount deletes itself, so the offer can be taken forever.** From
+Stripe's own coupon documentation: once the discounted invoice finalizes, the discount is
+**removed from the subscription's `discounts` array** — "a subscription may appear to have
+no discount even though a coupon was applied". So the obvious eligibility check, asking
+Stripe whether this customer was already discounted, answers no every cycle. A monthly
+subscriber who reopens the cancel flow rides half price indefinitely, and every renewal
+looks ordinary in the logs. Compounding it: `retention.coupon_offer` takes a **coupon**,
+and a coupon cannot be restricted to a customer, capped per customer, or deactivated —
+`max_redemptions` is a total across all customers and reading it is a race. Eligibility
+is a row in your database or it does not exist.
+
+**Under flexible `billing_mode`, a portal cancellation does not set
+`cancel_at_period_end`.** It sets `cancel_at` and leaves the flag `false`, so a billing
+page whose banner reads the boolean tells a customer who cancelled ten seconds ago that
+their plan renews. Nothing errors. Because `billing_mode` is fixed at creation, an
+established account holds both kinds of row at once.
+
+Both are now invariants with fixtures and a mutant each —
+`retention-offer-is-consumed-once` (mutant: no ledger, eligibility read from
+`subscription.discounts`) and `scheduled-cancellation-survives-billing-mode` (mutant:
+the flag alone). The pack goes 12 → 14 invariants, 45 → 57 assertions, 9 → 13 event
+bodies, 9 → 11 mutants, each still isolated by a fixture.
+
+### New: `references/cancellation-and-retention.md`
+
+The single home for cancellation and the save offer: the exact `flow_data` shape and why
+there is **no** `retention` field on the portal *configuration* (so a targeted offer
+exists only per session); the Dashboard "Retention Coupon" switch that offers every
+cancelling customer a discount with no code review and no test; the eligibility ledger
+and its four conditions; the absent event (`billing_portal.session.created` exists,
+`…completed` does not — absence of a cancellation is not a save); `discounts` on an
+update being a **replacement**, which silently deletes a negotiated discount; the five
+conditions under which the portal cancel page is not available at all, including a
+subscription schedule, which is how a downgrade-at-period-end implementation removes its
+own cancel page.
+
+Also recorded: discounts read through one more level since `2025-09-30.clover` —
+`discount.coupon` → `discount.source.coupon`, `promotion_code.coupon` →
+`promotion_code.promotion.coupon`, `subscription.discount` → `subscription.discounts[]`.
+All three fail as `undefined` rather than as an error.
+
+### The split behind it
+
+`stripe-billing/SKILL.md` was at ~4747 tokens against a 4750 working limit — three tokens
+of headroom, stated in the gate for exactly this moment. Cancellation moved into the new
+reference and three body code blocks that had a second home in
+`references/subscription-lifecycle.md` (get-or-create, the seat update, the refund
+compare-and-swap) now live only there: 4747 → 4683 tokens, 409 → 381 lines. The rule with
+two homes is the one that drifts at one of them.
+
+`references/stripe-agent-toolchain.md` re-read against plugin 0.6.1: Stripe ships **eight**
+agent skills now, not the seven this file listed, and a grep for `retention`, `coupon` and
+`churn` across all eight returns nothing about cancellation deflection — so the save offer
+is this skill's ground by absence rather than by preference, and that is now stated where
+the division of labour is.
+
+`package.json` also stopped describing six skills. There have been seven since v0.9.0, and
+`error-tracking` was missing from the sentence npm shows.
+
+
 ## v0.9.2 — the README stops claiming a command the package cannot run
 
 The README told a reader to run commands the published package cannot run: it ships no

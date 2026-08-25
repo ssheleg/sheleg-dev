@@ -2,8 +2,8 @@
 // same handler with one rule removed at a time.
 //
 // It is deliberately tiny and dependency-free: an in-memory store standing in for your
-// database, and the seven decisions the SKILL.md and `references/webhook-events.md`
-// require. Point `assert-money-invariants.mjs` at YOUR handler instead and the
+// database, and the decisions `SKILL.md`, `references/webhook-events.md` and
+// `references/cancellation-and-retention.md` require. Point `assert-money-invariants.mjs` at YOUR handler instead and the
 // assertions do not change — that is the whole purpose of shipping it.
 //
 // Two properties of the store matter, and both model a real database rather than a
@@ -27,6 +27,15 @@ export const RULES = Object.freeze([
   'cumulative-refund',
   'async-gate',
   'conversion-id-from-metadata',
+  // Eligibility for the save offer read from YOUR ledger rather than from Stripe's
+  // `subscription.discounts` -- which a `duration=once` discount leaves as soon as its
+  // invoice finalizes, so Stripe's answer to "was this customer already discounted" is
+  // no, every month, forever.
+  'retention-eligibility',
+  // A scheduled cancellation read from BOTH `cancel_at` and `cancel_at_period_end`.
+  // Under flexible billing_mode a portal cancellation sets the first and leaves the
+  // second false, so the flag alone reads as "renews" on a subscription Stripe will end.
+  'cancellation-timestamp',
   // The baseline, and the broadest mutant: a handler that treats `invoice.paid` as
   // information and grants nothing. It breaks every grant assertion at once, which is the
   // point — without it, a handler that does nothing would satisfy every invariant about
@@ -41,6 +50,13 @@ export const RULES = Object.freeze([
 /** Credits one paid period is worth. Arbitrary; the assertions count grants, not credits. */
 export const CREDITS_PER_PERIOD = 500;
 
+/** The save offer this handler is willing to make. Yours, not Stripe's -- a coupon cannot
+ *  be restricted to one customer, so the identity of the offer has to live on your side. */
+export const RETENTION_OFFER_ID = 'cancel-50-once';
+export const RETENTION_COUPON = 'cpn_PLACEHOLDER_save50';
+/** How many times a customer may walk the cancel flow without taking the offer. */
+export const RETENTION_DECLINE_LIMIT = 2;
+
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 export function createStore() {
@@ -53,6 +69,8 @@ export function createStore() {
     grants: [], // one row per grant actually applied
     clawbacks: [], // { paymentIntent, amount } in minor units
     conversions: [], // what the server sent to the ad platforms
+    retentionOffers: [], // { customerId, offerId, couponId, subscriptionId, redeemedAt }
+    saves: [], // one row per cancellation deflected, recorded from the discount event
     notifications: [], // side effects that must not run twice
     log: [],
 
@@ -88,6 +106,25 @@ export function createStore() {
       return true;
     },
 
+    /** The ledger, and the reason it is a SELECT: it is a row, not a Stripe field. */
+    async readRetentionOffers(customerId) {
+      await tick();
+      return this.retentionOffers.filter((o) => o.customerId === customerId);
+    },
+    /** Written BEFORE the portal session exists. An offer nobody recorded cannot be counted. */
+    openRetentionOffer(row) {
+      this.retentionOffers.push({ ...row, redeemedAt: null });
+    },
+    /** Returns how many rows matched -- zero means a discount nobody here offered. */
+    markRetentionRedeemed(customerId, couponId, at) {
+      const row = this.retentionOffers.find(
+        (o) => o.customerId === customerId && o.couponId === couponId && o.redeemedAt === null,
+      );
+      if (!row) return 0;
+      row.redeemedAt = at;
+      return 1;
+    },
+
     addCredits(userId, amount) {
       this.credits.set(userId, (this.credits.get(userId) || 0) + amount);
     },
@@ -116,6 +153,25 @@ function periodOf(invoice) {
   const line = lines.find((l) => !l.proration) || lines[0];
   if (!line || !line.period) return null;
   return { start: line.period.start, end: line.period.end, line };
+}
+
+/** The coupon behind a discount moved down a level in `2025-09-30.clover`:
+ *  `discount.coupon` is gone and `discount.source.coupon` replaced it. Reading the old
+ *  path yields `undefined` rather than an error, so a save card renders "% off" with
+ *  nothing in front of it. */
+export function couponIdOf(discount) {
+  const source = discount.source;
+  if (!source || source.type !== 'coupon') return null;
+  const coupon = source.coupon;
+  if (typeof coupon === 'string') return coupon;
+  return (coupon && coupon.id) || null;
+}
+
+/** The latest period end across items -- what `cancel_at_period_end` means once a
+ *  subscription can hold items on different intervals. */
+export function maxPeriodEnd(sub) {
+  const items = (sub.items && sub.items.data) || [];
+  return items.reduce((max, i) => Math.max(max, i.current_period_end || 0), 0) || null;
 }
 
 export function createHandler(store, options = {}) {
@@ -258,6 +314,64 @@ export function createHandler(store, options = {}) {
     return [];
   }
 
+  /** A scheduled cancellation, read from both fields because flexible and classic
+   *  billing modes record it in different ones -- and one account holds both kinds of
+   *  row, because `billing_mode` cannot be changed after creation. */
+  function cancellationAt(sub) {
+    if (!has('cancellation-timestamp')) {
+      // The classic-only reading. Under flexible mode this returns null for a
+      // subscription Stripe will end, and the banner says "renews".
+      return sub.cancel_at_period_end ? maxPeriodEnd(sub) : null;
+    }
+    if (sub.cancel_at) return sub.cancel_at;
+    if (sub.cancel_at_period_end) return maxPeriodEnd(sub);
+    return null;
+  }
+
+  async function subscriptionUpdated(event) {
+    const sub = event.data.object;
+    const existing = store.subscriptions.get(sub.id) || {
+      periodStart: null, periodEnd: null, quantity: 1, priceId: null,
+    };
+    store.subscriptions.set(sub.id, {
+      ...existing,
+      status: sub.status,
+      cancelAt: cancellationAt(sub),
+      cancellationFeedback: (sub.cancellation_details || {}).feedback || null,
+      discountIds: (sub.discounts || []).map((d) => (typeof d === 'string' ? d : d.id)),
+      billingMode: (sub.billing_mode || {}).type || null,
+    });
+    store.log.push({ event: event.id, decision: 'mirrored subscription' });
+    return [];
+  }
+
+  /** The redemption. There is no portal event for a completed flow, so this is the only
+   *  signal that a cancellation was deflected rather than abandoned. */
+  async function discountCreated(event) {
+    const discount = event.data.object;
+    const couponId = couponIdOf(discount);
+    const customerId = typeof discount.customer === 'string'
+      ? discount.customer
+      : (discount.customer && discount.customer.id) || null;
+    if (!couponId || !customerId) {
+      store.log.push({ event: event.id, decision: 'skipped: not a coupon discount' });
+      return [];
+    }
+    const matched = store.markRetentionRedeemed(customerId, couponId, event.created);
+    if (matched === 0) {
+      // Applied by support, by the Dashboard, or by a Dashboard-configured retention
+      // coupon nobody told the code about. Swallowing this is how a discount programme
+      // becomes untraceable.
+      store.log.push({ event: event.id, decision: 'discount with no open retention offer' });
+      return [];
+    }
+    store.saves.push({
+      customerId, couponId, subscription: discount.subscription, at: event.created,
+    });
+    store.log.push({ event: event.id, decision: 'retention offer redeemed' });
+    return [];
+  }
+
   async function handle(event) {
     switch (event.type) {
       case 'invoice.paid':
@@ -270,6 +384,10 @@ export function createHandler(store, options = {}) {
       case 'checkout.session.async_payment_failed':
         store.log.push({ event: event.id, decision: 'async payment failed: nothing granted' });
         return [];
+      case 'customer.subscription.updated':
+        return subscriptionUpdated(event);
+      case 'customer.discount.created':
+        return discountCreated(event);
       default:
         return []; // 200 for a type we do not handle
     }
@@ -311,5 +429,29 @@ export function createHandler(store, options = {}) {
     return { granted: true };
   }
 
-  return { deliver, reconcile };
+  /**
+   * The decision your server makes BEFORE it mints a cancel-flow portal session: may this
+   * customer be shown the save offer? It is a fourth entry point because Stripe has no
+   * answer to it -- `retention.coupon_offer` takes a coupon, and a coupon cannot be
+   * restricted to one customer, capped per customer, or deactivated.
+   */
+  async function offerRetention(customerId, sub) {
+    if ((sub.discounts || []).length > 0) return null;   // discounted RIGHT NOW
+    if (sub.status !== 'active') return null;            // never discount out of dunning
+
+    const offer = { offerId: RETENTION_OFFER_ID, couponId: RETENTION_COUPON };
+    if (!has('retention-eligibility')) return offer;   // no ledger at all: Stripe decides
+
+    const history = await store.readRetentionOffers(customerId);
+    if (history.some((o) => o.redeemedAt !== null)) return null;
+    if (history.filter((o) => o.redeemedAt === null).length >= RETENTION_DECLINE_LIMIT) {
+      return null;
+    }
+    // Written BEFORE the portal session is minted. Without this row the redemption that
+    // arrives later matches nothing, so a save cannot be told from a support discount.
+    store.openRetentionOffer({ customerId, ...offer, subscriptionId: sub.id });
+    return offer;
+  }
+
+  return { deliver, reconcile, offerRetention };
 }

@@ -23,7 +23,7 @@ actually prints. Both were watched refusing a plant; see the SD-05 block.
 
 ---
 
-## Shipped state — v0.9.2
+## Shipped state — v0.10.0
 
 **The first v0.8.0 tag failed its own release, and this is the record of it.** The notice
 `install.sh` gained in this version — that the manual gate does not travel with a skills
@@ -57,7 +57,7 @@ Seven skills ship: `ad-tracking`, `crypto-payments`, `error-tracking`,
 
 | REQ | Requirement | Verified by | Result | Status |
 |---|---|---|---|---|
-| 001 | The structural validator passes on the shipped tree | `python3 test/validate.py` | `OK: sheleg-dev structurally valid (23 checks, 7 skill(s), v0.9.2)` — and the check count is now the length of the registry, so adding a check moves it. It used to be `10 + len(skill_dirs)`: adding a **skill** moved the number and adding a check did not, and four rows of this file read it as evidence that a guard had been added. `check_ledger_quotes_the_validator_verdict` compares this quoted string against the line the run prints, so it cannot drift again | **verified** |
+| 001 | The structural validator passes on the shipped tree | `python3 test/validate.py` | `OK: sheleg-dev structurally valid (23 checks, 7 skill(s), v0.10.0)` — and the check count is now the length of the registry, so adding a check moves it. It used to be `10 + len(skill_dirs)`: adding a **skill** moved the number and adding a check did not, and four rows of this file read it as evidence that a guard had been added. `check_ledger_quotes_the_validator_verdict` compares this quoted string against the line the run prints, so it cannot drift again | **verified** |
 | 002 | Every guard has been watched failing against a planted defect | CI run `32293489020` at `6f66255`, step-level conclusions of every `Negative self-test` step | **28 of 28 `success`**, 39 of 39 steps `success`, 0 failed steps in the run. This retires the *"CI has not seen any of this"* limitation that SD-01 through SD-04 each recorded separately: the four blocks below all ran in that one run, against the tagged tree | **verified** |
 | 003 | Version is synchronised across every surface | read back from `package.json`, `.claude-plugin/marketplace.json`, `plugins/sheleg-dev/.claude-plugin/plugin.json`, the top `## vX.Y.Z` in `CHANGELOG.md` | all four → `0.7.0` | **verified** |
 | 056 | `error-tracking` meets the Agent Skills standard and the house canon | `python3 audit_skill.py plugins/sheleg-dev/skills/error-tracking --house` (make-skill 0.23.0) | `0 GAP, 14 PASS` — description 943/970 chars, body 242 lines / ~2777 tokens against a 500/4750 working limit, every relative link resolves | **verified** |
@@ -338,12 +338,34 @@ Board rows: `docs/evidence/backlog.md` B-84, B-86, B-90, B-92, B-93, B-95, B-98,
   shelf life of hours, and `check_ledger_names_the_shipped_version` is what notices when it
   expires.
 
+Rows **066 through 070**, 2026-08-25. The cancel-flow save offer — Cursor's
+*"Before you go… 50% off your next invoice"* — and the two ways it leaks money. Every
+Stripe claim below was read from the OpenAPI spec at `2026-07-29.dahlia` or from a
+documentation page, never recalled.
+
+| REQ | Requirement | Verified by | Result | Observed at | Status |
+|---|---|---|---|---|---|
+| 066 | The offer on that page is `flow_data[subscription_cancel][retention]`, and it exists only per session | the Stripe OpenAPI spec (`info.version` → `2026-07-29.dahlia`, matching `docs.stripe.com/changelog` for latest); `docs.stripe.com/customer-management/portal-deep-links.md`; `.../cancellation-page.md` | `POST /v1/billing_portal/sessions` carries `flow_data.subscription_cancel.retention` (`retention_param`, required `["coupon_offer","type"]`, `type` enum `["coupon_offer"]`, `coupon_offer.coupon` required). The portal **configuration**'s `features.subscription_cancel` holds only `cancellation_reason`, `enabled`, `mode`, `proration_behavior` — **no `retention`** — so per-customer targeting exists on the session and nowhere else. The deep-links guide lists all four flow types and never mentions `retention`: it is in the spec and not in the page, which is why the spec was read | 2026-08-25 | **verified locally · unreleased** |
+| 067 | A `duration=once` save offer can be taken every cycle, and Stripe cannot stop it | `docs.stripe.com/billing/subscriptions/coupons.md`; the spec's `coupon` schema | Stripe: *"the coupon is considered used after the invoice finalizes and is removed from the subscription's `discounts` array… a subscription may appear to have no discount even though a coupon was applied."* The `coupon` schema has `max_redemptions` — a total across **all** customers, shared with its promotion codes — `times_redeemed`, `redeem_by`, and no per-customer field of any kind. Stripe's own comparison marks *restrict to a specific customer*, *first purchase only* and *minimum spend* ❌ for coupons and ✓ for promotion codes, and `retention.coupon_offer` takes a **coupon**. Eligibility is therefore inexpressible in Stripe and has to be a row you own | 2026-08-25 | **verified locally · unreleased** |
+| 068 | Flexible billing mode records a portal cancellation in a different field | `docs.stripe.com/billing/subscriptions/billing-mode/compare.md` → *Cancellations in the Customer Portal* | classic: `cancel_at_period_end: true`, `cancel_at` set to `current_period_end` and **following** it when it moves. Flexible: `cancel_at` set to the maximum `current_period_end` across items, `cancel_at_period_end` **false**, and `cancel_at` does not follow. `billing_mode` cannot be migrated back, so an established account holds both shapes at once and code reading the boolean is wrong for the customers who have paid longest | 2026-08-25 | **verified locally · unreleased** |
+| 069 | Both defects are invariants with a mutant each, watched failing one assertion at a time | `node plugins/sheleg-dev/skills/stripe-billing/fixtures/assert-money-invariants.mjs --self-test`; `npm run test:all` | `OK: 14 invariants over 57 assertions — 43 watched failing ONE CALL SITE AT A TIME against 13 mutants; 14 declared unmutated and measured unbreakable; 11 rules, each isolated by a fixture`, and `PASS: all 42 guards provably reject their planted defect`. The first measurement of `retention-offer-is-consumed-once` reported **three assertions broken by no mutant** (`:302`, `:308`, `:311`) — the `retention-eligibility` mutant was gating only the ledger *reads*. Making it remove the whole ledger, the row included, turned all three into evidence and left the first-offer assertion as the declared positive control | 2026-08-25 | **verified locally · unreleased** |
+| 070 | The split that made room for it, and every count that moved with it | `python3 test/validate.py` | `stripe-billing/SKILL.md` **4747 → 4683** tokens, **409 → 381** lines, against a 4750 working limit that had three tokens of headroom. Cancellation moved to `references/cancellation-and-retention.md`; three body code blocks with a second home in `references/subscription-lifecycle.md` (get-or-create, the seat update, the refund compare-and-swap) now live only there. `SECURITY.md` was restating **56** payload files (61), **34** markdown (35), **22** non-markdown (26), **25** references (26), **62** tarball files (67), and `SKILL.md`, one per skill` = **6** for seven skills. `package.json`'s npm description still began *"Six integration skills"* and omitted `error-tracking`, which has shipped since v0.9.0. The skill's own description sat at **967 of the 970 house working limit**, so the four new triggers (`cancel subscription`, `retention coupon`, `скидка при отмене`, and the cancel step in the opening sentence) were paid for rather than appended: `963` chars, `0 GAP, 14 PASS` under `audit_skill.py --house` (make-skill 0.23.1) | 2026-08-25 | **verified locally · unreleased** |
+
+
 ## What these checks do not cover
 
 Named rather than left to be inferred, because a ledger that lists only its successes
 reads as coverage it does not have.
 
-- **Whether the integration advice is correct against the live vendors.** These six
+- **The retention flow has not been walked against a live Stripe sandbox.** Rows 066–068
+  are read from the OpenAPI spec and the documentation, which is stronger than
+  recollection and weaker than a run. Two things neither source states: the order in
+  which `customer.discount.created` and `customer.subscription.updated` arrive when the
+  offer is redeemed, and whether redeeming abandons the cancellation entirely (no
+  `cancel_at`, no `cancel_at_period_end`). `references/cancellation-and-retention.md`
+  marks both as unverified and carries the `stripe listen` commands that answer them, so
+  the gap is in the reader's hands rather than hidden.
+- **Whether the integration advice is correct against the live vendors.** These seven
   skills describe Stripe, Heleket/BTCPay, Google Sign-In, Workload Identity, ad networks
   and web performance. Every row above measures the *artifact*: valid, linked, budgeted,
   released. Nothing here re-checks a vendor's current API against the page describing

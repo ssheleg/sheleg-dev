@@ -1,15 +1,16 @@
 # Money fixtures and the assertion pack
 
 **Copy this whole directory into your repository.** It is the executable half of what
-`SKILL.md` and `references/webhook-events.md` state in prose: nine real Stripe event
-bodies, twelve invariants a correct webhook handler must hold — 45 assertions between
+`SKILL.md`, `references/webhook-events.md` and
+`references/cancellation-and-retention.md` state in prose: thirteen real Stripe event
+bodies, fourteen invariants a correct webhook handler must hold — 57 assertions between
 them — and a self-test that breaks the handler one rule at a time so you can watch each
 assertion fail on its own.
 
 Two commands, no dependencies, no network, no key:
 
 ```bash
-node assert-money-invariants.mjs              # 12 invariants / 45 assertions
+node assert-money-invariants.mjs              # 14 invariants / 57 assertions
 node assert-money-invariants.mjs --self-test  # break one rule at a time; EACH ASSERTION must go red
 ```
 
@@ -42,6 +43,10 @@ Every file is a webhook event body shaped the way Stripe sends it on
 | `checkout-session-completed-async-unpaid.json` | a bank-debit session, `payment_status: "unpaid"` | the session completed and the money has not moved |
 | `checkout-session-async-payment-failed.json` | days later: it never cleared | the redirect proved a browser and nothing else |
 | `checkout-session-completed-paid.json` | a card session that did clear | the positive control: without it, a handler refusing every session would pass the two above |
+| `customer-discount-created-retention.json` | the save offer redeemed: a `duration=once`, 50%-off coupon read through `source.coupon` | there is no portal event for a completed flow, so this is the ONLY signal that a cancellation was deflected rather than abandoned |
+| `customer-subscription-updated-discount-consumed.json` | the discounted invoice has finalized and `discounts` is `[]` again, with the old value in `previous_attributes` | Stripe's answer to "was this customer already discounted" is now no — the fixture that makes the re-offer loop visible |
+| `customer-subscription-updated-cancel-flexible.json` | a portal cancellation under **flexible** `billing_mode`: `cancel_at` set, `cancel_at_period_end` **false** | the flag alone reads as "renews" on a subscription Stripe will end |
+| `customer-subscription-updated-cancel-classic.json` | the same cancellation under **classic**: both fields set | the control — both readings agree here, which is why the flag alone survived until flexible mode |
 
 The refund pair resolves to a **purchase row**, not a Stripe object: a $90 credit pack with
 `refundedTotal: 0`, seeded by the assertion pack because it is your database's, not
@@ -65,6 +70,8 @@ Run `node assert-money-invariants.mjs` and each line names the invariant it hold
 | `unpaid-session-grants-nothing` | unpaid + failed | grants the product and reports a purchase for a charge that failed |
 | `paid-session-grants-once` | `checkout-session-completed-paid.json` | answers 200 and writes nothing — the positive control, without which refusing every session would pass the row above |
 | `conversion-id-survives-the-session` | cycle | generates its own conversion id, and the browser event never deduplicates against it |
+| `retention-offer-is-consumed-once` | discount created + discount consumed | offers 50% off again every cycle, because it asked Stripe instead of its own ledger |
+| `scheduled-cancellation-survives-billing-mode` | cancel flexible + cancel classic | tells a customer who cancelled ten seconds ago that their plan renews |
 
 ## What each mutant deletes
 
@@ -82,6 +89,8 @@ a line a generated handler routinely omits:
 | `conversion-id-from-metadata` | reading `conversionEventId` out of the subscription metadata | generates an id at emission time |
 | `grant-on-renewal` | the grant itself | treats `invoice.paid` as information |
 | `grant-on-checkout` | the first grant | answers 200 to `checkout.session.completed` and writes nothing |
+| `retention-eligibility` | the whole offer ledger — the row written before the session, the history read, and the redemption mark | asks `subscription.discounts` whether this customer was already discounted, which a `duration=once` discount empties as soon as its invoice finalizes |
+| `cancellation-timestamp` | `if (sub.cancel_at) return sub.cancel_at` ahead of the flag | reads `cancel_at_period_end` alone, correct for classic rows and wrong for every flexible one |
 
 ## What masks what
 
@@ -105,7 +114,7 @@ separate them are here because of it rather than by design.
 ## Placeholders
 
 Every id spells `PLACEHOLDER`: `sub_PLACEHOLDER_alice`, `ch_PLACEHOLDER_creditpack`,
-`cus_PLACEHOLDER_bob`. There is no key, token, signing secret or real customer id anywhere
+`cus_PLACEHOLDER_bob`, `cpn_PLACEHOLDER_save50`. There is no key, token, signing secret or real customer id anywhere
 in this directory — signature verification happens before any of this and is
 `SKILL.md`'s subject, not these fixtures'. The email is `placeholder@example.invalid` and
 the one 64-hex string is its SHA-256.
