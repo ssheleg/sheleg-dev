@@ -1,5 +1,12 @@
 # sheleg-dev
 
+[![validate](https://github.com/ssheleg/sheleg-dev/actions/workflows/validate.yml/badge.svg)](https://github.com/ssheleg/sheleg-dev/actions/workflows/validate.yml)
+[![npm](https://img.shields.io/npm/v/%40ssheleg%2Fsheleg-dev)](https://www.npmjs.com/package/@ssheleg/sheleg-dev)
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![site](https://img.shields.io/badge/docs-ssheleg.github.io-8ab0ff)](https://ssheleg.github.io/sshlg-skills/skills/sheleg-dev/)
+
+**[Docs, and all 8 skills →](https://ssheleg.github.io/sshlg-skills/)** · [this skill's page](https://ssheleg.github.io/sshlg-skills/skills/sheleg-dev/) · [follow @sshlg93 on X](https://x.com/intent/follow?screen_name=sshlg93)
+
 The integration layer a product reaches once it has users: **money in, tracking,
 sign-in, and speed.**
 
