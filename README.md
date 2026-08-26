@@ -5,6 +5,16 @@
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![site](https://img.shields.io/badge/docs-skills.sshlg.me-8ab0ff)](https://skills.sshlg.me/skills/sheleg-dev/)
 
+**Wire the product seams where money, identity, measurement, errors and frontend performance meet production.**
+
+```bash
+npx skills add ssheleg/sheleg-dev
+```
+
+Ask: `Wire Stripe subscriptions so access follows verified webhook state exactly once.`
+
+**[Detailed docs →](https://skills.sshlg.me/skills/sheleg-dev/)**
+
 **[Docs, and every skill →](https://skills.sshlg.me/)** · [this skill's page](https://skills.sshlg.me/skills/sheleg-dev/) · [follow @sshlg93 on X](https://x.com/intent/follow?screen_name=sshlg93)
 
 Loads in **DeepSeek Harness** (`dsh`) with **no plugin to write**: it reads the

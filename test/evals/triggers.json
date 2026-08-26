@@ -1,0 +1,125 @@
+{
+  "skill": "sheleg-dev",
+  "note": "Behavioral trigger cases. Run each in a fresh session; the committed data contains no model results.",
+  "split": {
+    "train": [
+      "q01",
+      "q02",
+      "q03",
+      "q04",
+      "q08",
+      "q09",
+      "q10",
+      "q11"
+    ],
+    "validation": [
+      "q05",
+      "q06",
+      "q07",
+      "q12",
+      "q13",
+      "q14"
+    ]
+  },
+  "queries": [
+    {
+      "id": "q01",
+      "lang": "en",
+      "query": "Wire Stripe subscriptions with webhook idempotency, seats and proration",
+      "should_trigger": true,
+      "why": "stripe-billing"
+    },
+    {
+      "id": "q02",
+      "lang": "ru",
+      "query": "добавь оплату криптовалютой с защитой от дублей webhook",
+      "should_trigger": true,
+      "why": "crypto-payments"
+    },
+    {
+      "id": "q03",
+      "lang": "en",
+      "query": "Add GA4, Google Ads and Meta purchase events under Consent Mode v2",
+      "should_trigger": true,
+      "why": "ad-tracking"
+    },
+    {
+      "id": "q04",
+      "lang": "ru",
+      "query": "подключи вход через Google и закрой account pre-hijacking",
+      "should_trigger": true,
+      "why": "google-signin"
+    },
+    {
+      "id": "q05",
+      "lang": "en",
+      "query": "Implement server-side Google OAuth for API access and token refresh",
+      "should_trigger": true,
+      "why": "google-auth"
+    },
+    {
+      "id": "q06",
+      "lang": "ru",
+      "query": "улучши Core Web Vitals на лендинге и докажи изменение",
+      "should_trigger": true,
+      "why": "frontend-performance"
+    },
+    {
+      "id": "q07",
+      "lang": "en",
+      "query": "Wire Sentry without leaking authorization headers and upload release metadata",
+      "should_trigger": true,
+      "why": "error-tracking"
+    },
+    {
+      "id": "q08",
+      "lang": "en",
+      "query": "Decide which Stripe plans and prices we should sell",
+      "should_trigger": false,
+      "why": "pricing is a business decision"
+    },
+    {
+      "id": "q09",
+      "lang": "ru",
+      "query": "нарисуй экран оплаты",
+      "should_trigger": false,
+      "why": "checkout appearance belongs to design"
+    },
+    {
+      "id": "q10",
+      "lang": "en",
+      "query": "Write the upgrade CTA and cancellation copy",
+      "should_trigger": false,
+      "why": "user-facing wording belongs to copywriting"
+    },
+    {
+      "id": "q11",
+      "lang": "en",
+      "query": "Add Telegram Stars payments to our bot",
+      "should_trigger": false,
+      "why": "Telegram-native rails belong to telegram-dev"
+    },
+    {
+      "id": "q12",
+      "lang": "ru",
+      "query": "сделай обычную форму входа по email и паролю",
+      "should_trigger": false,
+      "why": "not a Google authentication seam"
+    },
+    {
+      "id": "q13",
+      "lang": "en",
+      "query": "Explain what LCP means",
+      "should_trigger": false,
+      "why": "informational performance question"
+    },
+    {
+      "id": "q14",
+      "lang": "en",
+      "query": "Reconcile an internal invoice CSV with no product integration",
+      "should_trigger": false,
+      "why": "data work rather than wiring a paid-product seam"
+    }
+  ]
+}
+

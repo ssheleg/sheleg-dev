@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.10.1 — seven integration skills, one reviewable public contract
+
+The pack now publishes a root skill card, routed trigger cases, three cross-skill
+behavioral scenarios and an explicit no-model-run results ledger. The README
+opens with one install and one Stripe request, the workbench social preview is
+committed, and CI runs the pinned house audit plus the eval validator's planted
+failure. Integration behavior and provider contracts are unchanged.
+
 ## v0.10.0 — the cancel flow that offers a discount, and the two ways it leaks money
 
 Cursor's cancel page — "Before you go… 50% off your next invoice" — is Stripe's

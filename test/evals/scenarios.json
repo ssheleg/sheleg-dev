@@ -1,0 +1,52 @@
+{
+  "note": "Score each expected_behavior line independently. These are authored evaluations, not executed results.",
+  "scenarios": [
+    {
+      "id": "s01",
+      "title": "Stripe authority",
+      "skills": [
+        "stripe-billing"
+      ],
+      "query": "Implement subscription checkout and grant access after payment.",
+      "files": [],
+      "expected_behavior": [
+        "Treats the webhook as payment authority rather than the redirect",
+        "Claims webhook idempotency before side effects",
+        "Reconciles provider state into the product database",
+        "Tests renewal, refund and out-of-order delivery paths"
+      ]
+    },
+    {
+      "id": "s02",
+      "title": "Consent-safe purchase tracking",
+      "skills": [
+        "ad-tracking"
+      ],
+      "query": "Send one purchase to GA4, Google Ads and Meta from browser and server.",
+      "files": [],
+      "expected_behavior": [
+        "Uses one stable event id across browser and server copies",
+        "Waits for confirmed payment rather than the thank-you page",
+        "Respects consent state and names degraded measurement",
+        "Prevents duplicate revenue across destinations"
+      ]
+    },
+    {
+      "id": "s03",
+      "title": "Google account linking",
+      "skills": [
+        "google-signin",
+        "google-auth"
+      ],
+      "query": "Add Google sign-in to an app that already has password accounts and also needs offline API access.",
+      "files": [],
+      "expected_behavior": [
+        "Separates identity sign-in from server-side API authorization",
+        "Prevents automatic linking by unverified matching email alone",
+        "Stores and rotates refresh credentials server-side",
+        "Defines revocation, re-consent and error handling"
+      ]
+    }
+  ]
+}
+
