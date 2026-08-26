@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | Pack | `sheleg-dev` |
-| Version | `0.10.2` |
+| Version | `0.10.3` |
 | Skills | `stripe-billing`, `crypto-payments`, `error-tracking`, `ad-tracking`, `google-signin`, `google-auth`, `frontend-performance` |
 | License | MIT |
 | Source | https://github.com/ssheleg/sheleg-dev |

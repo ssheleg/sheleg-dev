@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.10.3 — the shared seam is explicit
+
+Both shared validators now state `diverges: none`, completing the umbrella
+mechanism contract.
+
 ## v0.10.2 — shared guards identify their owner
 
 The eval and social-preview validators now declare their umbrella-owned shared
