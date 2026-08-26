@@ -1,6 +1,6 @@
 {
   "name": "@ssheleg/sheleg-dev",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "Seven integration skills for the layer a product reaches once it has users: Stripe subscription billing and cancellation retention, crypto payments, ad and conversion tracking under Consent Mode v2, Google sign-in and the wider Google auth surface, error tracking, and Core Web Vitals. This package is the installer CLI.",
   "bin": {
     "sheleg-dev": "bin/sheleg-dev.js"
