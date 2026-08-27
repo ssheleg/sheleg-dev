@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.10.4 — the channel that sends the installs, on npm too
+
+- The `skills.sh` badge and the canonical `homepage` reached GitHub in the previous cycle and stopped
+  there: npm serves the README and the metadata from the last **publish**, so the package
+  page still showed a badge-less README and a homepage pointing at GitHub.
+  This release carries both across.
+- No behaviour changes. Cut because a change that lands on `main` and never publishes is a
+  change the package's own readers cannot see.
+
 ## v0.10.3 — the shared seam is explicit
 
 Both shared validators now state `diverges: none`, completing the umbrella
