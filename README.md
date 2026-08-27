@@ -4,6 +4,7 @@
 [![npm](https://img.shields.io/npm/v/%40ssheleg%2Fsheleg-dev)](https://www.npmjs.com/package/@ssheleg/sheleg-dev)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![site](https://img.shields.io/badge/docs-skills.sshlg.me-8ab0ff)](https://skills.sshlg.me/skills/sheleg-dev/)
+[![skills.sh](https://skills.sh/b/ssheleg/sheleg-dev)](https://skills.sh/ssheleg/sheleg-dev)
 
 **Wire the product seams where money, identity, measurement, errors and frontend performance meet production.**
 
