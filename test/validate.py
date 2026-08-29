@@ -499,6 +499,9 @@ NOT_IN_THE_TARBALL = {
         "run inside *Verifying for yourself*, after the `git clone`",
     ("SECURITY.md", "test/fixtures_test.js"):
         "run inside *Verifying for yourself*, after the `git clone`",
+    ("SECURITY.md", "test/installer_test.js"):
+        "run inside *Verifying for yourself*, after the `git clone` -- the suite that "
+        "watches both installers refuse the plugin shadow",
     ("SECURITY.md", "install.sh"):
         "clone-only, and the table row now says so: the tarball ships `bin/sheleg-dev.js`, "
         "not the shell installer",

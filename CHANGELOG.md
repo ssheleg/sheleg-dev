@@ -4,6 +4,42 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.10.5 — the installers refuse the shadow they used to write
+
+Both install channels — `npx @ssheleg/sheleg-dev` and `install.sh` — now consult the
+target home's `~/.claude/plugins/installed_plugins.json` before writing anything under
+`~/.claude/skills/`. If the sheleg-dev **plugin** is installed there, the install is
+**refused with exit 3**: a plain copy beside a plugin shadows the plugin's skill of the
+same name and serves the frozen version forever, and until this release neither channel
+looked at all. Reproduced live in the family on 2026-08-29: a bare
+`npx @ssheleg/telegram-dev` shipped three shadows while the plugin was enabled.
+
+- `installed_plugins.json` is the signal, because it is the record of what is actually
+  installed. A check keyed on the `plugins/marketplaces/<name>` directory alone — the
+  shape other family members carried — is the fail-open class: a marketplace added from
+  a local `directory` source has no dir there, and plugin names differ from marketplace
+  names. The directory is kept only as a fallback signal.
+- The refusal names its remedy with the **real spec read from the JSON**
+  (`claude plugin marketplace update sheleg-dev`, `claude plugin update <spec>`), plus
+  the family launcher line, and offers `--force` as the explicit override for running
+  two channels deliberately.
+- An absent or corrupt `installed_plugins.json` reads as "no plugin": the check fails
+  open and never crashes an install — the fresh HOME is the common case.
+- New suite `test/installer_test.js` (11 cases, both channels, throwaway HOMEs), wired
+  into `npm test` and CI. **Watched failing first**: run against the pre-refusal
+  installers it went red on 7 of 11 cases, each showing the shadow landing at exit 0.
+- Both success paths now end by saying how the next version arrives — the update line —
+  and `install.sh` gained `--force`/usage parsing (unknown argument exits 2) to carry
+  the same contract as the npm channel.
+- `.claude-plugin/marketplace.json` still said "Six integration skills" while seven
+  ship (the validator counts 7; README and SECURITY say seven). It now says seven and
+  names error tracking — the second hand-written count this repository has caught after
+  the fact, which is why the new suite derives the roster from the tree.
+- `SECURITY.md`'s installer contract moved with the behaviour: the read surface now
+  includes the two read-only looks at the target home, and the I/O-surface grep line
+  count was re-measured (twelve, and it was already twelve before this change — the
+  "eleven" had rotted when a comment naming `rm -rf` arrived).
+
 ## v0.10.4 — the channel that sends the installs, on npm too
 
 - The `skills.sh` badge and the canonical `homepage` reached GitHub in the previous cycle and stopped

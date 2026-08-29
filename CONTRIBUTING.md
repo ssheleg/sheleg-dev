@@ -73,13 +73,15 @@ One command:
 ```bash
 npm test          # python3 test/validate.py, then node test/moneygate_test.js,
                   # then node test/fixtures_test.js
+                  # then node test/installer_test.js
 ```
 
-**Three suites, not two.** This line said two until 2026-08-20, and the missing one was
+**Four suites, not two.** This line said two until 2026-08-20, and the missing one was
 `test/fixtures_test.js` — the 16 checks that run both money-assertion packs in both modes
 and plant six neutered assertions. `test/validate.py` now derives the list from
-`package.json` → `scripts.test`, so a fourth suite fails this paragraph rather than
-passing it.
+`package.json` → `scripts.test`, so a fifth suite fails this paragraph rather than
+passing it. The fourth, `test/installer_test.js`, arrived 2026-08-29 with the
+plugin-shadow refusal.
 
 It checks the four-way version sync (`package.json`, the plugin manifest, the
 marketplace manifest and the top `CHANGELOG.md` heading — one number, four files, and a
@@ -111,6 +113,17 @@ reference implementation, once with `--self-test`, which deletes one rule at a t
 requires every assertion to go red — and then plants three neutered assertions and requires
 `--self-test` to notice. **An assertion nobody has watched failing is the thing this row
 existed to remove**, so a check that cannot fail is a failure here.
+
+`node test/installer_test.js` is the installers' suite: both channels
+(`bin/sheleg-dev.js` and `install.sh`) against throwaway HOMEs — fresh install, rerun,
+`--force`, and the case that earns the file its place: a HOME whose
+`~/.claude/plugins/installed_plugins.json` declares the sheleg-dev plugin must be
+**refused** with exit 3,
+a remedy naming the real plugin spec, and nothing written, because a plain copy beside a
+plugin shadows it and serves its frozen version forever. A corrupt or missing registry
+reads as "no plugin" — the check fails open rather than crashing a fresh machine. Every
+refusal case was watched failing against the pre-refusal installers before the refusal
+was written.
 
 It also asks the family umbrella whether this repository still advertises every word the
 routing hook fires on. That check needs an `sshlg-skills` checkout above this one and

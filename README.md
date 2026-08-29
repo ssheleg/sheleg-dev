@@ -118,6 +118,12 @@ a Lighthouse score.
 npx @ssheleg/sheleg-dev
 ```
 
+If the sheleg-dev **plugin** is already installed in that home, the npm installer
+and `install.sh` refuse with exit 3 instead of writing plain copies — a plain
+copy shadows the plugin's skill of the same name and serves the frozen version
+forever. The refusal prints the plugin-channel update commands; `--force`
+overrides it, deliberately.
+
 **Any of 70+ agents:**
 
 ```bash

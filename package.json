@@ -1,6 +1,6 @@
 {
   "name": "@ssheleg/sheleg-dev",
-  "version": "0.10.4",
+  "version": "0.10.5",
   "description": "Seven integration skills for the layer a product reaches once it has users: Stripe subscription billing and cancellation retention, crypto payments, ad and conversion tracking under Consent Mode v2, Google sign-in and the wider Google auth surface, error tracking, and Core Web Vitals. This package is the installer CLI.",
   "bin": {
     "sheleg-dev": "bin/sheleg-dev.js"
@@ -43,8 +43,8 @@
     "skill"
   ],
   "scripts": {
-    "test": "python3 test/validate.py && node test/moneygate_test.js && node test/fixtures_test.js",
+    "test": "python3 test/validate.py && node test/moneygate_test.js && node test/fixtures_test.js && node test/installer_test.js",
     "test:negatives": "python3 test/negatives.py",
-    "test:all": "python3 test/validate.py && node test/moneygate_test.js && node test/fixtures_test.js && python3 test/negatives.py"
+    "test:all": "python3 test/validate.py && node test/moneygate_test.js && node test/fixtures_test.js && node test/installer_test.js && python3 test/negatives.py"
   }
 }

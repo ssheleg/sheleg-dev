@@ -46,6 +46,18 @@ jobs:
       - name: Money fixtures (both packs, both modes, neutered-assertion plants)
         run: node test/fixtures_test.js
 
+      # Both installers against throwaway HOMEs. The case this step exists for is
+      # PLUGIN-PRESENT: a fake HOME whose installed_plugins.json declares the
+      # sheleg-dev plugin, asserting the exit-3 refusal, the remedy in the output,
+      # and that nothing was written. Every member's CI tested only a fresh HOME
+      # until 2026-08-29, which is how the family's installers shipped a
+      # shadow-writer nobody had ever run against a plugin (telegram-dev,
+      # reproduced live that day). The `Installers run` step below keeps the
+      # fresh-HOME sweep; the cases live in test/installer_test.js so `npm test`
+      # locally and this job exercise the same assertions.
+      - name: Installer functional tests (fresh / rerun-skip / --force / plugin-present refusal)
+        run: node test/installer_test.js
+
       # Every negative self-test below plants a defect and REQUIRES a failure.
       # A validator nobody has watched fail is not evidence that it works.
 
@@ -194,8 +206,8 @@ jobs:
           python3 - <<'PY'
           p = "/tmp/deadline/SECURITY.md"
           t = open(p, encoding="utf-8").read()
-          old = "(`install.sh:21-22`)"
-          assert old in t, "PLANT DID NOT LAND: SECURITY.md no longer cites install.sh:21-22"
+          old = "(`install.sh:62-63`)"
+          assert old in t, "PLANT DID NOT LAND: SECURITY.md no longer cites install.sh:62-63"
           open(p, "w", encoding="utf-8").write(t.replace(old, "(`install.sh:9001`)", 1))
           PY
           if (cd /tmp/deadline && python3 test/validate.py); then
