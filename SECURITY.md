@@ -33,7 +33,7 @@ no socket; the greps below prove all three.
 | `plugins/sheleg-dev/hooks/money-gate.js` | 1 | Runs on a tool call, when the plugin is enabled. Requires `path` and its own decision module — nothing else. Reads stdin, writes one JSON line, exits 0 on every path. |
 | `plugins/sheleg-dev/hooks/lib/moneygate.js` | 1 | Pure. Payload and environment in, verdict out. No `require` at all, no filesystem, no clock. |
 | `bin/sheleg-dev.js` — the npm installer | 1 | Runs only when you invoke it. Node built-ins only: `fs`, `path`, `os`. |
-| `install.sh` — the shell installer | 1 | **Not in the tarball** — `files` ships `bin/` and `plugins/`, so this one reaches you only through a clone. Runs when you invoke it. Coreutils only: `cd`, `pwd`, `dirname`, `basename`, `mkdir`, `rm`, `cp`, `echo`. It is the destructive channel: `rm -rf` per skill, then `cp -R`. |
+| `install.sh` — the shell installer | 1 | **Not in the tarball** — `files` ships `bin/` and `plugins/`, so this one reaches you only through a clone. Runs when you invoke it. Shell tools only: `cd`, `pwd`, `dirname`, `basename`, `mkdir`, `rm`, `cp`, `echo`, plus `sed` and `head` to read the plugin registry it refuses to shadow. It is the destructive channel: `rm -rf` per skill, then `cp -R`. |
 | `plugins/sheleg-dev/skills/*/fixtures/*.json` — webhook payloads | 16 | Data. Placeholder ids only; no key, token, signing secret or real customer id. |
 | `plugins/sheleg-dev/skills/*/fixtures/*.mjs` — the assertion packs and their reference implementations | 4 | Runs only when you invoke it. Reads the JSON beside it with `readFileSync` and nothing else: no `child_process`, no `fetch`, no write, no `process.env`. |
 | `plugins/sheleg-dev/skills/*/fixtures/manifest.json` and its `README.md` | 4 | Text. The invariant-to-fixture-to-document map, which `test/validate.py` reads. |
@@ -61,24 +61,32 @@ nothing but the CLI you typed.
 ## What the installers read and write
 
 Both do one thing: copy the seven skill directories out of the package into
-`~/.claude/skills/<name>`.
+`~/.claude/skills/<name>` — unless the sheleg-dev **plugin** is already installed
+in that home, in which case both refuse with exit 3 rather than write plain
+copies that would shadow the plugin's skills and serve this frozen version
+forever. `--force` overrides the refusal, deliberately.
 
-- **Read:** only files inside the package.
+- **Read:** files inside the package, plus two read-only looks at the target
+  home to decide the refusal above: `~/.claude/plugins/installed_plugins.json`
+  (the record of installed plugins; a missing or unparsable file reads as "no
+  plugin", so the check fails open and never crashes an install) and whether
+  `~/.claude/plugins/marketplaces/sheleg-dev` exists, kept only as a fallback
+  signal.
 - **Write:** only `~/.claude/skills/` — seven directories, named for the seven skills.
   Nothing else on the filesystem, nothing outside `$HOME`.
 - **Network: none.** Neither file opens a socket or resolves a hostname.
   `bin/sheleg-dev.js` requires `fs`, `path` and `os` and nothing else — no
   `child_process`, no `fetch`, no `http` — so it spawns no process at all;
-  `install.sh` runs only the coreutils named above. The grep below prints the
-  whole surface of both files in eleven lines.
+  `install.sh` runs only the shell tools named above. The grep below prints the
+  whole surface of both files in twelve lines.
 - **No telemetry, no analytics, no phone-home.** Nothing here has anywhere to
   send anything.
 
 **One destructive difference between the two installers.** `bin/sheleg-dev.js`
 skips a skill that is already installed and says so, unless you pass `--force`
-(`bin/sheleg-dev.js:45-46`). `install.sh` does not ask: for each of the seven names
+(`bin/sheleg-dev.js:89-90`). `install.sh` does not ask: for each of the seven names
 it runs `rm -rf` on the destination and re-copies, every time
-(`install.sh:21-22`). If you have hand-edited an installed skill, the shell
+(`install.sh:62-63`). If you have hand-edited an installed skill, the shell
 installer deletes your edits and the node installer does not.
 
 ## Credentials
@@ -193,14 +201,22 @@ node test/moneygate_test.js
 # The command prints its own count.
 node test/fixtures_test.js
 
+# Both installers against throwaway HOMEs: fresh install, rerun, --force, and the
+# plugin-present refusal — exit 3, the remedy naming the real plugin spec, nothing
+# written; a corrupt ~/.claude/plugins/installed_plugins.json fails open. The command
+# prints its own count.
+node test/installer_test.js
+
 # What the assertion packs cannot reach: NO OUTPUT, and grep exits 1 because it
 # matched nothing. `readFileSync` of the fixtures beside them is their whole I/O.
 grep -rnE "child_process|\bfetch\(|require\('(http|https|net|dns|tls)'\)|spawn\(|execFile|writeFileSync|appendFileSync|unlinkSync|process\.env\." \
   plugins/sheleg-dev/skills/*/fixtures/*.mjs
 
-# The entire I/O surface of the only two executable files: eleven lines. Three
-# built-in requires, the copy/mkdir/remove calls, homedir, and install.sh's
-# rm -rf + cp -R. No process, no socket, no network.
+# The entire I/O surface of the only two executable files: twelve lines. Three
+# built-in requires, the copy/mkdir/remove calls, homedir, install.sh's
+# rm -rf + cp -R, and one comment naming rm -rf. No process, no socket, no
+# network — the plugin-registry read that decides the shadow refusal is
+# readFileSync in the node file and sed in the shell one.
 grep -nE "require|child_process|exec|spawn|fetch|socket|rm -rf|cp -R|copyFileSync|mkdirSync|rmSync|homedir" bin/sheleg-dev.js install.sh
 
 # Live-key shapes across the skill payload: one line, and it is a placeholder.

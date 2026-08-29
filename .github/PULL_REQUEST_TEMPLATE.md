@@ -7,7 +7,7 @@
 <!-- Paste what you ran and what it printed. Both are required for any change. -->
 
 ```
-npm test    # python3 test/validate.py, node test/moneygate_test.js, node test/fixtures_test.js
+npm test    # python3 test/validate.py, node test/moneygate_test.js, node test/fixtures_test.js, node test/installer_test.js
 ```
 
 <!--
