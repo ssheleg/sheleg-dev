@@ -23,7 +23,7 @@ Agent Skills standard directly, scanning `~/.agents/skills` — where `npx skill
 add` puts this pack — at rank 500.
 
 The integration layer a product reaches once it has users: **money in, tracking,
-sign-in, and speed.**
+errors, sign-in, and speed.**
 
 Part of the [ssheleg skill family](https://github.com/ssheleg/sshlg-skills).
 

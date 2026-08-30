@@ -90,6 +90,8 @@ export function getStripe(): Stripe {
   if (!client) {
     const key = process.env.STRIPE_SECRET_KEY;
     if (!key) throw new Error("STRIPE_SECRET_KEY is not set");
+    // Pin checked 2026-08-30 — 2026-08-26.dahlia was already newer. Confirm
+    // against Stripe's changelog before pinning; this line goes stale monthly.
     client = new Stripe(key, { apiVersion: "2026-07-29.dahlia", maxNetworkRetries: 2 });
   }
   return client;
@@ -171,7 +173,7 @@ await stripe.checkout.sessions.create({
 
 `{CHECKOUT_SESSION_ID}` is substituted by Stripe, not rendered by you. On
 `2026-03-25.dahlia`+ an `integration_identifier` label lets you compare flows in
-the Dashboard.
+the Dashboard (floor checked 2026-08-30 against Stripe's changelog).
 
 Three decisions belong to `stripe-best-practices`: **usage-based billing**
 (Metronome for anything new; Billing Meters is a low-level primitive), **tax**

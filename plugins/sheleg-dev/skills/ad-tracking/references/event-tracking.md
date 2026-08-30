@@ -13,6 +13,8 @@
 - [Ecommerce Events](#ecommerce-events)
 - [SaaS / Subscription Events](#saas--subscription-events)
 - [trackEvent Wrapper Pattern](#trackevent-wrapper-pattern)
+- [User identification](#user-identification)
+- [UTM Attribution](#utm-attribution)
 
 ## Table of Contents
 
@@ -23,6 +25,8 @@
 - [Ecommerce Events](#ecommerce-events)
 - [SaaS / Subscription Events](#saas--subscription-events)
 - [trackEvent Wrapper Pattern](#trackevent-wrapper-pattern)
+- [User identification](#user-identification)
+- [UTM Attribution](#utm-attribution)
 
 ## Event Types
 
@@ -243,3 +247,38 @@ Moved out of `SKILL.md` on 2026-08-16: the body was 5273 tokens against a
 < 5000 budget, and identity is the other half of the question this file already
 owns — an event name says what happened, identity says who it happened to.
 
+
+---
+
+## UTM Attribution
+
+Moved out of `SKILL.md` on 2026-08-30: the body crossed the 4750-token house
+working limit when the Enhanced Conversions fix landed, and attribution
+parameters are schema — the question this file already owns.
+
+### Capture Flow
+
+1. `UtmCapture` component reads UTM params from URL on page load → stores in localStorage
+2. On registration (credentials): read UTM from localStorage, send in POST body, save to DB
+3. On registration (OAuth): UTM persists in localStorage through redirect → synced after return via API call
+4. Mixpanel `people.set_once()` stores initial UTM as permanent user properties
+5. Clear localStorage after successful DB sync
+
+### UTM Parameters
+
+| Parameter | Purpose | Example |
+|---|---|---|
+| `utm_source` | Traffic source | `google`, `facebook`, `newsletter` |
+| `utm_medium` | Marketing medium | `cpc`, `social`, `email` |
+| `utm_campaign` | Campaign name | `spring_sale_2025` |
+| `utm_content` | Ad creative variant | `banner_a`, `text_link` |
+| `utm_term` | Paid search keyword | `ai+chatbot` |
+
+### gclid / fbclid / li_fat_id
+
+Google, Meta, and LinkedIn append their own click IDs to URLs:
+- `gclid` — Google Ads click ID (stored in `_gcl_aw` cookie by gtag.js automatically)
+- `fbclid` — Meta click ID (stored in `_fbc` cookie by fbevents.js automatically)
+- `li_fat_id` — LinkedIn click ID (handled by Insight Tag)
+
+These are handled automatically by the respective SDKs. Do not strip them from URLs.

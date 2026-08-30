@@ -155,6 +155,31 @@ jobs:
             echo "OK: validator catches the rename that was missed on the way in"
           fi
 
+      - name: Negative self-test (a trigger literal advertised by two skills must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/trig-copy && cp -R . /tmp/trig-copy
+          python3 - <<'PY'
+          # DEV-01, measured 2026-08-29: google-auth and google-signin both advertised
+          # "google login", "GIS", "Sign In with Google" and the Russian sign-in phrase,
+          # so a host matching either description fired on both. The fix stripped the
+          # end-user set from google-auth; this plant puts two of them back and the
+          # validator must refuse the collision rather than let the next edit re-ship it.
+          p = "/tmp/trig-copy/plugins/sheleg-dev/skills/google-auth/SKILL.md"
+          s = open(p, encoding="utf-8").read()
+          old = 'Triggers - "google auth",'
+          assert old in s, "PLANT DID NOT LAND: google-auth description changed shape"
+          s2 = s.replace(old, 'Triggers - "google auth", "google login", "GIS",', 1)
+          assert s2 != s, "PLANT DID NOT LAND: the collision was not planted"
+          open(p, "w", encoding="utf-8").write(s2)
+          PY
+          if python3 /tmp/trig-copy/test/validate.py; then
+            echo "ERROR: validator accepted a trigger literal advertised by two skills"
+            exit 1
+          else
+            echo "OK: validator refuses a cross-skill trigger collision (DEV-01)"
+          fi
+
       - name: Negative self-test (CONTRIBUTING routing to a file we do not have must fail)
         run: |
           set -eu

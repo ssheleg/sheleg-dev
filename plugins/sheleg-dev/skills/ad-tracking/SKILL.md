@@ -157,7 +157,20 @@ Both share consent state, first-party cookies, and the dataLayer pipeline.
 
 Enhanced Conversions improve attribution by matching hashed user data (email, phone) with Google accounts. Setup:
 
-1. Enable in GA4 config: `allow_enhanced_conversions: true`
+1. Where the flag appears at all, it belongs on the **Google Ads config — the
+   `AW-` tag, never the GA4 `G-` tag** (an earlier revision of this skill put it
+   on the `G-` config, where it enables nothing for Ads):
+
+```javascript
+gtag('config', 'AW-XXXXXXXXX', { allow_enhanced_conversions: true });
+```
+
+   Checked 2026-08-30: Google's current setup docs
+   (`support.google.com/google-ads/answer/9888145`, `…/13258081`) no longer
+   document the flag at all — the live mechanism is the account-level toggle
+   (step 3) plus `user_data` (step 2). Keep the flag if your tag already
+   carries it; do not copy it onto the `G-` config.
+
 2. Set user data before conversion events fire:
 
 ```javascript
@@ -323,32 +336,10 @@ Strategies** for `next/script` strategy choice and SPA route changes.
   the parent page's.
 ## UTM Attribution
 
-### Capture Flow
-
-1. `UtmCapture` component reads UTM params from URL on page load → stores in localStorage
-2. On registration (credentials): read UTM from localStorage, send in POST body, save to DB
-3. On registration (OAuth): UTM persists in localStorage through redirect → synced after return via API call
-4. Mixpanel `people.set_once()` stores initial UTM as permanent user properties
-5. Clear localStorage after successful DB sync
-
-### UTM Parameters
-
-| Parameter | Purpose | Example |
-|---|---|---|
-| `utm_source` | Traffic source | `google`, `facebook`, `newsletter` |
-| `utm_medium` | Marketing medium | `cpc`, `social`, `email` |
-| `utm_campaign` | Campaign name | `spring_sale_2025` |
-| `utm_content` | Ad creative variant | `banner_a`, `text_link` |
-| `utm_term` | Paid search keyword | `ai+chatbot` |
-
-### gclid / fbclid / li_fat_id
-
-Google, Meta, and LinkedIn append their own click IDs to URLs:
-- `gclid` — Google Ads click ID (stored in `_gcl_aw` cookie by gtag.js automatically)
-- `fbclid` — Meta click ID (stored in `_fbc` cookie by fbevents.js automatically)
-- `li_fat_id` — LinkedIn click ID (handled by Insight Tag)
-
-These are handled automatically by the respective SDKs. Do not strip them from URLs.
+Read `references/event-tracking.md` → **UTM Attribution** for the capture flow
+(localStorage through OAuth redirects into the DB), the five-parameter table,
+and the platform click IDs (`gclid`/`fbclid`/`li_fat_id`) — which the SDKs
+handle automatically; do not strip them from URLs.
 
 ---
 
