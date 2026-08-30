@@ -246,6 +246,71 @@ def check_references_resolve_both_ways():
             )
 
 
+# A quoted trigger literal that two skills both advertise, ON PURPOSE, declared one
+# collision at a time with the reason. The key is (skill-a, skill-b, literal) with the
+# skills sorted; the value is why the shared literal is a decision rather than a drift.
+# Same shape as FOREIGN_BY_DESIGN below: an enumeration is honest where a rule would
+# guess, and a stale entry is a failure rather than a hole.
+TRIGGERS_SHARED_BY_DESIGN = {
+    ("crypto-payments", "stripe-billing", "webhook signature"):
+        "both rails own a webhook-signature seam and either skill answers the phrase "
+        "correctly for its rail; the umbrella routes it to stripe-billing "
+        "(lib/triggers.js), and crypto-payments labels its scheme as one provider's",
+}
+
+
+@check
+def check_trigger_literals_have_one_home():
+    """A quoted trigger literal lives in ONE skill's description, or is declared shared.
+
+    The defect, measured 2026-08-29 (audit row DEV-01): `google-auth` and `google-signin`
+    both advertised "google login", "GIS", "Sign In with Google" and «вход через Google»
+    in their front-matter descriptions -- four literal collisions between the skill that
+    owns end-user sign-in and the skill that owns the server library surface. A host
+    matching either description fires on both, and which one loads is the host's guess.
+    The fix stripped the end-user set from `google-auth`; this check is what stops the
+    next edit putting it back.
+
+    Compared on the QUOTED literals of the `Triggers -` segment, lowercased -- the same
+    strings a host matches on. Prose overlap is not a collision; two skills may both
+    discuss Google. An empty corpus fails: if no description carries a quoted trigger
+    list, this check is reading the wrong shape and must say so rather than pass.
+    """
+    quoted = {}
+    for name in skill_dirs:
+        block, _text = _skill_front_matter(name)
+        if block is None:
+            continue  # check_skill_front_matter owns the missing case
+        desc = scalar(block, "description") or ""
+        m = re.search(r"Triggers\s*-\s*(.*)$", desc)
+        if not m:
+            continue
+        literals = {t.lower() for t in re.findall(r'"([^"]+)"', m.group(1))}
+        if literals:
+            quoted[name] = literals
+    if not quoted:
+        fail("trigger collision: no skill description carries a quoted `Triggers -` "
+             "list -- an empty corpus makes this check pass everything, so either the "
+             "descriptions changed shape or this check went blind")
+        return
+    used = set()
+    for a, b in ((a, b) for i, a in enumerate(sorted(quoted)) for b in sorted(quoted)[i + 1:]):
+        for literal in sorted(quoted[a] & quoted[b]):
+            key = (a, b, literal)
+            if key in TRIGGERS_SHARED_BY_DESIGN:
+                used.add(key)
+                continue
+            fail(f"trigger collision: {a} and {b} both advertise {literal!r} in their "
+                 "front-matter descriptions (DEV-01). A host matching either fires on "
+                 "both, and which skill loads is the host's guess. Give the literal one "
+                 "home, or declare the pair in TRIGGERS_SHARED_BY_DESIGN with a reason")
+    for key, reason in TRIGGERS_SHARED_BY_DESIGN.items():
+        if key not in used:
+            fail(f"TRIGGERS_SHARED_BY_DESIGN carries {key!r} ({reason}) but the two "
+                 "descriptions no longer share that literal -- a stale exemption is a "
+                 "hole waiting for the next collision")
+
+
 # --------------------------------------------------------------- hygiene
 
 

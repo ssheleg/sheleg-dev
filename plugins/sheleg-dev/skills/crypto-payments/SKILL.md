@@ -24,7 +24,9 @@ production.
 This skill is provider-neutral. Concrete request/response shapes for one gateway
 live in [`references/heleket-provider.md`](references/heleket-provider.md);
 the invariants below hold for Coinbase Commerce, NOWPayments, BTCPay, Heleket
-and anything else that issues an invoice and calls you back.
+and anything else that issues an invoice and calls you back. One thing is NOT
+provider-neutral and is labeled where it appears: the webhook signature
+*algorithm*, which differs per gateway.
 
 > **Choosing a provider is a business and compliance decision, not a technical
 > one.** Crypto payment processors differ sharply in regulatory standing —
@@ -117,9 +119,20 @@ waterfall below.
 
 The callback is an unauthenticated public endpoint until you prove otherwise.
 
+**The `sign()` below is ONE provider's scheme — Heleket's:
+`md5(base64(json) + apiKey)`.** The *pattern* (constant-time compare, sign the
+raw body, verify before parsing) transfers; the algorithm does not. Checked
+2026-08-30: Coinbase Commerce signs with **HMAC-SHA256** of the raw body
+(`X-CC-Webhook-Signature`), NOWPayments with **HMAC-SHA512** of the
+sorted-key JSON (`x-nowpayments-sig`), BTCPay with **HMAC-SHA256**
+(`BTCPay-Sig`). Take the algorithm from your provider's own reference — for
+Heleket's full shapes see
+[`references/heleket-provider.md`](references/heleket-provider.md).
+
 ```ts
 import { createHash, timingSafeEqual } from 'node:crypto';
 
+// Heleket's scheme. Swap the digest for your provider — see the note above.
 function sign(payload: unknown, apiKey: string): string {
   const json = JSON.stringify(payload);
   return createHash('md5')

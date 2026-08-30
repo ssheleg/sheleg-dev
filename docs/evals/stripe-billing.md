@@ -82,7 +82,7 @@ run them before claiming the skill improves anything.
 
 ## Verified at authoring time
 
-- Body budget: ~4683 tokens by the house heuristic, 381 lines of body — both
+- Body budget: ~4737 tokens by the house heuristic, 383 lines of body — both
   recomputed by `test/validate.py` (`check_evals_numbers_are_computed`), because the
   three numbers this line used to carry were measured once and restated afterwards:
   `4994` tokens and `441` lines against a tree that measured 4747 and 409, plus

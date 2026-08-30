@@ -1,16 +1,16 @@
 ---
 name: google-auth
 description: >-
-  Use when implementing Google authentication in a Node.js or Python web application — Google
-  login, OAuth 2.0 flows, verifying Google ID tokens, service account authentication,
-  Application Default Credentials, Google Identity Services, Workload Identity Federation, API
-  keys, or working with google-auth-library (Node.js) or google-auth (Python). Covers ID token
-  verification and security best practices. Triggers - "google auth", "google login", "google
-  sign in", "OAuth 2.0 Google", "google-auth-library", "Sign In with Google", "Google Identity
-  Services", "GIS", "ADC", "Application Default Credentials", "service account", "Google ID
-  token", "verifyIdToken", "GOOGLE_APPLICATION_CREDENTIALS", "Google SSO", "вход через Google",
-  "авторизация Google", "сервисный аккаунт", "проверить ID-токен", "гугл-логин". For end-user
-  web sign-in only, use the google-signin skill instead.
+  Use when a server authenticates to Google in a Node.js or Python application — OAuth 2.0
+  flows, verifying Google ID tokens server-side, service account authentication and keys,
+  Application Default Credentials, Workload Identity Federation, API keys, or working with
+  google-auth-library (Node.js) or google-auth (Python). Covers server-side ID token
+  verification and security best practices. Triggers - "google auth", "OAuth 2.0 Google",
+  "google-auth-library", "ADC", "Application Default Credentials", "service account",
+  "Workload Identity Federation", "Google ID token", "verifyIdToken",
+  "GOOGLE_APPLICATION_CREDENTIALS", "Google SSO", "авторизация Google", "сервисный аккаунт",
+  "ключи сервисного аккаунта", "проверить ID-токен". For end-user web sign-in only, use the
+  google-signin skill instead.
 ---
 
 # Google Authentication for Node.js & Python
@@ -45,7 +45,7 @@ pip install google-api-python-client
 |--------|----------|-------------------|---------------------------|
 | **ADC** | Same identity for all users, server-to-server | `GoogleAuth` | `google.auth.default()` |
 | **OAuth 2.0** | Actions on behalf of end users | `OAuth2Client` | `google_auth_oauthlib.flow.Flow` |
-| **Sign In with Google (GIS)** | User sign-in/sign-up on websites | GIS JS SDK + `verifyIdToken()` | GIS JS SDK + `id_token.verify_oauth2_token()` |
+| **Sign In with Google (GIS)** | User sign-in/sign-up on websites — the google-signin skill's ground | GIS JS SDK + `verifyIdToken()` | GIS JS SDK + `id_token.verify_oauth2_token()` |
 | **JWT / Service Account** | Server-to-server, single identity | `JWT` | `service_account.Credentials` |
 | **API Key** | Public data, no user context | `OAuth2Client({ apiKey })` | passed to `googleapiclient.discovery.build(developerKey=)` |
 | **Compute** | On GCP with attached service account | `Compute` | `google.auth.compute_engine.Credentials` |
@@ -134,7 +134,7 @@ credentials = flow.credentials
 
 For the complete OAuth 2.0 flow (parameters, token exchange, refresh, revocation, incremental auth), see [references/oauth2-web-server.md](references/oauth2-web-server.md).
 
-### 3. Sign In with Google — ID Token Verification
+### 3. Verifying a Google ID Token — the library call
 
 **Node.js**
 
@@ -147,10 +147,6 @@ const ticket = await client.verifyIdToken({
   audience: WEB_CLIENT_ID,
 });
 const payload = ticket.getPayload();
-const userId = payload['sub'];
-const email = payload['email'];
-const name = payload['name'];
-const picture = payload['picture'];
 ```
 
 **Python**
@@ -159,22 +155,14 @@ const picture = payload['picture'];
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
-request = requests.Request()
-
-payload = id_token.verify_oauth2_token(
-    token,
-    request,
-    WEB_CLIENT_ID
-)
-user_id = payload['sub']
-email = payload['email']
-name = payload.get('name', '')
-picture = payload.get('picture')
+payload = id_token.verify_oauth2_token(token, requests.Request(), WEB_CLIENT_ID)
 ```
 
-Verification checks: JWT signature, `aud`, `exp`, `iss` (accounts.google.com).
-
-For GIS integration, CSRF protection, and hosted domain validation, see [references/sign-in-with-google.md](references/sign-in-with-google.md).
+The call checks signature, `aud`, `exp` and `iss` — **and nothing else**. That is
+the library contract, not the web sign-in contract: for the sign-in security
+checklist (`nonce` binding, `email_verified`, login-CSRF defense, account
+linking) use the **google-signin** skill — it is the one home for that contract,
+and this skill deliberately does not restate it.
 
 ### 4. JWT / Service Account
 
@@ -264,7 +252,7 @@ if credentials.expired and credentials.refresh_token:
 - Store `refresh_token` securely; it's only returned on first authorization
 - Validate external credential configurations before use (check `token_url`, `service_account_impersonation_url` point to googleapis.com)
 - Prefer Workload Identity Federation over service account keys for non-GCP environments
-- For GIS: verify `g_csrf_token` with double-submit-cookie pattern
+- For end-user web sign-in, apply the google-signin skill's full checklist — a partial restatement here is how the two skills drifted apart once already
 - **Python-specific**: reuse a single `google.auth.transport.requests.Request()` instance across verifications for connection pooling; do not create a new one per call in hot paths
 
 ## Reference Files

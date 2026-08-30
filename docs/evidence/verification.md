@@ -23,7 +23,7 @@ actually prints. Both were watched refusing a plant; see the SD-05 block.
 
 ---
 
-## Shipped state — v0.10.5
+## Shipped state — v0.11.0
 
 **The first v0.8.0 tag failed its own release, and this is the record of it.** The notice
 `install.sh` gained in this version — that the manual gate does not travel with a skills
@@ -57,7 +57,7 @@ Seven skills ship: `ad-tracking`, `crypto-payments`, `error-tracking`,
 
 | REQ | Requirement | Verified by | Result | Status |
 |---|---|---|---|---|
-| 001 | The structural validator passes on the shipped tree | `python3 test/validate.py` | `OK: sheleg-dev structurally valid (23 checks, 7 skill(s), v0.10.5)` — and the check count is now the length of the registry, so adding a check moves it. It used to be `10 + len(skill_dirs)`: adding a **skill** moved the number and adding a check did not, and four rows of this file read it as evidence that a guard had been added. `check_ledger_quotes_the_validator_verdict` compares this quoted string against the line the run prints, so it cannot drift again | **verified** |
+| 001 | The structural validator passes on the shipped tree | `python3 test/validate.py` | `OK: sheleg-dev structurally valid (24 checks, 7 skill(s), v0.11.0)` — and the check count is now the length of the registry, so adding a check moves it. It used to be `10 + len(skill_dirs)`: adding a **skill** moved the number and adding a check did not, and four rows of this file read it as evidence that a guard had been added. `check_ledger_quotes_the_validator_verdict` compares this quoted string against the line the run prints, so it cannot drift again | **verified** |
 | 002 | Every guard has been watched failing against a planted defect | CI run `32293489020` at `6f66255`, step-level conclusions of every `Negative self-test` step | **28 of 28 `success`**, 39 of 39 steps `success`, 0 failed steps in the run. This retires the *"CI has not seen any of this"* limitation that SD-01 through SD-04 each recorded separately: the four blocks below all ran in that one run, against the tagged tree | **verified** |
 | 003 | Version is synchronised across every surface | read back from `package.json`, `.claude-plugin/marketplace.json`, `plugins/sheleg-dev/.claude-plugin/plugin.json`, the top `## vX.Y.Z` in `CHANGELOG.md` | all four → `0.7.0` | **verified** |
 | 056 | `error-tracking` meets the Agent Skills standard and the house canon | `python3 audit_skill.py plugins/sheleg-dev/skills/error-tracking --house` (make-skill 0.23.0) | `0 GAP, 14 PASS` — description 943/970 chars, body 242 lines / ~2777 tokens against a 500/4750 working limit, every relative link resolves | **verified** |
@@ -353,6 +353,18 @@ documentation page, never recalled.
 | 071 | Both installers refuse to write beside the installed plugin, and the refusal was watched failing first | `node test/installer_test.js` — 11 cases over both channels against throwaway HOMEs | `PASS: installer — 11 case(s)`, `residue: this run left nothing`. Run against the **pre-refusal** installers first: **7 of 11 cases red, exit 1**, each red case showing the seven plain copies landing at exit 0 beside a declared plugin — the shadow this row exists to refuse. The refusal keys on `~/.claude/plugins/installed_plugins.json` (the record of what is installed; the remedy carries the real spec from it, `sheleg-dev@sshlg-skills` included), keeps the `marketplaces/` dir only as a fallback signal, exits 3 with the plugin-channel commands and the family-launcher line, offers `--force` as the explicit override, and reads an absent or corrupt registry as "no plugin" — fail open, never crash. Wired into `npm test` (fourth suite, derived into `CONTRIBUTING.md` and the PR template by `check_gate_commands_agree`) and into `validate.yml` as its own step | 2026-08-29 | **verified locally · unreleased** |
 | 072 | No shipped surface hand-counts the skills wrong, and both success paths say how the next version arrives | `python3 test/validate.py`; `grep -c '"description"' .claude-plugin/marketplace.json`; both installers against a fresh HOME | `.claude-plugin/marketplace.json` opened with *"Six integration skills"* while the validator counts **7** and README/SECURITY say seven — the same class as the v0.8.0 release failure and the REQ-070 npm description, a hand-written count beside a computed one. It now says seven and names error tracking. Both installers end their success path with the update line (`npx --yes sshlg-skills@latest update` and the channel's own rerun), asserted in `test/installer_test.js` for both channels, because an install that never says how the next version arrives is how a frozen copy gets mistaken for the current one | 2026-08-29 | **verified locally · unreleased** |
 
+Rows **073 through 076**, 2026-08-30. The 2026-08-29 skill audit (rows DEV-01 through
+DEV-05 of its evidence file) — a trigger collision between the two Google skills, a
+weaker duplicate of the sign-in contract, three undated external facts, and the social
+card the umbrella compares pixels against.
+
+| REQ | Requirement | Verified by | Result | Observed at | Status |
+|---|---|---|---|---|---|
+| 073 | A quoted trigger literal has one home, and the guard was watched failing in both directions | `python3 test/validate.py`; two plants against `/tmp` copies; `python3 test/negatives.py` | Before the fix, `google-auth` and `google-signin` shared `"google login"`, `"GIS"`, `"Sign In with Google"` and «вход через Google» — measured by extracting the quoted literals of every `Triggers -` segment and intersecting pairwise (audit DEV-01). The end-user set is stripped from `google-auth`; `check_trigger_literals_have_one_home` now refuses a collision, and both directions were watched: re-planting `"google login", "GIS"` → exit 1 naming both literals; deleting `webhook signature` from `crypto-payments` → exit 1 on the stale `TRIGGERS_SHARED_BY_DESIGN` entry (the one deliberate share — the umbrella's `lib/triggers.js` routes that phrase to `stripe-billing`). CI negative added; `MIN_EXPECTED` 42 → 43; verdict 23 → 24 checks | 2026-08-30 | **verified locally · unreleased** |
+| 074 | `google-auth` no longer re-teaches the sign-in verification with a weaker contract | reading both skills side by side (audit DEV-02); `python3 test/validate.py` | The old section 3 taught end-user ID-token verification omitting the `nonce` binding and `email_verified` — the two checks `google-signin` requires above the library call — so the weaker copy was the one a host loading `google-auth` would follow. Cut to the bare `verifyIdToken` / `verify_oauth2_token` call plus an explicit "checks signature, `aud`, `exp`, `iss` — and nothing else" and the pointer to `google-signin` as the one home for the sign-in checklist; the partial `g_csrf_token` bullet in Security Best Practices is now the same pointer. `references/` resolve both ways after the cut | 2026-08-30 | **verified locally · unreleased** |
+| 075 | Every external fact this release touched carries the date it was checked and what the source said | `docs.stripe.com/changelog` read 2026-08-30; `support.google.com/google-ads/answer/9888145` and `…/13258081` read 2026-08-30; provider webhook docs | Stripe: `2026-08-26.dahlia` is current, so the skill's `2026-07-29.dahlia` pin was already one release behind an undated claim in a document that says the API moves monthly (DEV-03) — both pin sites now dated. Crypto: the `sign()` block is labeled as Heleket's `md5(base64(json)+apiKey)` alone; Coinbase Commerce HMAC-SHA256, NOWPayments HMAC-SHA512, BTCPay HMAC-SHA256 (DEV-04). Ads: `allow_enhanced_conversions` belongs on the `AW-` config, never `G-` — and Google's current setup docs no longer document the flag at all, which the step now states rather than pretending the flag is the mechanism (DEV-05) | 2026-08-30 | **verified locally · unreleased** |
+| 076 | The committed social card is the one the umbrella will generate from the role cell that includes `errors` | `node` against the umbrella's `scripts/og-card.js`; `python3 test/social_preview.py`; pixel scan of the result | The umbrella's `site_test.js` compares `docs/assets/social-preview.png` byte-for-byte against `og.card({eyebrow: role, …})`. Invocation proven first: regenerating with the OLD cell (`integrations: money in, tracking, sign-in, speed`) reproduced the committed PNG **byte-identically**. Then regenerated with the cell the umbrella adopts — `integrations: money in, tracking, errors, sign-in, speed` — 1200×630, 8966 bytes, PNG checks green. Measured while doing it: at the chosen scale 3 the eyebrow paints to x=1198 (right margin **1 px**), because `fitScale` (`og-card.js:216`) measures `textWidth` without the `tracking` that `drawText` adds — nothing truncated, fix belongs upstream (board B-105) | 2026-08-30 | **verified locally · unreleased** |
+
 
 ## What these checks do not cover
 
@@ -374,7 +386,9 @@ reads as coverage it does not have.
   it, and vendor drift is this repository's largest untested exposure.
 - **`--force` and the bad-argument path.** CI exercises both against a fake HOME; REQ-006
   and REQ-007 cover the fresh and rerun-skip paths locally and stop there.
-- **The 42 negatives, one by one, on the shipped tree.** REQ-002 reads their step
-  conclusions from CI run `32293489020`, which ran the 28 that existed at the tag. The 14
-  added on 2026-08-20 were run locally as processes (SD-05, REQ-055) and have not yet been
-  seen by CI — the same gap, honestly one release old rather than four blocks deep.
+- **The negatives, one by one, on the shipped tree.** REQ-002 reads their step
+  conclusions from CI run `32293489020`, which ran the 28 that existed at that tag. The
+  suite is 43 as of v0.11.0 (the trigger-collision plant is the newest); every addition
+  since has been run locally as processes (`python3 test/negatives.py`, 43/43 refused)
+  and by CI on pull requests, but no post-v0.7.0 tagged run's step conclusions have been
+  read back into a REQ row — the same gap, honestly aged rather than hidden.

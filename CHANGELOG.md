@@ -4,6 +4,70 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.11.0 — a trigger literal gets one home, and four facts get their dates
+
+The 2026-08-29 skill audit found the pack's two Google skills advertising the same
+end-user sign-in triggers, one skill re-teaching another's contract more weakly, and
+three external facts stated without the date they were true on. All of it shipped green
+through a 23-check validator, because none of it was a check yet.
+
+- **`google-auth` and `google-signin` no longer compete for the same prompt** (audit
+  DEV-01, HIGH). Both front-matter descriptions carried `"google login"`, `"GIS"`,
+  `"Sign In with Google"` and «вход через Google» — four literal collisions between the
+  skill that owns end-user sign-in and the skill that owns the server library surface,
+  with which one loads left to the host's guess. The end-user set is stripped from
+  `google-auth`, whose description now speaks the server vocabulary (ADC, service
+  accounts and their keys, Workload Identity Federation, `verifyIdToken`); the
+  cross-deferral sentence stays. A new validator check,
+  `check_trigger_literals_have_one_home`, compares the quoted trigger literals of every
+  skill pair and refuses a collision — watched failing in both directions (a re-planted
+  `"google login"`, and a stale entry in `TRIGGERS_SHARED_BY_DESIGN`, the enumerated
+  exemption that carries the one deliberate share: `webhook signature`, which the
+  umbrella routes to `stripe-billing`). One new negative self-test in CI; the local
+  floor moves 42 → 43. The verdict line moves 23 → 24 checks.
+- **`google-auth` stops re-teaching ID-token verification with a weaker contract**
+  (DEV-02). Its section 3 taught the sign-in verification omitting the `nonce` binding
+  and `email_verified` — the two checks `google-signin`'s checklist adds above the
+  library call, drifting live under a section that duplicated the other skill's core
+  job. Cut to the bare `verifyIdToken` / `verify_oauth2_token` call plus an explicit
+  statement of what the call does NOT check and where the sign-in contract lives. The
+  partial `g_csrf_token` bullet in Security Best Practices is likewise now a pointer.
+- **The Stripe `apiVersion` pins carry their date** (DEV-03). `2026-07-29.dahlia` was
+  pinned undated in a document that itself says the API moves monthly — and it was
+  already one release behind: checked 2026-08-30 against `docs.stripe.com/changelog`,
+  where `2026-08-26.dahlia` is current. Both pin sites now say when they were true and
+  send the reader to the changelog before pinning.
+- **The crypto `sign()` block is labeled as ONE provider's scheme** (DEV-04). The
+  SKILL taught `md5(base64(json) + apiKey)` under a provider-neutral heading two
+  screens after claiming the section holds for four providers — it is Heleket's scheme
+  alone. Checked 2026-08-30: Coinbase Commerce signs HMAC-SHA256
+  (`X-CC-Webhook-Signature`), NOWPayments HMAC-SHA512 (`x-nowpayments-sig`), BTCPay
+  HMAC-SHA256 (`BTCPay-Sig`). The pattern transfers; the algorithm does not, and the
+  intro now says which is which.
+- **`allow_enhanced_conversions` moves to the tag it belongs on** (DEV-05). The setup
+  step put the flag on the GA4 `G-` config, where it enables nothing for Google Ads;
+  where it appears at all it belongs on the `AW-` config command. Checked 2026-08-30:
+  Google's current setup docs (`support.google.com/google-ads/answer/9888145`,
+  `…/13258081`) no longer document the flag — the live mechanism is the account-level
+  toggle plus `gtag('set', 'user_data', …)` — and the step now states both facts.
+- **`ad-tracking`'s UTM Attribution section moved into
+  `references/event-tracking.md`.** The DEV-05 fix pushed the body past the 4750-token
+  house working limit (23 tokens of headroom going in), and the house answer at the
+  limit is a split, not a trim — same seam as v0.10.0's cancellation split.
+  Body ~4753 tokens after the move; `stripe-billing`'s recomputed numbers in
+  `docs/evals/stripe-billing.md` moved with its dated pins (4737 tokens, 383 lines).
+- **The social card now names all five trades** (umbrella deferral, 2026-08-29). The
+  committed `docs/assets/social-preview.png` is compared pixel-for-pixel by the
+  umbrella's site test against the card it generates from its `skills.json` role cell,
+  and the role grows `errors` for the seventh skill. Regenerated with the umbrella's
+  own generator from the exact cell it will adopt — `integrations: money in, tracking,
+  errors, sign-in, speed` — verified by reproducing the previous committed card
+  byte-for-byte from the previous cell first. README and `marketplace.json` carry the
+  same five-trade phrasing. Measured while regenerating: at scale 3 the new eyebrow
+  paints to 1 px of the canvas edge, because the umbrella's `fitScale` measures without
+  the tracking `drawText` adds — nothing is truncated, and the fix (if wanted) belongs
+  in `og-card.js`, not here.
+
 ## v0.10.5 — the installers refuse the shadow they used to write
 
 Both install channels — `npx @ssheleg/sheleg-dev` and `install.sh` — now consult the

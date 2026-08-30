@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """COPIED from `seo-aeo-audit/test/negatives.py`, 2026-08-24, which was copied from
-`task-pipeline`'s. Four things differ from the original: the step floor (42, not 412), the property-check floor (0 -- this repository
+`task-pipeline`'s. Four things differ from the original: the step floor (43, not 412), the property-check floor (0 -- this repository
 has none yet), the lock name, and the success marker is matched case-insensitively --
 this repository prints `OK:` like the original, but the insensitivity is kept so the
 three copies stay one file rather than three dialects. Everything else is the same file, because
@@ -57,7 +57,7 @@ MIN_PROPS = 0
 # which is the floor doing half its job: it would have caught a total collapse and
 # not the loss of a third of the suite. Set it to the real count, and treat a
 # mismatch as a finding rather than as noise to be lowered away.
-MIN_EXPECTED = 42
+MIN_EXPECTED = 43
 
 # The success vocabulary, DECLARED rather than assumed, and this constant is the
 # whole lesson of porting this runner three times in one afternoon. Copying it
