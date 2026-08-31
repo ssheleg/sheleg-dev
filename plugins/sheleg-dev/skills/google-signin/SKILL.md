@@ -17,9 +17,8 @@ description: >-
 Condensed operating instructions. Full narrative guide with diagrams, token
 anatomy, troubleshooting table, and a copy-paste FastAPI + JS skeleton:
 [references/full-guide.md](references/full-guide.md) — read it when
-implementing from scratch. A live reference implementation exists in the
-Prowl repo (`0xDEV`): `web/auth.py`, `web/server.py:1657`
-(`/api/auth/google`), `web/static/js/app.js:16-110`.
+implementing from scratch; its FastAPI + JS skeleton is the reference
+implementation this skill ships.
 
 ## Pick the right flow first
 

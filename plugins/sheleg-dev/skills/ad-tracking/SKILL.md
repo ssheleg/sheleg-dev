@@ -180,7 +180,10 @@ gtag('set', 'user_data', {
 });
 ```
 
-3. Enable in Google Ads console: Tools → Conversions → Enhanced conversions → Turn on
+3. Enable in the Google Ads console: **Goals → Conversions → Settings →
+   Enhanced conversions → "Turn on enhanced conversions"** (checked 2026-08-31
+   against `support.google.com/google-ads/answer/13258081`; the old
+   Tools → Conversions path is gone from the redesigned UI)
 
 ### user_id (Cross-Device Tracking)
 
@@ -195,7 +198,11 @@ gtag('config', 'G-XXXXXXXXXX', {
 
 ### gclid Preservation Through External Redirects
 
-The `gclid` from Google Ads auto-tagging is stored in the `_gcl_aw` first-party cookie. This cookie persists across external redirects (e.g. Stripe Checkout → return URL) because it's set on your domain. No additional code needed.
+The `gclid` from Google Ads auto-tagging is stored in the `_gcl_aw` first-party
+cookie (~90-day default life). It survives external redirects (Stripe Checkout →
+return URL) because only expiry ends a cookie on your own domain — no extra code.
+Checked 2026-08-31; the caveat is Safari, where ITP caps JS-set cookies at 7
+days — 24 hours after a link-decorated navigation, which a gclid landing is.
 
 ### Google Ads console setup
 

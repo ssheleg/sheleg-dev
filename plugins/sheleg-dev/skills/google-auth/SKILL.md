@@ -27,6 +27,11 @@ npm install google-auth-library
 npm install googleapis
 ```
 
+The `client.fetch()` calls below require google-auth-library **≥ 10.1.0** (the
+fetch-compatible API landed in 10.1.0, 2025-06-12); on 9.x use
+`client.request()` with the same arguments. Checked 2026-08-31: latest is 11.x
+and keeps both methods.
+
 ### Python
 
 - `google-auth` — core auth library (google.oauth2, google.auth, credentials, transport)

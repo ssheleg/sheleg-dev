@@ -4,6 +4,48 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.11.1 — the evals stop being a plan, and the last tails get their receipts
+
+The 2026-08-29 skill audit left four tails (DEV-06 through DEV-08, DEV-10), and the
+eval suite's own RESULTS.md opened with "authored, schema-validated, never executed
+against a model". This release closes all four; that sentence is replaced by two dated
+model runs and the method that produced them.
+
+- **The behavioral evals cover all seven skills and carry dated runs** (DEV-10, board
+  B-103). Three scenarios are authored for the skills that had none — `crypto-payments`
+  (crediting under hostile deliveries), `error-tracking` (scrubbing layers and release
+  parity), `frontend-performance` (vitals moved and proven) — bringing `scenarios.json`
+  to six, green under `evals_validate.py` with the planted-defect self-test still
+  caught. Then the whole suite was executed on 2026-08-31: 14 trigger queries × 3 fresh
+  subagent sessions × 2 models (haiku, sonnet — 84 blind probes), plus all six
+  scenarios' expected-behavior lines scored against fresh sonnet implementation designs.
+  Haiku: train 23/24, validation 15/18. Sonnet: train 23/24, validation 16/18; scenario
+  lines 23/24 (s01's design named no refund-path test). Two findings are recorded
+  rather than tuned away: "Explain what LCP means" (q13, a negative case) pulls
+  `frontend-performance` in 5 of 6 runs across both models, and one sonnet run routed
+  the crypto implementation query to `task-pipeline` — coexistence changes routing,
+  exactly as the eval README warns. Method and its limits: `test/evals/RESULTS.md`.
+- **`ad-tracking`'s last two undated vendor facts were re-verified, and one was stale**
+  (DEV-06, B-104). The Enhanced Conversions step said `Tools → Conversions → …` — the
+  pre-redesign console path; checked 2026-08-31 against
+  `support.google.com/google-ads/answer/13258081`, the live path is **Goals →
+  Conversions → Settings → Enhanced conversions**, and the step now states it with its
+  date. The `_gcl_aw` claim was true but incomplete: the cookie's ~90-day default life
+  and the Safari ITP cap (JS-set cookies live 7 days, 24 hours after a link-decorated
+  navigation — which a gclid landing is) now sit beside the redirect-survival claim,
+  dated. Body ~4726 tokens of the 4750 house working limit.
+- **`google-signin` stops pointing installers at a private repository** (DEV-07,
+  B-102). The third sentence a reader met cited `web/server.py:1657` in the Prowl repo
+  as the live reference implementation — an address no installer can resolve (M-07).
+  The shipped `references/full-guide.md` FastAPI + JS skeleton is the reference
+  implementation, and the sentence now says so.
+- **`google-auth` states the major its own examples require** (DEV-08, B-101). The ADC
+  and JWT examples call `client.fetch()` while `npm install google-auth-library` pinned
+  nothing, so a reader on 9.x copied a method their client does not have. Checked
+  2026-08-31 against the library's CHANGELOG: the fetch-compatible API landed in
+  **10.1.0** (2025-06-12, PR #1939), `client.request()` is the 9.x form and survives in
+  the current 11.x. The install block now carries the floor, the fallback and the date.
+
 ## v0.11.0 — a trigger literal gets one home, and four facts get their dates
 
 The 2026-08-29 skill audit found the pack's two Google skills advertising the same
