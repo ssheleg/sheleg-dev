@@ -125,11 +125,36 @@ def scalar(block, key):
 
 # ---------------------------------------------------------------- versions
 
+PLUGIN_MANIFEST = "plugins/sheleg-dev/.claude-plugin/plugin.json"
+MARKETPLACE = ".claude-plugin/marketplace.json"
+
 pkg = load_json("package.json")
-plugin = load_json("plugins/sheleg-dev/.claude-plugin/plugin.json")
-market = load_json(".claude-plugin/marketplace.json")
+plugin = load_json(PLUGIN_MANIFEST)
+market = load_json(MARKETPLACE)
 
 version = pkg.get("version") if pkg else None
+
+# The live Claude Code schemas on SchemaStore, one per document type. An ALLOWLIST
+# rather than a pattern, because the address that was wrong here looked exactly right.
+# Measured 2026-08-31 with `curl -sSL -o /dev/null -w '%{http_code}'`, following
+# redirects to www.schemastore.org:
+#     claude-code-plugin.json           404   <- what both manifests declared until v0.11.2
+#     claude-code-plugin-manifest.json  200   "Claude Code Plugin Manifest"
+#     claude-code-marketplace.json      200   "Claude Code Plugin Marketplace"
+# That those two still RESOLVE, and that these documents still validate against what
+# they serve, is `test/check_schemas.py` — deliberately outside `npm test`, which must
+# stay offline and stdlib-only. This half cannot fetch, so it pins. Both halves read
+# this one map: two checks with two copies of a URL is how the copies disagree.
+#
+# The shape of this guard is telegram-dev's (its `test/validate.py` check 14 and
+# `test/check_schemas.py`, shipped 2026-08-31 in its 0263b89), adopted here because
+# its sweep is what found this defect.
+SCHEMA_HOST = "https://json.schemastore.org/"
+SCHEMA_FOR = {
+    MARKETPLACE: SCHEMA_HOST + "claude-code-marketplace.json",
+    PLUGIN_MANIFEST: SCHEMA_HOST + "claude-code-plugin-manifest.json",
+}
+DEAD_SCHEMAS = {SCHEMA_HOST + "claude-code-plugin.json": "404"}
 
 
 @check
@@ -152,6 +177,76 @@ def check_one_version_four_files():
             src = entry.get("source", "")
             if not os.path.isdir(os.path.join(ROOT, src.lstrip("./"))):
                 fail(f"marketplace.json: source {src!r} does not exist")
+
+
+@check
+def check_schema_declared_at_the_root_and_right_for_the_document():
+    """A `$schema` is read at the document ROOT or it is not read at all.
+
+    v0.11.2 fixed the dead `claude-code-plugin.json` address the two manifests
+    declared. It fixed the NAME and left the marketplace's declaration where it
+    already sat — inside `plugins[0]`, one level below the root, where nothing
+    reads it. `json.load(f).get("$schema")` on that document returned None: the
+    marketplace had no effective declaration at all, and the release that closed
+    the defect reads exactly like the release that closed it.
+
+    That is the failure this guard is shaped around. A position is not a name, and
+    a check that compares only names calls an inert declaration conformant. So the
+    root is read first and its absence is its own refusal, and the nested position
+    is refused separately — decoration below the root is worse than nothing, because
+    it hides the absence of the declaration that counts.
+
+    Three ways to be wrong, three branches: absent, dead, or the wrong document type.
+    A marketplace is not a plugin manifest and the two shapes genuinely differ.
+    Measured 2026-08-31 against what SchemaStore serves:
+
+        marketplace  required ['name', 'owner', 'plugins'];
+                     each plugins[] entry required ['name', 'source']
+        manifest     required ['name'] — and no `source` key at all
+
+    so the wrong schema is a SILENT defect in one direction and a loud one in the
+    other. This repository's manifest checked against the marketplace schema raises
+    2 errors ('owner' and 'plugins' are required). Its marketplace checked against
+    the manifest schema raises ZERO — the manifest schema requires only `name` and
+    neither root sets `additionalProperties: false`, so a marketplace pointed at its
+    sibling's schema validates clean while nothing appropriate to it is checked.
+    That is why the map above is an allowlist and not a "does it validate" test: for
+    the direction that matters here, validating proves nothing.
+
+    The same measurement explains why the fourth branch cannot be delegated either.
+    The served marketplace schema lists `$schema` among the permitted properties of a
+    plugins[] ENTRY, so the inert declaration was schema-legal — a conformance run
+    over that document would have passed it in v0.11.2 and did. Position is not
+    expressible as validity here; only a guard that reads the root can say it.
+
+    Pinning is not proof that the address still resolves. `test/check_schemas.py`
+    is the half that looks; this half runs offline, in `npm test`, forever.
+    """
+    docs = {MARKETPLACE: market, PLUGIN_MANIFEST: plugin}
+    for rel, want in SCHEMA_FOR.items():
+        doc = docs[rel]
+        if doc is None:                      # already reported by load_json
+            continue
+        got = doc.get("$schema")
+        if got is None:
+            fail(f"{rel}: declares no $schema at the document root — every editor and "
+                 f"validator that would check this document has nothing to fetch; "
+                 f"declare {want}")
+        elif got in DEAD_SCHEMAS:
+            fail(f"{rel}: $schema is {got!r}, which SchemaStore answers with "
+                 f"{DEAD_SCHEMAS[got]} — a dead address reads as conformance while "
+                 f"nothing checks the document; use {want}")
+        elif got != want:
+            fail(f"{rel}: $schema is {got!r}, not the schema for this document type — "
+                 f"a marketplace is not a plugin manifest and the two shapes differ "
+                 f"(a marketplace entry requires `source`, a manifest has no such key); "
+                 f"use {want}")
+    for entry in (market or {}).get("plugins", []):
+        if "$schema" in entry:
+            fail(f"{MARKETPLACE}: plugin entry {entry.get('name')!r} carries its own "
+                 f"$schema, which is inert — below the document root nothing reads it, "
+                 f"so a declaration there is decoration that hides the absence of the "
+                 f"root one. This shipped in v0.11.2.")
 
 
 @check
@@ -1911,13 +2006,20 @@ def check_routed_triggers_still_advertised():
 
 # ---------------------------------------------------------------- verdict
 
-for _fn in CHECKS:
-    _fn()
+# Guarded, so this file can be IMPORTED for its constants without running the suite
+# and exiting the importer. `test/check_schemas.py` reads `SCHEMA_FOR` from here so
+# the address map has one home; before the guard, that import ran all 25 checks and
+# called `sys.exit`, and the online half could never have been written against it.
+# Every other caller — CI, the release gate, all 47 negative plants — runs this file
+# as a script, where the guard changes nothing.
+if __name__ == "__main__":
+    for _fn in CHECKS:
+        _fn()
 
-if FAILURES:
-    print(f"FAIL: {len(FAILURES)} problem(s)", file=sys.stderr)
-    for f in FAILURES:
-        print(f"  - {f}", file=sys.stderr)
-    sys.exit(1)
+    if FAILURES:
+        print(f"FAIL: {len(FAILURES)} problem(s)", file=sys.stderr)
+        for f in FAILURES:
+            print(f"  - {f}", file=sys.stderr)
+        sys.exit(1)
 
-print(verdict_line())
+    print(verdict_line())
