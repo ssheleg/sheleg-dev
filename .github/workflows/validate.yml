@@ -930,6 +930,96 @@ jobs:
             echo "OK: the snippet is compared against the plugin manifest"
           fi
 
+      # Four plants for one check, because the defect it was written for was four
+      # failures wearing one line. v0.11.2 fixed the ADDRESS and left the declaration
+      # in the inert nested position, so the marketplace had no root $schema at all
+      # and the release that closed the defect read exactly like the release that
+      # closed it. Restoring any one of these four puts the tree back in a state that
+      # has shipped here looking correct.
+      - name: Negative self-test (a $schema in the inert nested position must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/schema-nested && cp -R . /tmp/schema-nested
+          python3 - <<'PY'
+          # The exact v0.11.2 shape: a correctly NAMED schema, one level below the
+          # root, where nothing reads it. The served marketplace schema permits
+          # `$schema` on a plugins[] entry, so this plant is schema-LEGAL — no
+          # conformance run can reject it, which is why the guard reads position.
+          import json
+          p = "/tmp/schema-nested/.claude-plugin/marketplace.json"
+          d = json.load(open(p, encoding="utf-8"))
+          d["plugins"][0]["$schema"] = "https://json.schemastore.org/claude-code-marketplace.json"
+          json.dump(d, open(p, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
+          d2 = json.load(open(p, encoding="utf-8"))
+          assert "$schema" in d2["plugins"][0], "PLANT DID NOT LAND: no nested $schema"
+          PY
+          if python3 /tmp/schema-nested/test/validate.py; then
+            echo "ERROR: an inert nested \$schema passed — this is v0.11.2 restored"
+            exit 1
+          else
+            echo "OK: a \$schema below the document root is refused as inert"
+          fi
+
+      - name: Negative self-test (a marketplace with no root $schema must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/schema-absent && cp -R . /tmp/schema-absent
+          python3 - <<'PY'
+          import json
+          p = "/tmp/schema-absent/.claude-plugin/marketplace.json"
+          d = json.load(open(p, encoding="utf-8"))
+          assert d.pop("$schema", None), "PLANT DID NOT LAND: no root $schema to remove"
+          json.dump(d, open(p, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
+          assert json.load(open(p, encoding="utf-8")).get("$schema") is None, "PLANT DID NOT LAND"
+          PY
+          if python3 /tmp/schema-absent/test/validate.py; then
+            echo "ERROR: a marketplace declaring no \$schema at its root passed"
+            exit 1
+          else
+            echo "OK: an absent root declaration is its own refusal"
+          fi
+
+      - name: Negative self-test (the dead $schema address restored must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/schema-dead && cp -R . /tmp/schema-dead
+          python3 - <<'PY'
+          # claude-code-plugin.json — what both manifests declared until v0.11.2.
+          # SchemaStore answers it 404, so it reads as conformance while nothing checks.
+          p = "/tmp/schema-dead/.claude-plugin/marketplace.json"
+          s = open(p, encoding="utf-8").read()
+          s2 = s.replace("claude-code-marketplace.json", "claude-code-plugin.json", 1)
+          assert s2 != s, "PLANT DID NOT LAND: the marketplace schema address moved"
+          open(p, "w", encoding="utf-8").write(s2)
+          PY
+          if python3 /tmp/schema-dead/test/validate.py; then
+            echo "ERROR: the dead 404 schema address passed"
+            exit 1
+          else
+            echo "OK: the dead claude-code-plugin.json address is refused by name"
+          fi
+
+      - name: Negative self-test (a $schema naming the wrong document type must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/schema-wrongtype && cp -R . /tmp/schema-wrongtype
+          python3 - <<'PY'
+          # The manifest pointed at the MARKETPLACE schema. Measured 2026-08-31: this
+          # direction raises 2 validation errors ('owner', 'plugins' required) — but
+          # the reverse raises none, so the guard pins the map instead of validating.
+          p = "/tmp/schema-wrongtype/plugins/sheleg-dev/.claude-plugin/plugin.json"
+          s = open(p, encoding="utf-8").read()
+          s2 = s.replace("claude-code-plugin-manifest.json", "claude-code-marketplace.json", 1)
+          assert s2 != s, "PLANT DID NOT LAND: the manifest schema address moved"
+          open(p, "w", encoding="utf-8").write(s2)
+          PY
+          if python3 /tmp/schema-wrongtype/test/validate.py; then
+            echo "ERROR: a manifest declaring the marketplace schema passed"
+            exit 1
+          else
+            echo "OK: each document is pinned to the schema for its own type"
+          fi
+
       - name: install.sh syntax check
         run: bash -n install.sh
 

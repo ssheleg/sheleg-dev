@@ -57,7 +57,7 @@ MIN_PROPS = 0
 # which is the floor doing half its job: it would have caught a total collapse and
 # not the loss of a third of the suite. Set it to the real count, and treat a
 # mismatch as a finding rather than as noise to be lowered away.
-MIN_EXPECTED = 43
+MIN_EXPECTED = 47
 
 # The success vocabulary, DECLARED rather than assumed, and this constant is the
 # whole lesson of porting this runner three times in one afternoon. Copying it

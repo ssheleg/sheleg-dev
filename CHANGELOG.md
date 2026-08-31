@@ -4,6 +4,59 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.11.3 — the schema address was fixed in a position nothing reads
+
+v0.11.2 corrected the `$schema` **name** in both manifests and left the marketplace's
+declaration where it already sat: inside `plugins[0]`, one level below the document
+root. Nothing reads it there. Measured before changing anything, which is how it was
+confirmed rather than assumed:
+
+```
+$ python3 -c "import json; print(list(json.load(open('.claude-plugin/marketplace.json')).keys()))"
+['name', 'owner', 'description', 'plugins']          # no $schema at all
+```
+
+So the pack shipped a release whose whole subject was a `$schema` address, and ended it
+with a marketplace document that had **no effective declaration** — reading, from the
+outside, exactly like the release that fixed it. Found by `telegram-dev`'s family-wide
+sweep on 2026-08-31, not by re-reading v0.11.2.
+
+- **The declaration moved to the document root** of `.claude-plugin/marketplace.json`,
+  with the marketplace schema, and the inert nested copy is gone. Root keys are now
+  `['$schema', 'name', 'owner', 'description', 'plugins']`. The plugin manifest's own
+  root declaration was already present and already the *manifest* schema — checked, not
+  presumed.
+- **Both documents were validated against the schema each one declares**, fetched from
+  the address it names: marketplace → 200 `'Claude Code Plugin Marketplace'`, manifest →
+  200 `'Claude Code Plugin Manifest'`, both validating clean under `jsonschema` 4.26.0.
+  The shapes genuinely differ, so the wrong schema is its own defect: a marketplace
+  requires `['name', 'owner', 'plugins']` and each `plugins[]` entry requires
+  `['name', 'source']`; a manifest requires `['name']` and has no `source` key.
+- **A guard, so the inert position cannot come back** — `test/validate.py` check 25
+  reads `$schema` from the **root** and refuses four ways: absent, the dead
+  `claude-code-plugin.json` name, the wrong document type, and a declaration nested in a
+  `plugins[]` entry. Its shape is adopted from `telegram-dev`'s check 14 and
+  `test/check_schemas.py` (its `0263b89`), with credit in both files.
+- **`test/check_schemas.py`** is the half that looks: it resolves every declared address
+  and validates the document against what is served. Deliberately outside `npm test`,
+  which stays offline and stdlib-only. Both halves import one `SCHEMA_FOR` map, so the
+  addresses have a single home — which required putting `validate.py`'s verdict block
+  under `if __name__ == "__main__"`, since importing it previously ran the suite and
+  exited the importer.
+
+**Two things measured while doing this, and they are why the guard pins addresses
+instead of just validating.** The served marketplace schema lists `$schema` among the
+permitted properties of a `plugins[]` entry — so v0.11.2's inert declaration was
+schema-**legal**, and no conformance run could ever have rejected it. And this
+repository's marketplace checked against the *manifest* schema raises **zero** errors,
+because that schema requires only `name` and neither root sets
+`additionalProperties: false`; the reverse raises two. For the direction that mattered
+here, validating proves nothing — only a guard that reads the root can.
+
+Four planted defects, each watched failing by name; the negatives floor is re-derived
+by `python3 test/negatives.py --list` (43 → 47) and the verdict moves 24 → 25 checks.
+No behavioural change to any skill.
+
 ## v0.11.2 — the schema address the manifests declared returns 404
 
 A sibling repository's wave-3 run (agent-stack) measured that
