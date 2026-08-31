@@ -11,7 +11,7 @@
       "displayName": "Sheleg Dev",
       "source": "./plugins/sheleg-dev",
       "description": "The integration layer a product needs once it has users: Stripe subscription billing reconciled into your own database, crypto payments that survive over-payment and duplicate webhooks, ad and conversion tracking under Consent Mode v2, Google sign-in with the account-linking guards, the wider Google auth surface, and Core Web Vitals work that moves the score, and Sentry error tracking wired so it does not forward your own credentials to a third party and so a stack trace names the commit that caused it.",
-      "version": "0.11.0",
+      "version": "0.11.1",
       "author": {
         "name": "ssheleg",
         "url": "https://x.com/sshlg93"

@@ -46,6 +46,51 @@
         "Stores and rotates refresh credentials server-side",
         "Defines revocation, re-consent and error handling"
       ]
+    },
+    {
+      "id": "s04",
+      "title": "Crypto crediting under hostile deliveries",
+      "skills": [
+        "crypto-payments"
+      ],
+      "query": "Accept crypto payments for plan upgrades and credit the user's balance when an invoice is paid.",
+      "files": [],
+      "expected_behavior": [
+        "Credits on the webhook or a server-side status poll, never on the redirect back to the success page",
+        "Processes repeated webhook deliveries idempotently so a retried callback cannot credit twice",
+        "Maps provider statuses to an explicit terminal set that names underpayment, overpayment and AML holds",
+        "Credits the received amount through a fixed fallback order rather than assuming the invoiced amount arrived"
+      ]
+    },
+    {
+      "id": "s05",
+      "title": "Sentry without leaking, releases that attribute",
+      "skills": [
+        "error-tracking"
+      ],
+      "query": "Add Sentry to our Python backend so production errors are reported with the commit that caused them.",
+      "files": [],
+      "expected_behavior": [
+        "Scrubs secrets by key name AND inside string values before events leave the process",
+        "Uses one identical version string for the SDK release and the release-creation commands",
+        "Keeps release bookkeeping non-fatal so a deploy that reached production is not reported as failed",
+        "Treats the DSN and auth tokens as different classes of credential with different placement rules"
+      ]
+    },
+    {
+      "id": "s06",
+      "title": "Core Web Vitals moved and proven",
+      "skills": [
+        "frontend-performance"
+      ],
+      "query": "Our landing page scores 61 on mobile PageSpeed. Get LCP and CLS into the green and prove the change.",
+      "files": [],
+      "expected_behavior": [
+        "Measures before changing anything and re-measures after, rather than shipping unverified fixes",
+        "Distinguishes the three Core Web Vitals from lab diagnostics like TBT and Speed Index",
+        "Maps each failing audit to a specific code-level cause before fixing it",
+        "Prioritizes fixes by impact, starting with render-blocking resources"
+      ]
     }
   ]
 }
