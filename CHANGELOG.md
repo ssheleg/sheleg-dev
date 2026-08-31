@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.11.2 — the schema address the manifests declared returns 404
+
+A sibling repository's wave-3 run (agent-stack) measured that
+`json.schemastore.org/claude-code-plugin.json` — the `$schema` both of this pack's
+manifests declared — redirects to a 404. Verified here with `curl -sL` on 2026-08-31
+before changing anything: the old address 404s, the two below return 200.
+
+- **`plugins/sheleg-dev/.claude-plugin/plugin.json`** now declares
+  `claude-code-plugin-manifest.json`, and **`.claude-plugin/marketplace.json`** declares
+  `claude-code-marketplace.json` — which also fixes a second, quieter defect: the
+  marketplace file had been pointing at the *plugin* schema, so even when the address
+  resolved it named the wrong contract. Both strings match what agent-stack verified
+  and ships. No behavioural change; `claude plugin validate --strict` does not fetch
+  the URL, which is why this shipped green through every gate.
+
 ## v0.11.1 — the evals stop being a plan, and the last tails get their receipts
 
 The 2026-08-29 skill audit left four tails (DEV-06 through DEV-08, DEV-10), and the
