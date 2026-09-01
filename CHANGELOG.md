@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## v0.11.4 — the registry card stopped lagging what ships
+
+`SKILL-CARD.md` carries the fields Anthropic's Skills-for-enterprise guidance asks every
+organisation to keep — *"written so somebody who did not build this can decide"*. It said
+`0.10.3` while this package shipped `0.11.3`.
+
+**Nothing read it, so it could only drift.** The version moves in `package.json`,
+`plugin.json` and `marketplace.json` on every release; the card was in no list. Measured
+2026-09-01 across the family: **four of nine cards were behind** — `agent-stack` by ten
+minor releases, `sheleg-design` by six, `super-ux` by four, this one by one.
+
+The same check now sits in each of them, which is this family's own rule that a class
+seen twice becomes a script. It refuses a card whose `Version` row disagrees with
+`package.json`, and refuses a card that states no version at all: one a reader cannot see
+go stale is worse than one that lags visibly. Watched failing before it shipped.
+
+Checks 25 → **26**, and `REQ-001`'s quoted gate line moves with it — the ledger's own
+guard caught the restated output before this entry was written, which is what that guard
+is for.
+
 ## v0.11.3 — the schema address was fixed in a position nothing reads
 
 v0.11.2 corrected the `$schema` **name** in both manifests and left the marketplace's
