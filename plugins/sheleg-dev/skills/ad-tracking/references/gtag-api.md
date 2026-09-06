@@ -6,7 +6,6 @@ Source: [Google Tag Platform — gtag.js](https://developers.google.com/tag-plat
 
 ## Contents
 
-- [Table of Contents](#table-of-contents)
 - [Overview](#overview)
 - [Installation](#installation)
 - [Tag ID Formats](#tag-id-formats)
@@ -16,22 +15,6 @@ Source: [Google Tag Platform — gtag.js](https://developers.google.com/tag-plat
 - [Multi-Product Configuration](#multi-product-configuration)
 - [Next.js / React Integration](#nextjs--react-integration)
 
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Installation](#installation)
-- [Tag ID Formats](#tag-id-formats)
-- [Commands](#commands)
-  - [config](#config)
-  - [event](#event)
-  - [set](#set)
-  - [get](#get)
-  - [consent](#consent)
-- [Parameter Scope & Precedence](#parameter-scope--precedence)
-- [Data Routing](#data-routing)
-- [Multi-Product Configuration](#multi-product-configuration)
-- [Next.js / React Integration](#nextjs--react-integration)
 
 ## Overview
 

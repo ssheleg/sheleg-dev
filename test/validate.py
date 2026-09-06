@@ -2041,6 +2041,40 @@ def check_routed_triggers_still_advertised():
         _disclose_routing(f"routed triggers — {(proc.stderr or 'the checker could not look').strip()}")
 
 
+@check
+def check_reference_anchors_resolve():
+    """Every intra-document `](#anchor)` in a shipped skill doc names a real heading.
+
+    Found twice in two audit rounds before this existed (2026-09-06/07):
+    `error-tracking`'s setup.md listed a section that never existed at any commit,
+    and `google-auth` carried a second, stale table of contents whose FedCM entry
+    pointed at a reworded heading. A Contents list is the first door an agent walks
+    through; a dangling entry reads as depth the file does not have.
+
+    Slugs use GitHub's NON-collapsing rule: punctuation drops, EVERY whitespace
+    character becomes one hyphen, and runs are never collapsed — a heading with an
+    em dash anchors with two hyphens, and a collapsing slugger disagrees with every
+    such heading (the umbrella paid for that on 2026-08-14, 22 false failures over a
+    clean shelf). Fenced code blocks are stripped first: a `](#…)` inside an example
+    is data, not a link.
+    """
+    docs = sorted(glob.glob(os.path.join(ROOT, "plugins/sheleg-dev/skills/*/references/*.md")))
+    docs += sorted(glob.glob(os.path.join(ROOT, "plugins/sheleg-dev/skills/*/SKILL.md")))
+    if not docs:
+        fail("anchor check: found no shipped docs to read — the glob is wrong, not the tree")
+        return
+    for md in docs:
+        prose = re.sub(r"```[\s\S]*?```", "", open(md, encoding="utf-8").read())
+        slugs = set()
+        for h in re.findall(r"^#{1,6}\s+(.+?)\s*$", prose, re.M):
+            s = re.sub(r"[^\w\s-]", "", h.replace("`", "").lower())
+            slugs.add(re.sub(r"\s", "-", s))
+        for anchor in re.findall(r"\]\(#([^)\s]+)\)", prose):
+            if anchor not in slugs:
+                fail(f"{os.path.relpath(md, ROOT)}: link `#{anchor}` resolves to no "
+                     "heading in the file — a Contents entry pointing nowhere is depth "
+                     "the file does not have")
+
 
 # ---------------------------------------------------------------- verdict
 

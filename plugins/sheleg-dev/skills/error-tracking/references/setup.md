@@ -8,7 +8,6 @@ refused and you need to tell a policy problem from an auth problem.
 - [Install](#install)
 - [Authenticate](#authenticate)
 - [Token taxonomy — which kind can do what](#token-taxonomy--which-kind-can-do-what)
-- [Find what already exists](#find-what-already-exists)
 - [Create a project](#create-a-project)
 - [Get the DSN and wire it in](#get-the-dsn-and-wire-it-in)
 - [Declare the MCP server](#declare-the-mcp-server)

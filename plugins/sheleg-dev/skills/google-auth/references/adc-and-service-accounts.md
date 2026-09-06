@@ -3,19 +3,6 @@
 
 ## Contents
 
-- [Table of Contents](#table-of-contents)
-- [ADC Overview](#adc-overview)
-- [ADC Search Order](#adc-search-order)
-- [Setting Up ADC](#setting-up-adc)
-- [Using ADC in Code](#using-adc-in-code)
-- [Service Account Keys (JWT)](#service-account-keys-jwt)
-- [Compute Credentials](#compute-credentials)
-- [Impersonated Credentials](#impersonated-credentials)
-- [Downscoped Client](#downscoped-client)
-- [ID Tokens](#id-tokens)
-- [Environment Variables](#environment-variables)
-
-## Table of Contents
 - [ADC Overview](#adc-overview)
 - [ADC Search Order](#adc-search-order)
 - [Setting Up ADC](#setting-up-adc)
