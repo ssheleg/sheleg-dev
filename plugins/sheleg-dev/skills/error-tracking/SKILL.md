@@ -10,11 +10,9 @@ description: >-
   "set up error tracking", "SENTRY_DSN", "sentry-cli", "sentry mcp", "scrub secrets from
   errors", "release tracking", "suspect commits", "why is Sentry empty", "подключить Sentry",
   "трекинг ошибок", "секреты в Sentry", "релизы в Sentry", "наблюдаемость". NOT for judging an
-  agent's trajectory (agent-evals), triaging tickets in a tracker (triage-issue), or choosing an
-  uptime vendor.
+  agent's trajectory (agent-evals), triaging tickets in a tracker (your tracker's own triage
+  skill), or choosing an uptime vendor.
 license: MIT
-metadata:
-  version: 0.9.2
 ---
 
 # error-tracking — Sentry wired so it does not leak, and so a stack trace names a commit

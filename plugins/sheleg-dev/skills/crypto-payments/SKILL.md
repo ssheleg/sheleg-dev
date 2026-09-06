@@ -11,6 +11,7 @@ description: >-
   checkout", "pay with crypto", "USDT payment", "TRC20", "payment webhook", "IPN", "webhook
   signature", "underpayment", "Heleket", "NOWPayments", "приём криптоплатежей", "оплата
   криптой", "вебхук платежа", "недоплата". Not for card billing — use stripe-billing.
+license: MIT
 ---
 
 # Crypto payments

@@ -11,6 +11,7 @@ description: >-
   "enhanced conversions", "retargeting", "purchase event", "CAPI", "gclid", "UTM",
   "attribution", "отслеживание конверсий", "пиксель Meta", "согласие на куки", "ретаргетинг",
   "аналитика рекламы". Not for running the ad campaigns themselves.
+license: MIT
 ---
 
 # Advertising Analytics & Conversion Tracking Integration
@@ -364,31 +365,11 @@ failure this whole skill exists to prevent, and it looks fine in every test
 that starts by accepting.
 ## Troubleshooting
 
-### Common Issues
-
-| Problem | Cause | Fix |
-|---|---|---|
-| No events in GA4 | Consent defaults not set before gtag.js loads | Ensure consent `default` call is **before** the script tag |
-| CSP violations in console | Missing domain in CSP header | Add the domain to the correct CSP directive |
-| Meta Pixel not firing | Consent-gated component not rendering | Check localStorage consent value, check CustomEvent listener |
-| Duplicate `PageView` events | Multiple pixel instances or route change listeners | Ensure pixel init code has `if(f.fbq)return;` guard |
-| Purchase events without value | Missing `value`/`currency` params | Both GA4 and Meta **require** these for conversion optimisation |
-| Advanced Matching not working | `fbq('init')` called before pixel SDK loads | Ensure `fbevents.js` is loaded before calling `setFbAdvancedMatching()` |
-| Enhanced Conversions not matching | `user_data` set after conversion event | Call `setEnhancedConversionData()` **before** the conversion event fires |
-| gclid lost after Stripe redirect | — (shouldn't happen) | `_gcl_aw` cookie is first-party, persists across redirects |
-| Events firing on localhost | Missing `isLocal` guard | Add `if (window.location.hostname === 'localhost') return;` |
-
-### Debug Mode
-
-Enable debug logging for local development:
-
-```typescript
-const isLocal = window.location.hostname === "localhost";
-if (isLocal) {
-  console.debug("[Analytics]", eventName, params);
-  return; // don't fire real events
-}
-```
+Read `references/performance-security.md` → **Troubleshooting** for the
+common-issues table (consent ordering, duplicate `PageView`, Advanced/Enhanced
+Matching timing, the localhost guard) and the debug-mode snippet. The two seen
+most: consent `default` must run **before** gtag.js loads, and a purchase
+without `value`/`currency` cannot be optimised against by either platform.
 
 ---
 

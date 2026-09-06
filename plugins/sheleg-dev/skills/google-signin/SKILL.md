@@ -10,6 +10,7 @@ description: >-
   "google.accounts.id", "gsi/client", "verify google token", "one tap", "account linking",
   "login csrf", "g_csrf_token", "вход через Google", "кнопка входа Google", "связать аккаунты",
   "проверить токен Google". For the broader library surface use google-auth instead.
+license: MIT
 ---
 
 # Google Sign-In (GIS) — production web login

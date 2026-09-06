@@ -314,18 +314,15 @@ product decision `stripe-best-practices` owns.
 
 - **At period end is the default** — the user keeps what they paid for and
   `status` stays `active`. Under **flexible** `billing_mode` a portal
-  cancellation sets `cancel_at` and leaves `cancel_at_period_end` **false**, so a
-  banner reading that boolean tells a customer who cancelled ten seconds ago that
-  their plan renews. Store the timestamp, derived from both fields.
+  cancellation sets `cancel_at` and leaves `cancel_at_period_end` **false** —
+  derive "is cancelling" from both fields, never from the boolean alone.
 - **Do the teardown in `customer.subscription.deleted`**, never beside the API
   call, so one path serves your UI, the portal and dunning alike.
 - On `invoice.payment_failed`, mark `past_due` and notify — do not cancel.
   Stripe's dunning decides the retries and the terminal state.
-- **A save offer's eligibility is yours.** Stripe's cancel page shows a coupon
-  card when you pass `flow_data.subscription_cancel.retention`, but a coupon
-  cannot be restricted to one customer and a `duration=once` discount leaves
-  `subscription.discounts` once its invoice finalizes. Ask Stripe whether this
-  customer was already discounted and the answer is no, every month, forever.
+- **A save offer's eligibility is yours.** Stripe cannot answer "was this
+  customer already discounted" — a `duration=once` discount leaves
+  `subscription.discounts` at finalization — so track eligibility yourself.
 
 Both, with the code:
 [`references/cancellation-and-retention.md`](references/cancellation-and-retention.md).
