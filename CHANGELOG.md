@@ -1,4 +1,9 @@
-## v0.11.6 — the fifth version surface is retired, and one audit finding is refused by a guard that already knew
+## v0.11.7 — the fifth version surface is retired, and one audit finding is refused by a guard that already knew
+
+> **v0.11.6 is a burned tag.** It was pushed before the release PR merged, in a repository
+> that squash-merges — so it points beside `main` at `7088752`, the release run refused it
+> at *The tag must be reachable from the default branch*, and the remote forbids tag
+> deletion. Nothing shipped under it; this version is the same tree, tagged on `main`.
 
 A family audit (2026-09-06, `sshlg-skills` wave `AUDIT-WAVE-0906`) read all seven skills
 against the standard. What it found here, closed:
