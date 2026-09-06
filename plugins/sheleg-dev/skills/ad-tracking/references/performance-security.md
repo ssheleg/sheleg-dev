@@ -5,20 +5,9 @@
 
 ## Contents
 
-- [Table of Contents](#table-of-contents)
 - [Script Loading Strategies](#script-loading-strategies)
 - [Content Security Policy](#content-security-policy)
 - [Next.js / React Integration](#nextjs--react-integration)
-- [SPA (Single Page Application) Handling](#spa-single-page-application-handling)
-- [Debug & Testing](#debug--testing)
-- [Common Mistakes](#common-mistakes)
-- [Multi-Page Consistency](#multi-page-consistency)
-- [Troubleshooting](#troubleshooting)
-
-## Table of Contents
-
-- [Script Loading Strategies](#script-loading-strategies)
-- [Content Security Policy](#content-security-policy)
 - [SPA (Single Page Application) Handling](#spa-single-page-application-handling)
 - [Debug & Testing](#debug--testing)
 - [Common Mistakes](#common-mistakes)

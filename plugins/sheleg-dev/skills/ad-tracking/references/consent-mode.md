@@ -5,7 +5,6 @@
 
 ## Contents
 
-- [Table of Contents](#table-of-contents)
 - [Status check — 2026](#status-check--2026)
 - [Advanced vs Basic Mode](#advanced-vs-basic-mode)
 - [All Consent Types](#all-consent-types)
@@ -16,17 +15,6 @@
 - [Tag Behavior When Denied](#tag-behavior-when-denied)
 - [URL Passthrough](#url-passthrough)
 - [Ads Data Redaction](#ads-data-redaction)
-- [Verification](#verification)
-
-## Table of Contents
-
-- [Advanced vs Basic Mode](#advanced-vs-basic-mode)
-- [All Consent Types](#all-consent-types)
-- [Region-Specific Defaults](#region-specific-defaults)
-- [Granular Consent](#granular-consent)
-- [Consent Update Flow](#consent-update-flow)
-- [GTM Implementation](#gtm-implementation)
-- [Tag Behavior When Denied](#tag-behavior-when-denied)
 - [Verification](#verification)
 
 ## Status check — 2026

@@ -1020,6 +1020,30 @@ jobs:
             echo "OK: each document is pinned to the schema for its own type"
           fi
 
+      - name: Negative self-test (a dangling Contents anchor must fail)
+        run: |
+          set -eu
+          rm -rf /tmp/anchor-plant && cp -R . /tmp/anchor-plant
+          python3 - <<'PY'
+          # Two audit rounds found dangling ToC entries by READING; this proves the
+          # validator now reads them. The plant recreates the exact defect
+          # error-tracking shipped from its first commit through v0.11.7.
+          p = "/tmp/anchor-plant/plugins/sheleg-dev/skills/error-tracking/references/setup.md"
+          s = open(p, encoding="utf-8").read()
+          marker = "## Contents\n"
+          assert marker in s, "PLANT DID NOT LAND: setup.md lost its Contents heading"
+          i = s.index(marker) + len(marker)
+          planted = s[:i] + "- [A section that never existed](#a-section-that-never-existed)\n" + s[i:]
+          assert planted != s, "PLANT DID NOT LAND: nothing changed"
+          open(p, "w", encoding="utf-8").write(planted)
+          PY
+          if python3 /tmp/anchor-plant/test/validate.py 2>&1 | grep -q "resolves to no"; then
+            echo "OK: validator FAILs — a Contents entry pointing nowhere is refused"
+          else
+            echo "ERROR: the anchor check went dormant and a dangling entry shipped green"
+            exit 1
+          fi
+
       - name: install.sh syntax check
         run: bash -n install.sh
 

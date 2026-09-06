@@ -3,7 +3,6 @@
 
 ## Contents
 
-- [Table of Contents](#table-of-contents)
 - [Overview](#overview)
 - [Client-Side Integration](#client-side-integration)
 - [Server-Side ID Token Verification](#server-side-id-token-verification)
@@ -16,19 +15,6 @@
 - [Flask Integration Pattern](#flask-integration-pattern)
 - [FedCM — mandatory, not a migration you are planning](#fedcm--mandatory-not-a-migration-you-are-planning)
 - [Sign Out](#sign-out)
-
-## Table of Contents
-- [Overview](#overview)
-- [Client-Side Integration](#client-side-integration)
-- [Server-Side ID Token Verification](#server-side-id-token-verification)
-- [CSRF Protection](#csrf-protection)
-- [Nonce Verification](#nonce-verification)
-- [ID Token Payload Fields](#id-token-payload-fields)
-- [Account Linking Flows](#account-linking-flows)
-- [Next.js / React Integration Pattern](#nextjs--react-integration-pattern)
-- [FastAPI Integration Pattern](#fastapi-integration-pattern)
-- [Flask Integration Pattern](#flask-integration-pattern)
-- [FedCM Migration](#fedcm-migration)
 
 ## Overview
 

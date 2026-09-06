@@ -5,19 +5,6 @@
 
 ## Contents
 
-- [Table of Contents](#table-of-contents)
-- [Event Types](#event-types)
-- [Recommended Events](#recommended-events)
-- [Custom Events](#custom-events)
-- [Parameter Rules](#parameter-rules)
-- [Ecommerce Events](#ecommerce-events)
-- [SaaS / Subscription Events](#saas--subscription-events)
-- [trackEvent Wrapper Pattern](#trackevent-wrapper-pattern)
-- [User identification](#user-identification)
-- [UTM Attribution](#utm-attribution)
-
-## Table of Contents
-
 - [Event Types](#event-types)
 - [Recommended Events](#recommended-events)
 - [Custom Events](#custom-events)

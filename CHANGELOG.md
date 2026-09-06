@@ -1,3 +1,24 @@
+## v0.11.8 — a Contents entry pointing nowhere is depth the file does not have
+
+The family audit's second round (2026-09-07) read the eight reference files that
+carry tables of contents and found the class the first round had walked past:
+
+- **`error-tracking/references/setup.md` listed a section that never existed at any
+  commit** — `git log -S'## Find what already exists'` is empty; the entry was born
+  dangling when the skill was created. Removed.
+- **Eight files carried TWO tables of contents**: the generated `## Contents` (v0.3.1)
+  sat on top of the older hand-kept `## Table of Contents`, which is where the one
+  genuinely broken anchor lived — `google-auth`'s `#fedcm-migration` pointed at a
+  heading reworded to *FedCM — mandatory, not a migration you are planning*. The
+  stale lists are gone; the generated one stays.
+- **The class is closed, not just the instances**: `check_reference_anchors_resolve`
+  reads every shipped `references/*.md` and `SKILL.md`, strips fenced code, and
+  resolves each intra-document `](#anchor)` against headings slugged by GitHub's
+  NON-collapsing rule (an em-dash heading anchors with two hyphens — the umbrella
+  measured 22 false failures from a collapsing slugger on 2026-08-14). Watched
+  firing on the replanted setup.md entry before being believed; a workflow negative
+  keeps it honest from here. Validator: 26 → **27 checks**.
+
 ## v0.11.7 — the fifth version surface is retired, and one audit finding is refused by a guard that already knew
 
 > **v0.11.6 is a burned tag.** It was pushed before the release PR merged, in a repository
