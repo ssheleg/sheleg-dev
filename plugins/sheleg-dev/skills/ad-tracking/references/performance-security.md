@@ -13,6 +13,7 @@
 - [Debug & Testing](#debug--testing)
 - [Common Mistakes](#common-mistakes)
 - [Multi-Page Consistency](#multi-page-consistency)
+- [Troubleshooting](#troubleshooting)
 
 ## Table of Contents
 
@@ -22,6 +23,7 @@
 - [Debug & Testing](#debug--testing)
 - [Common Mistakes](#common-mistakes)
 - [Multi-Page Consistency](#multi-page-consistency)
+- [Troubleshooting](#troubleshooting)
 
 ## Script Loading Strategies
 
@@ -288,3 +290,34 @@ terser js/consent.js -o js/consent.min.js -c -m
 ```
 
 Use the minified version in production, source version in development.
+
+## Troubleshooting
+
+Moved here from `SKILL.md` — the lookup table for symptoms whose causes are
+covered in the sections above.
+
+### Common Issues
+
+| Problem | Cause | Fix |
+|---|---|---|
+| No events in GA4 | Consent defaults not set before gtag.js loads | Ensure consent `default` call is **before** the script tag |
+| CSP violations in console | Missing domain in CSP header | Add the domain to the correct CSP directive |
+| Meta Pixel not firing | Consent-gated component not rendering | Check localStorage consent value, check CustomEvent listener |
+| Duplicate `PageView` events | Multiple pixel instances or route change listeners | Ensure pixel init code has `if(f.fbq)return;` guard |
+| Purchase events without value | Missing `value`/`currency` params | Both GA4 and Meta **require** these for conversion optimisation |
+| Advanced Matching not working | `fbq('init')` called before pixel SDK loads | Ensure `fbevents.js` is loaded before calling `setFbAdvancedMatching()` |
+| Enhanced Conversions not matching | `user_data` set after conversion event | Call `setEnhancedConversionData()` **before** the conversion event fires |
+| gclid lost after Stripe redirect | — (shouldn't happen) | `_gcl_aw` cookie is first-party, persists across redirects |
+| Events firing on localhost | Missing `isLocal` guard | Add `if (window.location.hostname === 'localhost') return;` |
+
+### Debug Mode
+
+Enable debug logging for local development:
+
+```typescript
+const isLocal = window.location.hostname === "localhost";
+if (isLocal) {
+  console.debug("[Analytics]", eventName, params);
+  return; // don't fire real events
+}
+```

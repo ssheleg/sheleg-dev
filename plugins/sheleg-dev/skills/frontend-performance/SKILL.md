@@ -11,6 +11,7 @@ description: >-
   "render-blocking", "bundle size", "code splitting", "lazy loading", "cache headers",
   "performance budget", "ускорить сайт", "медленно грузится", "оптимизация скорости", "вес
   бандла". Not for visual design or conversion work.
+license: MIT
 ---
 
 # Frontend Performance

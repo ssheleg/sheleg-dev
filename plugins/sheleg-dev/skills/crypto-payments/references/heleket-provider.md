@@ -174,8 +174,9 @@ than Stripe's and the difference decides the design:
 | Key also signs webhooks | no, a separate `whsec_` | **yes, the same value** |
 
 So the house pattern — declare the environment in a variable separate from the secret,
-then assert at boot that the two agree (the `stripe-billing` skill, `references/price-integrity.md`,
-*Test and live mode*) — applies, but its Stripe implementation does not: there is no key
+then assert at boot that the two agree (the `stripe-billing` skill,
+`../stripe-billing/references/price-integrity.md`, *Test and live mode*) — applies, but its
+Stripe implementation does not: there is no key
 prefix to read. The comparison has to be made against something else, and Heleket gives
 exactly two candidates, both non-secret:
 

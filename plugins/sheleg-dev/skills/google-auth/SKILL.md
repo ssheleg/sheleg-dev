@@ -11,6 +11,7 @@ description: >-
   "GOOGLE_APPLICATION_CREDENTIALS", "Google SSO", "авторизация Google", "сервисный аккаунт",
   "ключи сервисного аккаунта", "проверить ID-токен". For end-user web sign-in only, use the
   google-signin skill instead.
+license: MIT
 ---
 
 # Google Authentication for Node.js & Python
