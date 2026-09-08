@@ -62,6 +62,10 @@ Run `node assert-money-invariants.mjs` and each line names the invariant it hold
 | `proration-invoice-grants-nothing` | cycle + proration | gives a month of product for a $40 proration invoice |
 | `sequential-redelivery-grants-once` | cycle + redelivery | answers `received` twice and sends the renewal notice and the server-side conversion twice |
 | `concurrent-redelivery-grants-once` | cycle + redelivery, in flight together | both deliveries pass the marker's `SELECT` and both credit |
+| `crash-after-receipt-is-retryable` | cycle (worker dies) + redelivery | tells the retry "duplicate" about work that never finished — the payment is swallowed forever |
+| `in-flight-claim-answers-retry-later` | cycle (worker dies) + redelivery | answers `duplicate` to a retry while the first worker may still be mid-grant |
+| `completion-is-recorded-with-the-grant` | cycle | leaves the claim row saying `processing` after answering done — every later retry reads it as a corpse |
+| `duplicate-of-completed-never-regrants` | cycle + redelivery, aged past the claim expiry | takes the completed row over as if the worker had died, and grants again |
 | `sequential-redelivery-grants-once-by-count-alone` | cycle + redelivery | *nothing* — kept because that is the finding; see below |
 | `reconciliation-does-not-regrant` | cycle | the nightly repair grants a period the webhook already granted |
 | `out-of-order-pair-does-not-rewind-state` | February then January | stores the older period, so the renewal date points at a period that ended |
@@ -80,7 +84,9 @@ a line a generated handler routinely omits:
 
 | Rule | The code it removes | The generated handler that ships without it |
 |---|---|---|
-| `claim` | `if (!store.claimEvent(event.id)) return duplicate` | reads the processed table, then writes it — two deliveries 40 ms apart both pass the read |
+| `claim` | the whole claim block at the top of `deliver` | reads the processed table, then writes it — two deliveries 40 ms apart both pass the read |
+| `claim-completion` | `store.completeEvent(event.id)` after the grant commits | leaves every row at `processing`, so a retry past the claim expiry reprocesses a completed event |
+| `claim-expiry` | the takeover of a `processing` row older than `CLAIM_TTL_MS` | answers "in flight" forever for a worker that died — received quietly read as completed |
 | `billing-reason` | `if (invoice.billing_reason !== 'subscription_cycle') return` | handles `invoice.paid` as "a payment arrived" |
 | `grant-marker` | `if (granted.has(period.start)) return` | grants whenever an event says paid, including from the reconciliation job |
 | `ordering` | `if (period.start > mirror.periodStart)` around the mirror write | writes whatever arrived last |

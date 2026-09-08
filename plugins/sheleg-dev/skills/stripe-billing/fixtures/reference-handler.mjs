@@ -21,6 +21,15 @@
 
 export const RULES = Object.freeze([
   'claim',
+  // A claim records RECEIPT, and only `completeEvent` records completion. Without this
+  // rule the row never leaves 'processing', so a retry arriving after the claim expiry
+  // takes the event over and grants a second time — received quietly read as completed.
+  'claim-completion',
+  // The recovery half of the same split: a 'processing' claim older than CLAIM_TTL_MS
+  // belonged to a worker that died between receipt and completion, and a retry may take
+  // it over. Without this rule the crashed claim answers "in flight" forever and the
+  // payment is swallowed.
+  'claim-expiry',
   'billing-reason',
   'grant-marker',
   'ordering',
@@ -50,6 +59,11 @@ export const RULES = Object.freeze([
 /** Credits one paid period is worth. Arbitrary; the assertions count grants, not credits. */
 export const CREDITS_PER_PERIOD = 500;
 
+/** How long a 'processing' claim may sit before a retry may take it over. In production:
+ *  comfortably longer than your slowest handler run (say, twice the route timeout). The
+ *  store keeps a logical clock, so the assertions can age a claim without waiting. */
+export const CLAIM_TTL_MS = 5 * 60 * 1000;
+
 /** The save offer this handler is willing to make. Yours, not Stripe's -- a coupon cannot
  *  be restricted to one customer, so the identity of the offer has to live on your side. */
 export const RETENTION_OFFER_ID = 'cancel-50-once';
@@ -61,7 +75,11 @@ const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 export function createStore() {
   return {
-    processedEvents: new Set(),
+    processedEvents: new Map(), // event id -> { state: 'processing'|'completed', claimedAt }
+    clock: 0, // logical ms; advanced by tests, never read from the wall
+    advanceClock(ms) {
+      this.clock += ms;
+    },
     grantedPeriods: new Map(), // subscription id -> Set of period starts already granted
     subscriptions: new Map(), // the mirrored row: period, status, quantity, price
     purchases: new Map(), // payment intent -> { amount, refundedTotal } (minor units)
@@ -74,14 +92,44 @@ export function createStore() {
     notifications: [], // side effects that must not run twice
     log: [],
 
-    /** An INSERT on a primary key: atomic, and the only claim that survives a race. */
+    /** An INSERT on a primary key: atomic, and the only claim that survives a race.
+     *  The row it writes says 'processing' — a RECEIPT. What the caller does with an
+     *  existing row is a decision about states, so this returns one:
+     *  'claimed' (new row), 'completed' (real duplicate), 'expired' (a worker died
+     *  holding it), 'in_flight' (someone fresh is on it — answer retry-later). */
     claimEvent(id) {
-      if (this.processedEvents.has(id)) return false;
-      this.processedEvents.add(id);
+      const row = this.processedEvents.get(id);
+      if (!row) {
+        this.processedEvents.set(id, { state: 'processing', claimedAt: this.clock });
+        return 'claimed';
+      }
+      if (row.state === 'completed') return 'completed';
+      return this.clock - row.claimedAt >= CLAIM_TTL_MS ? 'expired' : 'in_flight';
+    },
+    /** The takeover: an UPDATE guarded by the same staleness test it was granted for —
+     *  atomic, so two retries racing for one corpse cannot both win. */
+    reclaimEvent(id) {
+      const row = this.processedEvents.get(id);
+      if (!row || row.state !== 'processing'
+          || this.clock - row.claimedAt < CLAIM_TTL_MS) return false;
+      row.claimedAt = this.clock;
       return true;
     },
+    /** Receipt becomes completion, explicitly — inside the grant transaction, so a row
+     *  that says 'completed' is one whose business write committed. */
+    completeEvent(id) {
+      const row = this.processedEvents.get(id);
+      if (row && row.state === 'processing') {
+        row.state = 'completed';
+        row.completedAt = this.clock;
+      }
+    },
+    /** Only for a handler that THREW and answered 5xx: the claim goes back so the retry
+     *  need not wait out the expiry. A crashed worker never reaches this line — that is
+     *  what the expiry is for. */
     releaseEventClaim(id) {
-      this.processedEvents.delete(id);
+      const row = this.processedEvents.get(id);
+      if (row && row.state === 'processing') this.processedEvents.delete(id);
     },
 
     async readGrantedPeriods(subId) {
@@ -393,11 +441,26 @@ export function createHandler(store, options = {}) {
     }
   }
 
-  /** The route Stripe posts to. Signature verification is the caller's; see SKILL.md. */
-  async function deliver(event) {
-    if (has('claim') && !store.claimEvent(event.id)) {
-      return { status: 200, body: { received: true, duplicate: true } };
+  /** The route Stripe posts to. Signature verification is the caller's; see SKILL.md.
+   *  `opts.crashAfterClaim` simulates the process dying between receipt and completion:
+   *  no release, no completion, no answer — the case a boolean claim turns into a
+   *  swallowed payment, because the row already says "seen". */
+  async function deliver(event, opts = {}) {
+    if (has('claim')) {
+      let claim = store.claimEvent(event.id);
+      if (claim === 'expired') {
+        claim = has('claim-expiry') && store.reclaimEvent(event.id) ? 'claimed' : 'in_flight';
+      }
+      if (claim === 'completed') {
+        return { status: 200, body: { received: true, duplicate: true } };
+      }
+      if (claim === 'in_flight') {
+        // Honest answer: somebody is (or may still be) working this event. 5xx makes
+        // Stripe retry THIS delivery too, so whichever worker dies, the event survives.
+        return { status: 500, body: { error: 'in flight' } };
+      }
     }
+    if (opts.crashAfterClaim) return { status: 0, body: null }; // the worker is gone
     let afterCommit = [];
     try {
       afterCommit = await handle(event);
@@ -405,6 +468,9 @@ export function createHandler(store, options = {}) {
       if (has('claim')) store.releaseEventClaim(event.id);
       return { status: 500, body: { error: 'handler error' } };
     }
+    // Receipt becomes completion in the same commit as the grant. A handler that
+    // answers 200 without this line has told Stripe "done" about work only received.
+    if (has('claim') && has('claim-completion')) store.completeEvent(event.id);
     for (const effect of afterCommit) effect(); // side effects run after the commit
     return { status: 200, body: { received: true } };
   }

@@ -220,18 +220,40 @@ cannot mask the defect — which is the only reason this fixture measures the or
 
 ## Idempotency store
 
+A claim records **receipt**, and only completion records **completion**. A row that
+cannot tell the two apart turns every crash between them into a swallowed payment: the
+retry is told "duplicate" about work that never finished. So the row carries a state —
+`'processing'` on claim, `'completed'` exactly once, in the same transaction as the
+grant — and a claim on an existing row answers by that state, never by mere existence.
+
 ```sql
 CREATE TABLE processed_webhook_events (
   id           TEXT PRIMARY KEY,      -- Stripe's evt_… id
   source       TEXT NOT NULL,         -- 'stripe' — the table serves every provider
-  processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  state        TEXT NOT NULL DEFAULT 'processing',  -- 'processing' → 'completed', nothing else
+  claimed_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at TIMESTAMPTZ            -- set once, in the transaction that granted
 );
-CREATE INDEX ON processed_webhook_events (processed_at);
+CREATE INDEX ON processed_webhook_events (state, claimed_at);
 ```
 
-- `claimEvent` = `INSERT`; unique violation means duplicate.
-- `releaseEventClaim` = `DELETE`, called only when processing threw.
-- Prune older than ~30 days on a schedule. Stripe stops retrying after three
+- `claimEvent` = `INSERT`; a unique violation is not yet an answer — read the row's
+  state. `'completed'` means duplicate: answer 200 and stop. `'processing'` younger
+  than the claim expiry means another worker is (or may still be) on it: answer 5xx so
+  this delivery retries too. `'processing'` older than the expiry belonged to a worker
+  that died between receipt and completion — take it over with an `UPDATE … SET
+  claimed_at = now() WHERE id = … AND state = 'processing' AND claimed_at < now() -
+  <expiry>`, one row updated means the takeover is yours, zero means somebody beat you.
+- `completeEvent` = `UPDATE … SET state = 'completed', completed_at = now()` — inside
+  the transaction that writes the grant, so a row that says completed is one whose
+  business write committed.
+- `releaseEventClaim` = `DELETE … WHERE state = 'processing'`, called only when
+  processing threw and the route answered 5xx. A crashed worker never reaches this
+  line — that is what the expiry exists for.
+- The claim expiry is comfortably longer than your slowest handler run (say, twice the
+  route timeout). Too short reprocesses live work; there is no "too long" that loses an
+  event, only one that delays its recovery.
+- Prune completed rows older than ~30 days on a schedule. Stripe stops retrying after three
   days, so anything older is dead weight — but do not prune to a window shorter
   than the retry window, or a late retry reprocesses.
 - A failure to *claim* (database down) is a 503, never an optimistic "probably
@@ -243,6 +265,16 @@ delivery to answer `duplicate` and the renewal notice and the conversion to fire
 `concurrent-redelivery-grants-once` delivers both **at the same time**, which is the fixture
 that separates this claim from the per-period marker, because the marker reads before it
 writes and the claim does not.
+
+**The crash between receipt and completion is proved too.**
+`crash-after-receipt-is-retryable` kills the worker after the claim and requires the
+retry arriving past the claim expiry to be let in and to grant;
+`in-flight-claim-answers-retry-later` requires the retry arriving *inside* the window
+to be told 5xx come back — not "duplicate", which is an answer about a completed row;
+`completion-is-recorded-with-the-grant` requires the claim row to leave `'processing'`
+the moment the grant commits; and `duplicate-of-completed-never-regrants` ages a
+completed row past the expiry and requires the late retry to answer duplicate and
+grant nothing. All four run against `fixtures/reference-handler.mjs`.
 
 ## What to log
 

@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import {
-  createStore, createHandler, subscriptionIdOf, RULES, CREDITS_PER_PERIOD,
+  createStore, createHandler, subscriptionIdOf, RULES, CREDITS_PER_PERIOD, CLAIM_TTL_MS,
 } from './reference-handler.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -117,7 +117,9 @@ export const INVARIANTS = [
     id: 'sequential-redelivery-grants-once',
     fixtures: [CYCLE_JAN, CYCLE_JAN_REDELIVERY],
     states: 'the same evt_ delivered twice grants once AND runs its side effects once',
-    breaks: ['claim', 'grant-on-renewal'],
+    // `claim-completion` is here because "duplicate" is an answer about a COMPLETED row:
+    // a handler that never marks completion answers the redelivery in-flight instead.
+    breaks: ['claim', 'claim-completion', 'grant-on-renewal'],
     async run({ store, handler, assert }) {
       const first = await handler.deliver(fixture(CYCLE_JAN));
       const second = await handler.deliver(fixture(CYCLE_JAN_REDELIVERY));
@@ -143,13 +145,76 @@ export const INVARIANTS = [
         handler.deliver(fixture(CYCLE_JAN)),
         handler.deliver(fixture(CYCLE_JAN_REDELIVERY)),
       ]);
-      const bodies = [a.body, b.body];
       assert.equal(store.grants.length, 1, 'both deliveries granted');
       assert.equal(store.credits.get('usr_PLACEHOLDER_alice'), CREDITS_PER_PERIOD,
         'the user was credited twice for one renewal');
       assert.equal(store.conversions.length, 1, 'the conversion fired twice');
-      assert.equal(bodies.filter((x) => x.duplicate === true).length, 1,
-        'exactly one of the two deliveries must answer duplicate');
+      // "duplicate" is an answer about a COMPLETED row. Mid-flight the loser answers 5xx
+      // so its own retry keeps the event alive if the winner dies before completing.
+      const winners = [a, b].filter((r) => r.status === 200 && r.body.duplicate !== true);
+      const loser = [a, b].find((r) => !winners.includes(r));
+      assert.ok(winners.length === 1 && loser
+        && ((loser.status === 200 && loser.body.duplicate === true)
+          || (loser.status === 500 && loser.body.error === 'in flight')),
+      'exactly one delivery processes; the other answers duplicate or in-flight, never grants');
+    },
+  },
+  {
+    id: 'crash-after-receipt-is-retryable',
+    fixtures: [CYCLE_JAN, CYCLE_JAN_REDELIVERY],
+    states: 'a worker that dies after claiming leaves a claim a later retry takes over — receipt is not completion',
+    breaks: ['claim-expiry', 'grant-on-renewal'],
+    async run({ store, handler, assert }) {
+      const dead = await handler.deliver(fixture(CYCLE_JAN), { crashAfterClaim: true });
+      assert.unmutated.equal(dead.status, 0, 'the crash simulation must not answer'); // the worker is gone
+      store.advanceClock(CLAIM_TTL_MS + 1);
+      const late = await handler.deliver(fixture(CYCLE_JAN_REDELIVERY));
+      assert.deepEqual(late.body, { received: true },
+        'the retry after the claim expiry was not let in — the payment is swallowed forever');
+      assert.equal(store.grants.length, 1, 'the recovered event did not grant');
+    },
+  },
+  {
+    id: 'in-flight-claim-answers-retry-later',
+    fixtures: [CYCLE_JAN, CYCLE_JAN_REDELIVERY],
+    states: 'a retry inside the claim window is told to come back — "duplicate" is an answer about a completed row',
+    breaks: ['claim'],
+    async run({ store, handler, assert }) {
+      await handler.deliver(fixture(CYCLE_JAN), { crashAfterClaim: true });
+      const early = await handler.deliver(fixture(CYCLE_JAN_REDELIVERY));
+      assert.ok(early.status === 500 && store.grants.length === 0,
+        'a retry inside the claim window must wait out a possibly live worker, not process or be told duplicate');
+    },
+  },
+  {
+    id: 'completion-is-recorded-with-the-grant',
+    fixtures: [CYCLE_JAN],
+    states: 'the claim row leaves processing the moment the grant commits — received and completed are different states',
+    breaks: ['claim-completion'],
+    async run({ store, handler, assert }) {
+      const event = fixture(CYCLE_JAN);
+      await handler.deliver(event);
+      const row = store.processedEvents.get(event.id);
+      // Conditional on the row existing so this isolates the completion mark: with no
+      // claim at all there is no row to leave in the wrong state.
+      assert.ok(!row || row.state === 'completed',
+        'the delivery answered done and its claim row still says processing — a crash-shaped lie');
+    },
+  },
+  {
+    id: 'duplicate-of-completed-never-regrants',
+    fixtures: [CYCLE_JAN, CYCLE_JAN_REDELIVERY],
+    states: 'a completed row stays completed: a retry arriving after the claim expiry answers duplicate and grants nothing',
+    breaks: ['claim', 'claim-completion', 'grant-on-renewal'],
+    async run({ store, handler, assert }) {
+      const first = await handler.deliver(fixture(CYCLE_JAN));
+      assert.unmutated.deepEqual(first.body, { received: true });
+      store.advanceClock(CLAIM_TTL_MS + 1);
+      const late = await handler.deliver(fixture(CYCLE_JAN_REDELIVERY));
+      assert.deepEqual(late.body, { received: true, duplicate: true },
+        'a completed event aged past the claim expiry was reprocessed — completion was never recorded');
+      assert.equal(store.grants.length, 1, 'a completed event was granted again');
+      assert.equal(store.notifications.length, 1, '"your renewal" was sent twice');
     },
   },
   {

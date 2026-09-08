@@ -198,7 +198,8 @@ export async function POST(request: Request) {
   }
 
   const claim = await claimEvent(event.id);              // INSERT on a primary key
-  if (claim === "duplicate") return json({ received: true, duplicate: true });
+  if (claim === "completed") return json({ received: true, duplicate: true });
+  if (claim === "in_flight") return json({ error: "in flight" }, 500); // retry later
 
   try {
     await handle(event);
@@ -215,10 +216,11 @@ export async function POST(request: Request) {
 - **Exempt this path — and only this path — from CSRF and session auth**, by
   exact match: a prefix match over `/api/billing` exempts checkout too, which is
   where the money is.
-- **Claim before working.** `SELECT` then `INSERT` is a race; two deliveries
-  40 ms apart both pass the read and both credit. Release the claim if
-  processing throws, or the retry finds the event "processed" and the work is
-  lost forever.
+- **Claim before working — a claim is a receipt, not completion.** `SELECT`
+  then `INSERT` is a race; two deliveries 40 ms apart both credit. The row
+  stays `processing` until the grant's transaction marks it `completed` —
+  states, expiry, takeover and release:
+  [`references/webhook-events.md`](references/webhook-events.md).
 - **Answer honestly.** 200 handled or duplicate, 400 bad signature, 5xx try
   again, 200 for types you do not handle. Never 200 on failure to stop retries —
   that discards a payment quietly.
