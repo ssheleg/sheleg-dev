@@ -266,6 +266,23 @@ delivery to answer `duplicate` and the renewal notice and the conversion to fire
 that separates this claim from the per-period marker, because the marker reads before it
 writes and the claim does not.
 
+## One transaction, then the outbox
+
+The business application is ONE transaction: the entitlement, the business
+dedup marker (the per-period grant row), the completion mark and the **outbox
+rows** for every side effect commit together, or none of them exist. A crash
+before the commit applies nothing — the claim still says `processing`, and the
+retry runs the whole application again. A crash after the commit changes
+nothing either: the work is durable, the retry reads `completed`, and the side
+effects wait in the outbox.
+
+The outbox delivers **at least once**, so the consumer carries its **own
+dedup key** — event id + effect kind — remembered across rows. A redelivered
+outbox row must send nothing twice: the email provider and the ad platform do
+not participate in your transaction, and the consumer key is the only thing
+standing between a queue hiccup and a second "your renewal" email with a
+double-counted conversion.
+
 **The crash between receipt and completion is proved too.**
 `crash-after-receipt-is-retryable` kills the worker after the claim and requires the
 retry arriving past the claim expiry to be let in and to grant;
@@ -275,6 +292,13 @@ to be told 5xx come back — not "duplicate", which is an answer about a complet
 the moment the grant commits; and `duplicate-of-completed-never-regrants` ages a
 completed row past the expiry and requires the late retry to answer duplicate and
 grant nothing. All four run against `fixtures/reference-handler.mjs`.
+
+**And the transaction boundary is proved.** `transaction-rolls-back-whole`
+crashes inside the transaction and requires no grant, no marker, no outbox row
+and no completion to survive; `crash-before-commit-applies-nothing` lets the
+retry in through the expired claim and requires everything applied exactly
+once; `committed-retry-sends-once` redelivers every outbox row and requires
+the notice and the conversion to fire once — the consumer key at work.
 
 ## What to log
 

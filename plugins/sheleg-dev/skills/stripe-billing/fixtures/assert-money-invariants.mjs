@@ -218,6 +218,54 @@ export const INVARIANTS = [
     },
   },
   {
+    id: 'transaction-rolls-back-whole',
+    fixtures: [CYCLE_JAN],
+    states: 'a crash inside the transaction leaves nothing: no grant, no marker, no outbox row, no completion',
+    breaks: ['atomic-application'],
+    async run({ store, handler, assert }) {
+      const dead = await handler.deliver(fixture(CYCLE_JAN), { crashBeforeCommit: true });
+      assert.unmutated.equal(dead.status, 0, 'the crash simulation must not answer');
+      assert.ok(store.grants.length === 0 && store.grantedPeriods.size === 0
+        && store.outbox.length === 0
+        && ![...store.processedEvents.values()].some((r) => r.state === 'completed'),
+      'a crash before the commit left part of the application behind — half a payment no retry can see');
+    },
+  },
+  {
+    id: 'crash-before-commit-applies-nothing',
+    fixtures: [CYCLE_JAN, CYCLE_JAN_REDELIVERY],
+    states: 'after a mid-transaction crash, the retry applies everything exactly once',
+    // `claim-expiry` is here because the retry enters through the expired-claim door.
+    breaks: ['atomic-application', 'claim-expiry', 'grant-on-renewal'],
+    async run({ store, handler, assert }) {
+      const dead = await handler.deliver(fixture(CYCLE_JAN), { crashBeforeCommit: true });
+      assert.unmutated.equal(dead.status, 0, 'the crash simulation must not answer');
+      store.advanceClock(CLAIM_TTL_MS + 1);
+      const retry = await handler.deliver(fixture(CYCLE_JAN_REDELIVERY));
+      assert.deepEqual(retry.body, { received: true },
+        'the retry after the crash was not let in');
+      assert.equal(store.grants.length, 1, 'the retry did not apply the payment exactly once');
+      assert.equal(store.notifications.length, 1, 'the renewal notice did not go out exactly once');
+    },
+  },
+  {
+    id: 'committed-retry-sends-once',
+    fixtures: [CYCLE_JAN],
+    states: 'after the commit, a redelivered outbox row sends nothing twice — the consumer holds its own key',
+    breaks: ['outbox-consumer-key', 'grant-on-renewal'],
+    async run({ store, handler, assert }) {
+      await handler.deliver(fixture(CYCLE_JAN));
+      assert.equal(store.notifications.length, 1, 'the first drain did not send');
+      // The queue redelivers: every sent row comes back pending. At-least-once is
+      // the outbox's contract, so this is the normal case, not the weird one.
+      for (const row of store.outbox) row.state = 'pending';
+      handler.drainOutbox();
+      assert.equal(store.notifications.length, 1, '"your renewal" was sent twice');
+      assert.equal(store.conversions.length, 1,
+        'the conversion fired twice — the revenue is counted twice');
+    },
+  },
+  {
     id: 'reconciliation-does-not-regrant',
     fixtures: [CYCLE_JAN],
     states: 'the nightly repair reuses the webhook marker — a nightly job is not a nightly gift',

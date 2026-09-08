@@ -30,6 +30,14 @@ export const RULES = Object.freeze([
   // it over. Without this rule the crashed claim answers "in flight" forever and the
   // payment is swallowed.
   'claim-expiry',
+  // Entitlement, dedup marker, completion and the outbox rows commit TOGETHER.
+  // Without this rule a crash mid-application leaves the grant applied and the
+  // completion missing — half a payment, which no retry can see or repair.
+  'atomic-application',
+  // The outbox delivers at least once, so the CONSUMER dedups on its own key
+  // (event id + effect kind). Without this rule a redelivered outbox row sends
+  // the renewal notice and fires the conversion a second time.
+  'outbox-consumer-key',
   'billing-reason',
   'grant-marker',
   'ordering',
@@ -73,6 +81,9 @@ export const RETENTION_DECLINE_LIMIT = 2;
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
+/** The crash simulation's marker: a process death, not a thrown handler error. */
+class SystemError_ extends Error {}
+
 export function createStore() {
   return {
     processedEvents: new Map(), // event id -> { state: 'processing'|'completed', claimedAt }
@@ -87,10 +98,38 @@ export function createStore() {
     grants: [], // one row per grant actually applied
     clawbacks: [], // { paymentIntent, amount } in minor units
     conversions: [], // what the server sent to the ad platforms
+    outbox: [], // side-effect rows written IN the grant transaction: { key, apply, state }
+    sentKeys: new Set(), // the consumer's own dedup — survives a redelivered row
     retentionOffers: [], // { customerId, offerId, couponId, subscriptionId, redeemedAt }
     saves: [], // one row per cancellation deflected, recorded from the discount event
     notifications: [], // side effects that must not run twice
     log: [],
+
+    /** All-or-nothing for the business application: what the fixture calls a
+     *  transaction. A crash inside the callback restores every collection, so a
+     *  half-applied grant cannot exist — which is the property the retry relies on. */
+    snapshot() {
+      return {
+        processedEvents: new Map([...this.processedEvents]
+          .map(([k, v]) => [k, { ...v }])),
+        grantedPeriods: new Map([...this.grantedPeriods].map(([k, v]) => [k, new Set(v)])),
+        subscriptions: new Map([...this.subscriptions].map(([k, v]) => [k, { ...v }])),
+        purchases: new Map([...this.purchases].map(([k, v]) => [k, { ...v }])),
+        credits: new Map(this.credits),
+        grants: this.grants.slice(),
+        clawbacks: this.clawbacks.slice(),
+        conversions: this.conversions.slice(),
+        retentionOffers: this.retentionOffers.map((o) => ({ ...o })),
+        saves: this.saves.slice(),
+        notifications: this.notifications.slice(),
+        outbox: this.outbox.map((r) => ({ ...r })),
+        sentKeys: new Set(this.sentKeys),
+        log: this.log.slice(),
+      };
+    },
+    restore(snap) {
+      Object.assign(this, snap);
+    },
 
     /** An INSERT on a primary key: atomic, and the only claim that survives a race.
      *  The row it writes says 'processing' — a RECEIPT. What the caller does with an
@@ -287,14 +326,20 @@ export function createHandler(store, options = {}) {
     const conversionId = conversionIdFor(invoice);
     store.log.push({ event: event.id, decision: 'granted' });
     return [
-      () => store.notifications.push({ userId, kind: 'renewal', periodStart: period.start }),
-      () => store.conversions.push({
-        eventId: conversionId,
-        eventName: 'Purchase',
-        source: 'webhook',
-        value: invoice.amount_paid / 100,
-        currency: (invoice.currency || '').toUpperCase(),
-      }),
+      {
+        key: `${event.id}:renewal-notice`,
+        apply: () => store.notifications.push({ userId, kind: 'renewal', periodStart: period.start }),
+      },
+      {
+        key: `${event.id}:conversion`,
+        apply: () => store.conversions.push({
+          eventId: conversionId,
+          eventName: 'Purchase',
+          source: 'webhook',
+          value: invoice.amount_paid / 100,
+          currency: (invoice.currency || '').toUpperCase(),
+        }),
+      },
     ];
   }
 
@@ -461,18 +506,44 @@ export function createHandler(store, options = {}) {
       }
     }
     if (opts.crashAfterClaim) return { status: 0, body: null }; // the worker is gone
-    let afterCommit = [];
+    // ONE transaction: entitlement, dedup marker, completion mark and the outbox rows
+    // commit together, or none of them exist. A crash inside leaves nothing applied —
+    // the claim row still says 'processing', and the retry runs the whole thing again.
+    const snap = has('atomic-application') ? store.snapshot() : null;
     try {
-      afterCommit = await handle(event);
+      const effects = await handle(event);
+      // Receipt becomes completion in the same commit as the grant. A handler that
+      // answers 200 without this line has told Stripe "done" about work only received.
+      if (has('claim') && has('claim-completion')) store.completeEvent(event.id);
+      for (const e of effects) {
+        store.outbox.push({ key: e.key, apply: e.apply, state: 'pending' });
+      }
+      if (opts.crashBeforeCommit) throw new SystemError_('killed inside the transaction');
     } catch (error) {
+      if (snap) store.restore(snap);
+      if (error instanceof SystemError_) return { status: 0, body: null }; // process died
       if (has('claim')) store.releaseEventClaim(event.id);
       return { status: 500, body: { error: 'handler error' } };
     }
-    // Receipt becomes completion in the same commit as the grant. A handler that
-    // answers 200 without this line has told Stripe "done" about work only received.
-    if (has('claim') && has('claim-completion')) store.completeEvent(event.id);
-    for (const effect of afterCommit) effect(); // side effects run after the commit
+    // After the commit the outbox drains — inline here; a worker in production, with
+    // the same at-least-once semantics and therefore the same need for a consumer key.
+    drainOutbox();
     return { status: 200, body: { received: true } };
+  }
+
+  /** The outbox consumer. The queue redelivers, so the consumer carries its OWN
+   *  dedup key — the row's `key` (event id + effect kind), remembered across rows. */
+  function drainOutbox() {
+    for (const row of store.outbox) {
+      if (row.state === 'sent') continue;
+      if (has('outbox-consumer-key') && store.sentKeys.has(row.key)) {
+        row.state = 'sent';
+        continue;
+      }
+      row.apply();
+      if (has('outbox-consumer-key')) store.sentKeys.add(row.key);
+      row.state = 'sent';
+    }
   }
 
   /**
@@ -519,5 +590,5 @@ export function createHandler(store, options = {}) {
     return offer;
   }
 
-  return { deliver, reconcile, offerRetention };
+  return { deliver, reconcile, offerRetention, drainOutbox };
 }

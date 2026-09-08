@@ -225,8 +225,8 @@ export async function POST(request: Request) {
   again, 200 for types you do not handle. Never 200 on failure to stop retries —
   that discards a payment quietly.
 - **Order inside a handler:** fallible external calls first, then one
-  transaction, then side effects that must not run twice (emails, provisioning)
-  after it commits.
+  transaction — entitlement, dedup marker, completion, outbox rows — then side
+  effects drain from the outbox, each under its own consumer key.
 
 Per-event detail: [`references/webhook-events.md`](references/webhook-events.md).
 

@@ -116,6 +116,46 @@
    ]
   },
   {
+   "id": "transaction-rolls-back-whole",
+   "isolates": "atomic-application",
+   "fixtures": [
+    "invoice-paid-subscription-cycle.json"
+   ],
+   "claimedBy": [
+    {
+     "document": "references/webhook-events.md",
+     "phrase": "commit together, or none of them exist"
+    }
+   ]
+  },
+  {
+   "id": "crash-before-commit-applies-nothing",
+   "isolates": null,
+   "fixtures": [
+    "invoice-paid-subscription-cycle.json",
+    "invoice-paid-subscription-cycle-redelivery.json"
+   ],
+   "claimedBy": [
+    {
+     "document": "references/webhook-events.md",
+     "phrase": "the retry runs the whole application again"
+    }
+   ]
+  },
+  {
+   "id": "committed-retry-sends-once",
+   "isolates": "outbox-consumer-key",
+   "fixtures": [
+    "invoice-paid-subscription-cycle.json"
+   ],
+   "claimedBy": [
+    {
+     "document": "references/webhook-events.md",
+     "phrase": "A redelivered outbox row must send nothing twice"
+    }
+   ]
+  },
+  {
    "id": "sequential-redelivery-grants-once-by-count-alone",
    "isolates": null,
    "fixtures": [
