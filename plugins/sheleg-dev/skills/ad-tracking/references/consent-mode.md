@@ -45,8 +45,42 @@ The recovery figures Google has cited (~65–70%) come from its own dated,
 campaign-specific case studies — **your recovery is unknown until measured on
 your traffic**; an unmeasured percentage is not a promise.
 
-Advanced mode = `gtag('consent', 'default', { ... 'denied' ... })` then load tags normally.
-Basic mode = physically block `<script>` tags until consent granted.
+**Two different technical contracts — never one snippet with a policy flag.**
+Each mode has its own wiring and its own pre-consent behaviour, and mixing
+their halves produces a page that behaves as neither:
+
+```html
+<!-- ADVANCED contract: denied defaults set synchronously, tags load at once.
+     Pre-consent behaviour: cookieless pings go out, no cookies are written. -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('consent', 'default', { 'ad_storage': 'denied', 'ad_user_data': 'denied',
+    'ad_personalization': 'denied', 'analytics_storage': 'denied',
+    'wait_for_update': 500 });
+</script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=TAG_ID"></script>
+```
+
+```html
+<!-- BASIC contract: NO tag bytes reach the page before consent.
+     Pre-consent behaviour: zero requests to Google — nothing loads, nothing pings. -->
+<script>
+  function loadTagsAfterConsent() {           // called by the CMP's grant callback
+    const s = document.createElement('script');
+    s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=TAG_ID';
+    document.head.appendChild(s);
+    gtag('js', new Date()); gtag('config', 'TAG_ID');
+  }
+</script>
+```
+
+**The mixed waterfall is the defect to test for**: gtag.js loaded eagerly (the
+Advanced half) while the config call waits for consent (the Basic half) sends
+requests the Basic policy said never happen and models nothing the Advanced
+policy promised. A fixture for each mode asserts ITS pre-consent behaviour —
+Advanced: pings without cookies; Basic: zero Google requests — and a page
+failing both assertions is running the mix.
 
 ## All Consent Types
 
