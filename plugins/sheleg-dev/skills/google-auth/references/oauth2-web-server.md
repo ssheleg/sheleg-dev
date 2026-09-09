@@ -83,6 +83,7 @@ const authorizationUrl = oauthClient.generateAuthUrl({
 ```python
 from google_auth_oauthlib.flow import Flow
 import secrets
+import time
 
 flow = Flow.from_client_secrets_file(
     'client_secret.json',
@@ -94,7 +95,8 @@ flow = Flow.from_client_secrets_file(
 )
 
 state = secrets.token_hex(32)
-session['state'] = state
+# Server-bound, random, with a TTL: the callback consumes it atomically.
+session['oauth_state'] = {'value': state, 'expires': time.time() + 600}
 
 authorization_url, state = flow.authorization_url(
     access_type='offline',             # gets refresh_token
@@ -212,14 +214,20 @@ def oauth2callback():
     if request.args.get('error'):
         return 'Authorization failed', 400
 
-    if request.args.get('state') != session.get('state'):
-        abort(403, 'State mismatch. Possible CSRF attack')
+    # Validate state BEFORE the token exchange, and consume it atomically:
+    # pop() removes it in the same step, so a replayed callback finds nothing.
+    # Presence is required on BOTH sides — None == None must NOT pass.
+    saved = session.pop('oauth_state', None)
+    got = request.args.get('state')
+    if (not got or not saved or saved['value'] != got
+            or time.time() > saved['expires']):
+        abort(403, 'State invalid, missing, expired or already used')
 
     flow = Flow.from_client_secrets_file(
         'client_secret.json',
         scopes=SCOPES,
         redirect_uri=YOUR_REDIRECT_URL,
-        state=session['state']
+        state=saved['value']
     )
     flow.fetch_token(authorization_response=request.url)
 
@@ -246,6 +254,9 @@ def oauth2callback():
 ### Python (FastAPI)
 
 ```python
+import secrets
+import time
+
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 from google_auth_oauthlib.flow import Flow
@@ -255,15 +266,19 @@ async def oauth2callback(request: Request):
     if request.query_params.get('error'):
         raise HTTPException(400, 'Authorization failed')
 
-    state = request.session.get('state')
-    if request.query_params.get('state') != state:
-        raise HTTPException(403, 'State mismatch')
+    # Consume atomically (pop) and validate BEFORE the exchange; a wrong,
+    # expired or replayed state must never start a token exchange.
+    saved = request.session.pop('oauth_state', None)
+    got = request.query_params.get('state')
+    if (not got or not saved or saved['value'] != got
+            or time.time() > saved['expires']):
+        raise HTTPException(403, 'State invalid, missing, expired or already used')
 
     flow = Flow.from_client_secrets_file(
         'client_secret.json',
         scopes=SCOPES,
         redirect_uri=YOUR_REDIRECT_URL,
-        state=state
+        state=saved['value']
     )
     flow.fetch_token(code=request.query_params.get('code'))
     credentials = flow.credentials
@@ -511,7 +526,7 @@ def auth():
         redirect_uri=REDIRECT_URI
     )
     state = secrets.token_hex(32)
-    session['state'] = state
+    session['oauth_state'] = {'value': state, 'expires': time.time() + 600}
     authorization_url, _ = flow.authorization_url(
         access_type='offline',
         include_granted_scopes='true',
@@ -524,8 +539,11 @@ def auth():
 def oauth2callback():
     if request.args.get('error'):
         return 'Authorization failed', 400
-    if request.args.get('state') != session.get('state'):
-        abort(403, 'State mismatch')
+    saved = session.pop('oauth_state', None)   # single-use: consume BEFORE exchange
+    got = request.args.get('state')
+    if (not got or not saved or saved['value'] != got
+            or time.time() > saved['expires']):
+        abort(403, 'State invalid, missing, expired or already used')
 
     flow = Flow.from_client_config(
         {
@@ -538,7 +556,7 @@ def oauth2callback():
         },
         scopes=SCOPES,
         redirect_uri=REDIRECT_URI,
-        state=session['state']
+        state=saved['value']
     )
     flow.fetch_token(authorization_response=request.url)
     creds = flow.credentials
@@ -605,7 +623,7 @@ CLIENT_CONFIG = {
 async def auth(request: Request):
     flow = Flow.from_client_config(CLIENT_CONFIG, scopes=SCOPES, redirect_uri=REDIRECT_URI)
     state = secrets.token_hex(32)
-    request.session['state'] = state
+    request.session['oauth_state'] = {'value': state, 'expires': time.time() + 600}
     authorization_url, _ = flow.authorization_url(
         access_type='offline',
         include_granted_scopes='true',
@@ -618,12 +636,15 @@ async def auth(request: Request):
 async def oauth2callback(request: Request):
     if request.query_params.get('error'):
         raise HTTPException(400, 'Authorization failed')
-    if request.query_params.get('state') != request.session.get('state'):
-        raise HTTPException(403, 'State mismatch')
+    saved = request.session.pop('oauth_state', None)   # single-use: consume BEFORE exchange
+    got = request.query_params.get('state')
+    if (not got or not saved or saved['value'] != got
+            or time.time() > saved['expires']):
+        raise HTTPException(403, 'State invalid, missing, expired or already used')
 
     flow = Flow.from_client_config(
         CLIENT_CONFIG, scopes=SCOPES, redirect_uri=REDIRECT_URI,
-        state=request.session['state']
+        state=saved['value']
     )
     flow.fetch_token(code=request.query_params.get('code'))
     creds = flow.credentials
