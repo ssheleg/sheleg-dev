@@ -53,3 +53,49 @@ too, which is where the money is.
 Back to [`SKILL.md`](../SKILL.md) — *Webhook signature verification* is the gate these two
 sit behind, and *Test matrix* in
 [`testing-and-local-dev.md`](testing-and-local-dev.md) carries the non-allowlisted-IP case.
+
+
+## Crediting: lifecycle, grant and refund are separate (DV-05)
+
+The CAS advances the payment's lifecycle; the GRANT is a second, independent
+step gated on a confirmed settlement; refunds and holds have their own path.
+Conflating them credits money that never settled — a webhook that transitions
+a payment to FAILED passes the CAS (`count: 1`) exactly as PAID does.
+
+```ts
+// 1. Advance the lifecycle by compare-and-swap. Fires for ANY non-final
+//    transition — PAID, FAILED, UNDERPAID, REFUNDED alike — so it is NOT
+//    permission to credit. It only records what the provider said.
+const { count } = await db.payment.updateMany({
+  where: { invoiceId, status: { notIn: FINAL_STATUSES } },
+  data: { status: mapped, paidAmount, txid, network, settledAt: new Date() },
+});
+
+// 2. Refunds and holds are their own path — never swallowed as a duplicate.
+if (mapped === 'REFUNDED' || mapped === 'ON_HOLD') {
+  await recordRefundOrHold(invoiceId, mapped);         // own ledger, own rules
+  return res.status(200).json({ ok: true });
+}
+if (count === 0) {
+  return res.status(200).json({ ok: true, duplicate: true });  // already advanced
+}
+
+// 3. CREDIT ONLY A CONFIRMED SETTLEMENT, and only once — an immutable grant
+//    row keyed by invoice is the business dedup, atomic with the credit.
+//    FAILED/UNDERPAID/pending advance the lifecycle above and grant NOTHING.
+if (mapped === 'PAID') {
+  await db.$transaction(async (tx) => {
+    try {
+      await tx.grantLedger.create({ data: { invoiceId, amount: creditFor(invoiceId) } });
+    } catch (e) {
+      if (isUniqueViolation(e)) return;                // this settlement already granted
+      throw e;
+    }
+    await creditUser(tx, invoiceId);
+  });
+}
+```
+
+`updateMany` + a status guard is a compare-and-swap for the LIFECYCLE, not the
+grant: a CAS that advanced a payment to FAILED returns `count: 1` too, so the
+credit hangs off `mapped === 'PAID'` and a UNIQUE grant row, never off the CAS.

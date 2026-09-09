@@ -179,26 +179,16 @@ Verify the signature **before** parsing anything into your domain, and return
 
 Do not read-then-write. Make the database refuse the second delivery:
 
-```ts
-const { count } = await db.payment.updateMany({
-  where: {
-    invoiceId,
-    status: { notIn: FINAL_STATUSES },   // ← the guard: a settled payment cannot re-settle
-  },
-  data: { status: mapped, paidAmount, txid, network, settledAt: new Date() },
-});
-
-if (count === 0) {
-  // already final: a retry, or a late duplicate. Acknowledge and do nothing.
-  return res.status(200).json({ ok: true, duplicate: true });
-}
-
-await creditUser(...);   // only reachable once per invoice
-```
-
-`updateMany` + a status guard is a compare-and-swap. `findFirst` followed by
-`update` is a race, and the two deliveries that arrive 40ms apart will both pass
-the read.
+Three things are separate — the payment's LIFECYCLE status, the immutable
+GRANT a confirmed settlement earns, and any refund/hold — and conflating them
+credits money that never settled. The CAS (`updateMany` with a `status notIn
+FINAL_STATUSES` guard) advances the LIFECYCLE only: it returns `count: 1` for
+a transition to FAILED exactly as it does for PAID, so it is not permission to
+credit. **Credit only a confirmed settlement (`mapped === 'PAID'`), once,
+behind a UNIQUE per-invoice grant-ledger row atomic with the credit; refunds
+and holds take their own path and are never swallowed as a duplicate.** The
+worked handler is in
+[`references/callback-route-hardening.md`](references/callback-route-hardening.md).
 
 **Always return 200 for a duplicate.** A 409 makes the provider retry forever.
 

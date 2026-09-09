@@ -111,7 +111,7 @@ sequenceDiagram
   H->>W: POST { type:"payment", status:"paid", uuid, sign, ... }
   W->>W: Verify caller IP + MD5 signature
   W->>W: Type guard, idempotency check
-  W->>DB: $transaction:<br/>  updateMany(status notIn final)<br/>  creditAccountPurchasedTokens<br/>  logTokenAudit(action:"crypto_topup")<br/>  optional createBalanceSubscription / seat upgrade
+  W->>DB: $transaction (only if status==paid):<br/>  updateMany(status notIn final)<br/>  INSERT grantLedger(invoiceId) UNIQUE<br/>  creditAccountPurchasedTokens<br/>  logTokenAudit(action:"crypto_topup")<br/>  optional createBalanceSubscription / seat upgrade
   W-->>H: 200 { status: "ok" }
   H-->>U: Redirect to url_success
   U->>FE: Polls /api/billing/crypto/status?orderId=...
