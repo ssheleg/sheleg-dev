@@ -1,0 +1,207 @@
+{
+ "contract": "outcome-case/1 (schemas/outcome-case.schema.json + test/outcome_harness.py in ssheleg/sshlg-skills)",
+ "note": "Outcome corpus for error-tracking (FIX-EV-01.18), anchored to the audit's own findings DV-15/DV-16/DV-19. Judged on ARTIFACTS via the family harness: the runner records the actual output oracle verdict AND the raw result per case; with/without-skill arms are the harness's baseline contract. P1 counterexamples must FAIL on the pre-fix output and pass after the fix, tied to the release. Nothing in the production skill was changed for grader convenience.",
+ "arms": {
+  "baseline": "same prompts, skill absent",
+  "current": "same prompts, skill installed"
+ },
+ "cases": [
+  {
+   "schema_version": "outcome-case/1",
+   "id": "ET-OUT-001-positive-canary-matrix",
+   "skill": "error-tracking",
+   "prompt": {
+    "text": "Build the scrubbing canary matrix: fake Redis (empty username), AMQP and Postgres URLs, percent-encoded credentials, a Telegram /bot<id>:<token>/ path, an ?access_token= query, and the same secrets NESTED inside event extras — run each through scrub_text and assert NO fake secret reaches the test transport (DV-15). Write canary-matrix.md."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "4af53f13d3de6ed97fe9e1da4ff6f778ff328a584d55252b192697eace7ec8c2"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "error-tracking"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "matrix exists",
+      "kind": "artifact-exists",
+      "target": "canary-matrix.md"
+     },
+     {
+      "name": "the empty-username redis case is present (DV-15)",
+      "kind": "artifact-contains",
+      "target": "canary-matrix.md",
+      "expect": "redis"
+     },
+     {
+      "name": "nested events are covered (DV-15)",
+      "kind": "artifact-contains",
+      "target": "canary-matrix.md",
+      "expect": "nested"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "ET-OUT-002-negative-routing",
+   "skill": "error-tracking",
+   "prompt": {
+    "text": "Explain in two sentences what a webhook is."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "a5da94aa03520bb6226ea88328a75ab6d7e3985c73a0e90a1379bf168fead57e"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [],
+     "expect_not_loaded": [
+      "error-tracking"
+     ]
+    },
+    "outcome": [
+     {
+      "name": "no tracking artifact appears",
+      "kind": "command-exit-0",
+      "target": "test ! -f canary-matrix.md"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "ET-OUT-003-revoked-session-composition",
+   "skill": "error-tracking",
+   "prompt": {
+    "text": "Compose the recovery for: Telegram session REVOKED while Sentry is installed. The outcome must be ONE actionable alert, work stopped, bounded retries and NO endless crash loop — the two skills' rules must not issue opposite actions (DV-16). Write recovery-plan.md."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "d69dec2603648c123d31b8d707f992a455863736d1a8dc3ee86303f1a233c565"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "error-tracking"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "one actionable alert, not a storm (DV-16)",
+      "kind": "artifact-contains",
+      "target": "recovery-plan.md",
+      "expect": "one alert"
+     },
+     {
+      "name": "bounded retries, no crash loop (DV-16)",
+      "kind": "artifact-contains",
+      "target": "recovery-plan.md",
+      "expect": "bounded"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "ET-OUT-004-hostile-pre-fix-must-fail",
+   "skill": "error-tracking",
+   "prompt": {
+    "text": "Audit the PRE-FIX scrubber whose regex required a non-empty username: the audit must FAIL it on redis://:pw@ and the bot-token path (the P1 counterexample), name the finding, and record the release the fixed scrubber shipped in (DV-19). Write hostile-audit.md."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "e2e1fc398aff0497f76aee79ab27f2f341addb79254f40d0ffde6dc52b0ad507"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "error-tracking"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "the old scrubber fails (DV-19)",
+      "kind": "artifact-contains",
+      "target": "hostile-audit.md",
+      "expect": "FAIL"
+     },
+     {
+      "name": "tied to a release (DV-19)",
+      "kind": "artifact-contains",
+      "target": "hostile-audit.md",
+      "expect": "release"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "ET-OUT-005-noop-covered-channel-untouched",
+   "skill": "error-tracking",
+   "prompt": {
+    "text": "Review a Sentry setup whose before_send/before_send_transaction/before_breadcrumb all carry the scrubber and whose attachments are declared UNSUPPORTED: report it clean and change NOTHING — write review-note.md only."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "6b1ef6f77c9fa3c17751040c43c42790f5d313942cfaa3a2d798ef7bf94982f9"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "error-tracking"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "a correct setup is reported clean, not rewritten",
+      "kind": "artifact-contains",
+      "target": "review-note.md",
+      "expect": "clean"
+     }
+    ]
+   }
+  }
+ ]
+}
