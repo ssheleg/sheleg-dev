@@ -33,19 +33,27 @@ implementation this skill ships.
 
 ## Core flow (ID-token)
 
-1. Frontend: `google.accounts.id.initialize({ client_id, callback, nonce })`
-   + `renderButton()`. Generate a **fresh random nonce per render**
-   (`crypto.randomUUID()`). The GSI script loads async — retry rendering
-   (e.g. 20 × 150 ms) instead of silently dropping the button.
+1. Frontend: fetch a **server-issued nonce** first (`GET /api/auth/google/nonce`
+   — the server stores it with a TTL, bound to a pre-auth HttpOnly cookie),
+   then `google.accounts.id.initialize({ client_id, callback, nonce })`
+   + `renderButton()`. A client-generated nonce POSTed back proves nothing:
+   the value would be read out of the very JWT it is meant to check. The GSI
+   script loads async — retry rendering (e.g. 20 × 150 ms) instead of
+   silently dropping the button.
 2. Callback receives `{ credential }` — a Google-signed ID token (JWT).
-   POST it with the nonce to your backend. Never treat it as a session.
+   POST it alone to your backend (no nonce in the body). Never treat it as a
+   session.
 3. Backend: verify with the official lib — Python
    `google.oauth2.id_token.verify_oauth2_token(credential, transport, CLIENT_ID)`,
    Node `google-auth-library` `verifyIdToken({ idToken, audience })`. That
    checks signature (Google JWKS), `aud`, `iss`, `exp`. Never hand-decode
    and trust the payload.
-4. Additionally require `email_verified == true` and token `nonce` claim ==
-   submitted nonce.
+4. Additionally require `email_verified == true` and **pop the expected nonce
+   from the pre-auth session (one-time consume) and require the token `nonce`
+   claim to equal it exactly** — a missing claim, a missing expectation, an
+   expired or an already-consumed nonce all reject. This is what makes a
+   stolen token non-replayable: a replay from a new session meets a different
+   expectation, a replay in the same session meets a consumed one.
 5. Find-or-create the user, then issue YOUR OWN session (app JWT) as an
    **HttpOnly + Secure + SameSite=Strict cookie**. Google's token is
    verified once, never stored, never logged.

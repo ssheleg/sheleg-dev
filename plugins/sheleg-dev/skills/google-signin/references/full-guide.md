@@ -41,21 +41,25 @@ secrets, no redirect URIs, no token storage for Google APIs.
  Browser                       Google                        Your backend
  ───────                       ──────                        ────────────
  1. load gsi/client script
- 2. google.accounts.id.initialize({client_id, callback, nonce})
+ 0. GET /api/auth/google/nonce ────────────────────────────► server issues nonce,
+    (pre-auth HttpOnly cookie set)                              stores it w/ TTL
+ 2. google.accounts.id.initialize({client_id, callback, nonce: serverIssued})
  3. renderButton(#container)
  4. user clicks button ──────► account-chooser popup
                                (user picks account,
                                 consents on first use)
  5. callback receives  ◄────── ID token (JWT, RS256-signed
     {credential: "<jwt>"}       by Google's private key)
- 6. POST /api/auth/google {credential, nonce} ─────────────► 7. verify ID token:
+ 6. POST /api/auth/google {credential} ────────────────────► 7. verify ID token:
                                                                 - signature vs Google JWKS
                                                                   (https://www.googleapis.com/oauth2/v3/certs)
                                                                 - aud == YOUR client_id
                                                                 - iss == accounts.google.com
                                                                 - exp not passed
                                                                 - email_verified == true
-                                                                - nonce matches
+                                                                - nonce claim == server
+                                                                  expectation (popped:
+                                                                  one-time consume)
                                                              8. find-or-create user,
                                                                 link accounts
                                                              9. issue YOUR OWN session
@@ -81,7 +85,7 @@ Payload claims you care about:
   "email_verified": true,
   "name": "Ada Lovelace",
   "picture": "https://lh3.googleusercontent.com/…",
-  "nonce": "d9b2d63d-…",       // echoed from initialize() — replay defense
+  "nonce": "d9b2d63d-…",       // the SERVER-issued value passed to initialize()
   "iat": 1719410000,
   "exp": 1719413600            // ~1 hour lifetime
 }
@@ -107,7 +111,7 @@ Payload claims you care about:
 // app.js (essentials)
 var _googleNonce = '';
 
-function _renderGoogleButton() {
+async function _renderGoogleButton() {
   var clientId = _getGoogleClientId();          // read from the <meta> tag
   if (!clientId) return;                        // Google auth not configured → hide, degrade honestly
   if (typeof google === 'undefined' || !google.accounts) {
@@ -115,7 +119,10 @@ function _renderGoogleButton() {
     if (_googleRenderRetries++ < 20) setTimeout(_renderGoogleButton, 150);
     return;
   }
-  _googleNonce = crypto.randomUUID();           // fresh nonce per render — replay defense
+  // SERVER-issued nonce: the backend stores it (TTL, pre-auth HttpOnly cookie)
+  // and will pop it on the callback — the client never invents the value.
+  var nr = await fetch('/api/auth/google/nonce');
+  _googleNonce = (await nr.json()).nonce;
 
   google.accounts.id.initialize({
     client_id: clientId,
@@ -135,7 +142,7 @@ async function handleGoogleCredential(response) {
   var resp = await fetch('/api/auth/google', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ credential: response.credential, nonce: _googleNonce }),
+    body: JSON.stringify({ credential: response.credential }),
   });
   var data = await resp.json();
   if (!resp.ok) { showError(data.detail); return; }
@@ -261,11 +268,17 @@ npm i google-auth-library      # Node
 
 ### 4.2 Nonce — replay defense
 
-Generate a fresh random nonce per button render, pass it to
-`google.accounts.id.initialize({nonce})`, send it alongside the credential,
-compare server-side with the token's `nonce` claim
-(`web/auth.py:375-376`). A stolen/logged ID token can't be replayed later
-because the nonce won't match the new session's nonce.
+**The server issues the nonce; the client never invents one.** A
+client-generated nonce POSTed back beside the credential proves nothing — the
+"expected" value would be read out of the very JWT it is meant to check, so a
+stolen token replays with its own nonce forever. Fetch the nonce from
+`GET /api/auth/google/nonce` (the server stores it with a TTL, bound to a
+pre-auth HttpOnly session cookie), pass it to
+`google.accounts.id.initialize({nonce})`, and on the callback the server POPs
+the expectation (one-time consume) and requires the token's `nonce` claim to
+equal it exactly. Missing claim, missing expectation, expiry and re-use all
+reject. First sign-in passes; a replay from a new session meets a different
+expectation; a replay in the same session meets a consumed one.
 
 ### 4.3 Account pre-hijacking guard (P3-01 in Prowl)
 
@@ -346,7 +359,7 @@ Defense (`web/server.py:1657-1686`), covering both possible delivery flows:
 
 ```python
 # --- backend ---
-import os, hmac
+import os, hmac, secrets, time
 from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel
 from google.oauth2 import id_token
@@ -356,10 +369,21 @@ GOOGLE_CLIENT_ID = os.environ["GOOGLE_CLIENT_ID"]
 _transport = google_requests.Request()
 app = FastAPI()
 
+NONCE_TTL = 600
+_nonce_store: dict[str, tuple[str, float]] = {}   # sid -> (nonce, expires); use Redis in prod
+
 class GoogleAuthRequest(BaseModel):
     credential: str
-    nonce: str | None = None
-    g_csrf_token: str | None = None
+    g_csrf_token: str | None = None               # no nonce in the body — the server holds it
+
+@app.get("/api/auth/google/nonce")
+async def google_nonce(req: Request, response: Response):
+    sid = req.cookies.get("preauth") or secrets.token_urlsafe(32)
+    nonce = secrets.token_urlsafe(32)
+    _nonce_store[sid] = (nonce, time.time() + NONCE_TTL)
+    response.set_cookie("preauth", sid, httponly=True, secure=True,
+                        samesite="lax", max_age=NONCE_TTL, path="/")
+    return {"nonce": nonce}
 
 @app.post("/api/auth/google")
 async def google_auth(req: Request, data: GoogleAuthRequest, response: Response):
@@ -377,8 +401,13 @@ async def google_auth(req: Request, data: GoogleAuthRequest, response: Response)
         raise HTTPException(401, f"Invalid Google token: {exc}")
     if not payload.get("email_verified"):
         raise HTTPException(401, "Google account email is not verified")
-    if data.nonce and payload.get("nonce") != data.nonce:
-        raise HTTPException(401, "Nonce mismatch")
+    # One-time consume BEFORE any account work: pop() removes the expectation
+    # in the same step, so a replayed callback finds nothing. Mandatory — a
+    # missing claim or a missing expectation rejects; the body carries no nonce.
+    sid = req.cookies.get("preauth") or ""
+    expected, expires = _nonce_store.pop(sid, (None, 0.0))
+    if not expected or time.time() > expires or payload.get("nonce") != expected:
+        raise HTTPException(401, "Nonce missing, expired, replayed or not server-issued")
 
     user = await find_or_create_user(          # your 3-way linking here (§2.4, §4.3)
         google_id=payload["sub"], email=payload["email"].lower().strip(),
@@ -395,8 +424,8 @@ async def google_auth(req: Request, data: GoogleAuthRequest, response: Response)
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <div id="gbtn"></div>
 <script>
-  const NONCE = crypto.randomUUID();
-  window.onload = () => {
+  window.onload = async () => {
+    const NONCE = (await (await fetch("/api/auth/google/nonce")).json()).nonce;
     google.accounts.id.initialize({
       client_id: "YOUR_CLIENT_ID.apps.googleusercontent.com",
       nonce: NONCE,
@@ -404,7 +433,7 @@ async def google_auth(req: Request, data: GoogleAuthRequest, response: Response)
         const r = await fetch("/api/auth/google", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ credential, nonce: NONCE }),
+          body: JSON.stringify({ credential }),
         });
         if (r.ok) location.href = "/app";
       },
