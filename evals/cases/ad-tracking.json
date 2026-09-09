@@ -1,0 +1,207 @@
+{
+ "contract": "outcome-case/1 (schemas/outcome-case.schema.json + test/outcome_harness.py in ssheleg/sshlg-skills)",
+ "note": "Outcome corpus for ad-tracking (FIX-EV-01.16), anchored to the audit's own findings DV-13/DV-14/DV-19. Judged on ARTIFACTS via the family harness: the runner records the actual output oracle verdict AND the raw result per case; with/without-skill arms are the harness's baseline contract. P1 counterexamples must FAIL on the pre-fix output and pass after the fix, with results tied to the release that carried it. Nothing in the production skill was changed for grader convenience.",
+ "arms": {
+  "baseline": "same prompts, skill absent",
+  "current": "same prompts, skill installed"
+ },
+ "cases": [
+  {
+   "schema_version": "outcome-case/1",
+   "id": "AT-OUT-001-positive-consent-gated-stack",
+   "skill": "ad-tracking",
+   "prompt": {
+    "text": "Wire GA4 + Meta with Consent Mode: the noscript Meta pixel is emitted server-side only behind a verified consent cookie (or omitted), and the GA4 G- config carries NO allow_enhanced_conversions (that flag is AW-only). Write snippets-audit.md listing both static checks (DV-14)."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "f999ef6cd4ebe5cfbc5e5e1344c1c96329af38a48eaeaeacc5a2c69d769953bd"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "ad-tracking"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "audit exists",
+      "kind": "artifact-exists",
+      "target": "snippets-audit.md"
+     },
+     {
+      "name": "the noscript gate is checked (DV-14)",
+      "kind": "artifact-contains",
+      "target": "snippets-audit.md",
+      "expect": "noscript"
+     },
+     {
+      "name": "the G-tag flag ban is checked (DV-14)",
+      "kind": "artifact-contains",
+      "target": "snippets-audit.md",
+      "expect": "allow_enhanced_conversions"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "AT-OUT-002-negative-routing",
+   "skill": "ad-tracking",
+   "prompt": {
+    "text": "Explain in two sentences what a webhook is."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "a5da94aa03520bb6226ea88328a75ab6d7e3985c73a0e90a1379bf168fead57e"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [],
+     "expect_not_loaded": [
+      "ad-tracking"
+     ]
+    },
+    "outcome": [
+     {
+      "name": "no tracking artifact appears",
+      "kind": "command-exit-0",
+      "target": "test ! -f snippets-audit.md"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "AT-OUT-003-near-miss-consent-policy",
+   "skill": "ad-tracking",
+   "prompt": {
+    "text": "An advertiser-only site (GA4 + Google Ads, NO publisher inventory) asks about consent: a certified CMP is NOT automatically required, Basic consent mode passes, and an unknown jurisdiction is NOT treated as granted (DV-13). Write consent-decision.md separating Google policy, legal decisions, and unverified percentages."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "7f6d4c036d196841e9a8f0ffd4ec3ab7bb0a22c6ab1cd607b0eed4978369afd4"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "ad-tracking"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "advertiser-only needs no auto-CMP (DV-13)",
+      "kind": "artifact-contains",
+      "target": "consent-decision.md",
+      "expect": "not automatically required"
+     },
+     {
+      "name": "unknown jurisdiction is not granted (DV-13)",
+      "kind": "artifact-contains",
+      "target": "consent-decision.md",
+      "expect": "unknown jurisdiction"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "AT-OUT-004-hostile-old-output-must-fail",
+   "skill": "ad-tracking",
+   "prompt": {
+    "text": "Audit this PRE-FIX snippet set: an unconditional <noscript> Meta pixel and gtag('config','G-X',{allow_enhanced_conversions:true}). The audit must FAIL both (the P1 counterexample), citing the finding each violates, and record the release the fixed doctrine shipped in (DV-19). Write hostile-audit.md."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "ea32cde86fca3cbfcbea5851faa806cdab5f6fffd39faaf249e77b295e2e6e79"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "ad-tracking"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "the old output fails, not passes (DV-19)",
+      "kind": "artifact-contains",
+      "target": "hostile-audit.md",
+      "expect": "FAIL"
+     },
+     {
+      "name": "results are tied to a release (DV-19)",
+      "kind": "artifact-contains",
+      "target": "hostile-audit.md",
+      "expect": "release"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "AT-OUT-005-noop-correct-setup-untouched",
+   "skill": "ad-tracking",
+   "prompt": {
+    "text": "Review a stack whose noscript is already server-gated and whose enhanced flag sits on the AW- tag only: report it clean and change NOTHING — write review-note.md only."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "881c7bfdd565de525fd98e964432354320b747aacd52b1322f18e2bbc0f5e6c2"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "ad-tracking"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "a correct setup is reported clean, not rewritten",
+      "kind": "artifact-contains",
+      "target": "review-note.md",
+      "expect": "clean"
+     }
+    ]
+   }
+  }
+ ]
+}
