@@ -259,6 +259,18 @@ if credentials.expired and credentials.refresh_token:
 - Validate external credential configurations before use (check `token_url`, `service_account_impersonation_url` point to googleapis.com)
 - Prefer Workload Identity Federation over service account keys for non-GCP environments
 - For end-user web sign-in, apply the google-signin skill's full checklist — a partial restatement here is how the two skills drifted apart once already
+- **Fail closed on a missing production secret.** The session signing secret,
+  and any credential-store key, is REQUIRED in production with NO dev fallback —
+  a hardcoded default signs every deployment's cookies with a key that lives in
+  the repo. Missing → refuse to boot, never a warning-and-continue (DV-07).
+- **Logs are sanitized; a credential never reaches one.** No token, no
+  `client_secret`, no `refresh_token`, no session value in a log line, a stack
+  trace, or an error message — a token in a log is a token anyone with log
+  access holds. Redact by allow-list, not by trying to strip the secret out.
+- **HTTPS is mandatory and the credential store can fail.** The auth cookie is
+  `Secure` and the callback refuses plain HTTP (an OAuth code over `http://` is a
+  code on the wire); and a credential-store read/write that FAILS is an auth
+  failure — re-prompt or 503, never proceed as if the credentials loaded.
 - **Python-specific**: reuse a single `google.auth.transport.requests.Request()` instance across verifications for connection pooling; do not create a new one per call in hot paths
 
 ## Reference Files

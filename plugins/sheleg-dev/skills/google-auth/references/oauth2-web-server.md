@@ -148,12 +148,17 @@ credential_store.put(                      # encrypted at rest, keyed by (sid, p
 # Never: log or return the tokens            ← no console.log(tokens.access_token)
 ```
 
-Three more, because a leaked secret does not announce itself: **never log a
-token or a credential** (no `console.log(tokens.access_token)`); the session
-signing secret is a **required production secret with NO dev fallback** (a
-hardcoded default signs every deployment's cookies with a key in the repo); and
-the auth cookie is **`Secure`, and the callback refuses plain HTTP** — an OAuth
-code or token over `http://` is a code or token on the wire.
+Four more, because a leaked secret does not announce itself: **never log a
+token or a credential** (no `console.log(tokens.access_token)`; sanitize logs
+by allow-list, so no token, `client_secret` or `refresh_token` reaches a line,
+a stack trace or an error message); the session signing secret is a **required
+production secret with NO dev fallback** (a hardcoded default signs every
+deployment's cookies with a key in the repo — missing in production is
+**fail-closed**, refuse to boot); the auth cookie is **`Secure`, and the
+callback refuses plain HTTP** — an OAuth code or token over `http://` is a code
+or token on the wire; and **a credential-store read or write that FAILS is an
+auth failure** — re-prompt the user or return 503, never proceed as if the
+credentials loaded (a silent empty read logs the user in as nobody).
 
 ### Node.js
 
