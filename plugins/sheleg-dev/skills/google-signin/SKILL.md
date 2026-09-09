@@ -64,14 +64,27 @@ Key the user on `sub` (stable Google user ID; store as `google_id`) — never
 on email (emails change, `sub` doesn't). On each Google login:
 
 1. Record with this `google_id` exists → login (refresh name/picture).
-2. Email matches an existing account without `google_id` → link, BUT apply
-   the **pre-hijacking guard**: if that account is password-based and its
-   email was never verified, REFUSE the auto-link ("sign in with your
-   password instead"). Otherwise an attacker who pre-registered the
-   victim's email with a known password captures the victim's first Google
-   login into the attacker's record.
-3. No match → create the user with `email_verified=True`, empty password
-   hash.
+2. Email matches an existing account without `google_id` → **do NOT auto-link
+   on `email_verified` alone.** `email_verified` is Google saying it verified
+   the inbox ONCE, not that this person owns the LOCAL account, and for a
+   third-party address Google is not even authoritative that they still own the
+   inbox. Default: link only after a **fresh re-auth of the existing local
+   account** (its password / existing factor), so the person proves they hold
+   the account Google is being attached to.
+   - Auto-link WITHOUT that re-auth is allowed only when Google is
+     **authoritative for the address** — `email_verified` AND (the address is
+     `@gmail.com` OR the token carries an `hd` Workspace-domain claim) — AND
+     the existing account's own email ownership was proven. For any other
+     (third-party) address, run an **independent challenge** (a link to that
+     inbox) before linking; Google's one-time verification is not current proof.
+   - If the existing account is a password account whose email was **never
+     verified** (a possible pre-registration hijack), send the person into a
+     **safe account-recovery flow** — never "sign in with the existing
+     password", which may be the attacker's.
+3. No match → create the user. Mark `email_verified=True` only when Google is
+   authoritative for the address (Gmail or `hd`); for a third-party address
+   record it unverified and challenge the inbox before granting anything that
+   trusts the email.
 
 ## Login-CSRF (cover BOTH delivery flows)
 

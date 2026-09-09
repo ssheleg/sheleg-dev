@@ -192,14 +192,21 @@ Every Google login resolves to exactly one of three cases:
 
 1. **Returning Google user** — a record with this `google_id` (`sub`) exists
    → issue session. Refresh `name`/`picture` if they changed.
-2. **Existing email/password account, no `google_id`** — link Google to it
-   (set `google_id`, mark `email_verified=True`) → issue session.
-   ⚠️ **Pre-hijacking guard** (see §4.3): only auto-link if the existing
-   account's email ownership was verified. Otherwise refuse with "sign in
-   with your password".
-3. **Brand-new user** — create the account with `email_verified=True` (the
-   Google token already proved inbox ownership), empty password hash → issue
-   session.
+2. **Existing account, no `google_id`** — `email_verified` is NOT authority to
+   attach Google to it. It means Google verified the inbox once; it does not
+   mean this person owns the LOCAL account, and for a third-party address it
+   does not even mean they still own the inbox. Default: link only after a
+   **fresh re-auth of the existing local account** (§4.3). Auto-link without
+   re-auth is permitted only when `google_authoritative(payload)` — the address
+   is `@gmail.com` or the token carries an `hd` Workspace claim — AND the
+   existing record's own email ownership was proven; for any other address run
+   an **independent inbox challenge** first. If the existing account is a
+   password account whose email was **never verified**, route to **safe
+   account recovery** (§4.3), never to the existing password.
+3. **Brand-new user** — create the account, empty password hash. Mark
+   `email_verified=True` only when `google_authoritative(payload)`; for a
+   third-party address (non-Gmail, no `hd`) create it UNVERIFIED and challenge
+   the inbox before anything trusts the email → issue session.
 
 Then issue your own session. Prowl issues an HS256 app JWT (72 h, `ver` claim
 for global revocation) delivered as an **HttpOnly, Secure, SameSite=Strict
@@ -287,10 +294,31 @@ victim ever visits. Later the victim clicks "Sign in with Google". Naïve
 auto-linking attaches victim's Google to the **attacker's** record — attacker
 keeps password access to the merged account (its data and wallet).
 
-Defense (`web/auth.py:392-417`): when a Google login matches an existing
-**password** account whose email was **never verified**, refuse to auto-link;
-tell the user to sign in with the password. Link only when email ownership of
-the existing record is proven.
+Defense: `email_verified` is not proof of ownership OF THE LOCAL ACCOUNT, and
+Google is only authoritative for the *address* when it is Gmail or carries an
+`hd` Workspace claim — for a third-party email, ownership can have changed
+since Google verified it (Google's own guidance excludes non-Gmail without
+`hd`). So:
+
+```python
+def google_authoritative(payload):
+    email = (payload.get("email") or "").lower()
+    return bool(payload.get("email_verified")
+                and (email.endswith("@gmail.com") or payload.get("hd")))
+```
+
+- **Default** — link only after a **fresh re-auth of the existing local
+  account** (its password or existing factor). Proving you hold the account is
+  the only thing that authorizes attaching a new identity to it.
+- **Auto-link without re-auth** — permitted only when
+  `google_authoritative(payload)` AND the existing record's email ownership was
+  already proven. For any other address, run an **independent challenge** (a
+  verification link to that inbox) first.
+- **Unverified pre-registration** — when the existing password account's email
+  was never verified, DO NOT tell the victim to "sign in with the password":
+  that password may be the attacker's. Route them into a **safe
+  account-recovery flow** (reset via a fresh inbox challenge), which takes the
+  account away from whoever pre-registered it rather than handing it over.
 
 ### 4.4 Login-CSRF (P3-03 in Prowl)
 
