@@ -181,6 +181,41 @@ default, the test tells you to stop carrying it yourself.
 same shape. A test that asserts a password is scrubbed, while carrying that
 password in the repository, has moved the leak rather than closed it.
 
+## Every OUTBOUND CHANNEL has its own hook — or it is not covered
+
+`before_send` sees ERROR EVENTS and nothing else. Sentry ships several outbound
+channels, each with its own hook, and a scrubber wired into one of them says
+nothing about the rest — the table below is the claim, per channel, and a
+channel without a hook is **UNSUPPORTED: stated, never promised away as a
+universal scrub**:
+
+| Channel | Hook | Status |
+|---|---|---|
+| error events | `before_send` (wired above) | covered |
+| transactions | `before_send_transaction` — `before_send` does NOT see these | covered once wired |
+| breadcrumbs | `before_breadcrumb` | covered once wired |
+| logs (Sentry Logs) | `before_send_log` where the SDK version ships it | covered on that SDK; on an older SDK the channel is UNKNOWN — gate or disable it |
+| attachments | **no scrub hook exists** — attachment bytes go out untouched | UNSUPPORTED: do not attach files that may carry secrets |
+
+```python
+import sentry_sdk
+
+sentry_sdk.init(
+    dsn=DSN,
+    before_send=scrub_values,
+    before_send_transaction=scrub_values,
+    before_breadcrumb=lambda crumb, _hint: scrub_values(crumb),
+    # before_send_log=scrub_values,   # only where this SDK version has it;
+    #                                 # absent => the logs channel is UNKNOWN
+)
+```
+
+**The fixture suite runs the SAME secret fixtures through EVERY channel the
+table claims** — an event, a transaction, a breadcrumb — and a channel the
+hooks cannot reach is reported UNKNOWN/UNSUPPORTED, never green. A green that
+covers one channel while four others ship raw is the universal-scrub promise
+this section exists to refuse.
+
 ## Re-measuring after an SDK upgrade
 
 Both facts on this page are version-dependent. After any `sentry-sdk` bump:
