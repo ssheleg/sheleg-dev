@@ -55,7 +55,7 @@ def t_three_states_in_error_tracking():
     for s in ("*Liveness*", "*Readiness*", "*degraded_auth*"):
         assert s in d, f"{s} missing"
     assert "live but NOT ready" in d
-    assert "the same rule `telegram-userbots` states" in d
+    assert "error-tracking and `telegram-userbots` name\n this one contract".replace("\n ", " ") in d or "name this one contract" in d
 
 
 def t_transient_vs_terminal():

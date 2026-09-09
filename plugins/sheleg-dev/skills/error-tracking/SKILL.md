@@ -236,11 +236,24 @@ NOT ready**, and a load balancer or supervisor reads readiness, not liveness.
   bounded retry count separates the two: retries exhausted against the same
   auth error is terminal, not "try harder".
 
+**The recovery contract — one decision table both skills obey.** A supervisor
+RESTART is applied only where the policy is `recoverable`; a `terminal` event
+is never restarted, whichever skill saw it first:
+
+| Event | Policy | Supervisor action | Readiness |
+|---|---|---|---|
+| transient auth failure (rotated token, network 401) | recoverable | restart / bounded retry | not ready → ready on success |
+| retries exhausted on the same auth error | terminal | STOP, alert, wait for fresh auth | not ready until re-auth |
+| revoked / killed session (MTProto or bearer) | terminal | STOP, alert, wait for fresh auth | not ready until re-auth |
+
+The row a revoked session lands on is the SAME in both packs, so the identical
+event cannot get opposite actions: error-tracking and `telegram-userbots` name
+this one contract, and a supervisor that restarts a `terminal` policy is the
+bug the table exists to forbid.
+
 Sentry helps only if something raises; a connection that stopped working
 without raising produces no event at all. Cron monitors (`sentry monitor`)
-cover the shape where a job stops running. This is the same rule
-`telegram-userbots` states for a revoked MTProto session — one contract across
-both skills.
+cover the shape where a job stops running.
 
 ## Degradation
 
