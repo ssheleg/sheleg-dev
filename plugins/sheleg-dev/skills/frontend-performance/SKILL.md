@@ -28,24 +28,39 @@ Optimize frontend applications for maximum Lighthouse scores and real-user perfo
 
 ## Core Web Vitals, and the diagnostics beside them
 
-**Three metrics are Core Web Vitals. The other three are not**, and the difference
-is not pedantry: only the first three are what Google reports and ranks on, and
-only they are field-measurable. TBT is a *lab* metric — web.dev says it "is not
-part of the Core Web Vitals set because they are not field-measurable" — and it
-stands in for INP when you have no field data. Telling a client their Speed Index
-is a failing Core Web Vital is telling them about a thing Google does not measure.
+**Two INDEPENDENT axes, and conflating them is the common error.** Axis one:
+**is it a Core Web Vital** — what Google reports and ranks on (LCP, INP, CLS)
+— or not. Axis two: **where can you measure it** — in the FIELD (real users,
+CrUX) or only in the LAB (a synthetic run). These do not line up: a metric can
+be not-CWV and still field-measurable. **FCP is the case that breaks the
+one-axis story — it is NOT a Core Web Vital, yet it IS field-measurable**
+(CrUX reports FCP; web.dev lists both lab and field tools for it). The earlier
+claim that "only the three CWV are field-measurable" was wrong.
 
-| Core Web Vital | Good | Needs Work | Poor |
-|--------|------|------------|------|
-| LCP (Largest Contentful Paint) | < 2.5s | 2.5-4.0s | > 4.0s |
-| INP (Interaction to Next Paint) | < 200ms | 200-500ms | > 500ms |
-| CLS (Cumulative Layout Shift) | < 0.1 | 0.1-0.25 | > 0.25 |
+| Metric | Core Web Vital? | Field-measurable? | Good | Needs Work | Poor |
+|---|---|---|---|---|---|
+| LCP | yes | yes (CrUX) | < 2.5s | 2.5-4.0s | > 4.0s |
+| INP | yes | yes (CrUX) | < 200ms | 200-500ms | > 500ms |
+| CLS | yes | yes (CrUX) | < 0.1 | 0.1-0.25 | > 0.25 |
+| FCP | no | **yes (CrUX)** | < 1.8s | 1.8-3.0s | > 3.0s |
+| TBT | no | no (lab only) | < 200ms | 200-600ms | > 600ms |
+| SI | no | no (lab only) | < 3.4s | 3.4-5.8s | > 5.8s |
 
-| Lab diagnostic | Good | Needs Work | Poor | Stands in for |
-|--------|------|------------|------|---|
-| FCP (First Contentful Paint) | < 1.8s | 1.8-3.0s | > 3.0s | early LCP signal |
-| TBT (Total Blocking Time) | < 200ms | 200-600ms | > 600ms | INP, in the lab |
-| SI (Speed Index) | < 3.4s | 3.4-5.8s | > 5.8s | perceived load |
+**A field claim carries its provenance, always: p75** (the 75th-percentile
+value Google classifies on, never a mean), the **device/cohort** (phone vs
+desktop, and which population), the **period** (CrUX is a 28-day trailing
+window), and the **sample size** (a thin origin has no field data — that is
+`unknown`, not `good`). A number without these four is a lab number wearing a
+field label.
+
+**TBT is a diagnostic CORRELATE of INP, never a substitute for its evidence.**
+A good lab TBT is a hint that INP may be fine; it does NOT PROVE INP, because
+INP is measured on real interactions the lab did not perform. So a page with
+CrUX FCP data and a Lighthouse TBT but **no field INP** reports **FCP =
+field-supported, INP = unknown** — never "INP passed by TBT". Telling a client
+their Speed Index is a failing Core Web Vital is telling them about a thing
+Google does not rank; telling them INP passed because TBT did is telling them
+about a measurement nobody took.
 
 Thresholds and the classification verified against `web.dev/articles/vitals`,
 2026-08-16.
