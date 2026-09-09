@@ -20,21 +20,30 @@
 ## Status check — 2026
 
 Consent Mode v2 has been required since **March 2024** for anyone using Google
-advertising products with EEA or UK traffic, and by 2026 Google additionally
-expects a **certified CMP** from the Consent Management Platform programme —
-a hand-rolled banner that sets the signals correctly is no longer sufficient on
-its own for Google's ad products. Verify your CMP's certification status before
-treating this box as ticked. *(Checked 2026-08-06.)*
+advertising products with EEA or UK traffic. The **certified CMP** requirement
+(Consent Management Platform programme) is scoped to Google's **publisher**
+products — AdSense, Ad Manager, AdMob — where a hand-rolled banner is no longer
+sufficient; on the advertiser side (Google Ads, GA4) a certified CMP is
+Google's recommendation, not a stated requirement. Verify the programme's
+current scope and your CMP's certification before treating either box as
+ticked. *(Checked 2026-08-06; scope per Google's CMP programme pages.)*
 
 ## Advanced vs Basic Mode
 
 | Mode | Tags load before consent? | Cookieless pings? | Conversion modeling? |
 |------|--------------------------|-------------------|---------------------|
-| **Basic** | No — tags blocked until consent granted | No | No |
-| **Advanced** | Yes — tags load with denied defaults | Yes | Yes (recovers ~65-70% of lost data) |
+| **Basic** | No — tags blocked until consent granted | No | **General** modeling only — Google models from aggregate patterns, less accurately; "no modeling" was never true |
+| **Advanced** | Yes — tags load with denied defaults | Yes | **Advertiser-specific** modeling from your own cookieless pings |
 
-**Always prefer Advanced mode** — it allows Google to model conversions from users who deny
-consent without storing any cookies or identifying individuals.
+**Which mode is three separate questions, not one default.** *Provider policy:*
+Google's modeling is stronger under Advanced (advertiser-specific vs general).
+*Business choice:* Advanced sends cookieless pings BEFORE consent — how much
+recovered attribution is worth that is yours to decide. *Jurisdiction:* whether
+pre-consent pings are lawful where your users are is counsel's question — some
+EEA regulators read them restrictively, and Basic is the conservative answer.
+The recovery figures Google has cited (~65–70%) come from its own dated,
+campaign-specific case studies — **your recovery is unknown until measured on
+your traffic**; an unmeasured percentage is not a promise.
 
 Advanced mode = `gtag('consent', 'default', { ... 'denied' ... })` then load tags normally.
 Basic mode = physically block `<script>` tags until consent granted.
@@ -71,7 +80,9 @@ gtag('consent', 'default', {
   'wait_for_update': 500
 });
 
-// Grant by default everywhere else (no banner needed)
+// Granted by default everywhere else — a recorded BUSINESS choice, not legal
+// advice: whether a banner is needed outside the listed regions is a
+// jurisdiction question (ePrivacy transpositions, US state laws, LGPD…).
 gtag('consent', 'default', {
   'ad_storage': 'granted',
   'ad_user_data': 'granted',

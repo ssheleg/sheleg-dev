@@ -75,8 +75,10 @@ defaults after the script has loaded looks correct in every test that begins by
 accepting consent, and loses the denied population entirely.
 
 **Denied is not off.** With Advanced mode Google still receives cookieless
-pings and models conversions from them — roughly two thirds of the otherwise
-lost data. Blocking the script instead throws that away.
+pings and models conversions from them (Google's own dated case studies cite
+~65–70%; yours is unknown until measured). Whether pre-consent pings are
+lawful in your jurisdiction is counsel's call — Basic is the conservative
+mode, and it still gets Google's general modeling.
 ## Google Analytics 4
 
 ### Setup
