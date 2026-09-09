@@ -177,33 +177,71 @@ is the assertion that measures it, against
 
 ## Seat and quantity changes
 
+A quantity upgrade with `always_invoice` CHARGES the customer at the moment
+Stripe accepts it. Everything below follows from that: a revert of the
+quantity does not return the money — the proration invoice already settled —
+so "compensate by putting the number back" compensates the count and keeps
+the charge. The operation is recorded BEFORE the effect, an ambiguous outcome
+stays `unknown`, and the database repairs itself FROM Stripe rather than
+reverting Stripe to match a failed local write.
+
 ```ts
 const item = (await stripe.subscriptions.retrieve(subId)).items.data[0];
 
+// 1. Durable intent, BEFORE the effect: an operation row with its own
+//    idempotency key. If we crash past this point, reconciliation finds the
+//    row and asks Stripe what actually happened — the key makes the retry
+//    safe and the answer attributable.
+const op = await db.operation.create({ data: { kind: "quantity-change", subId,
+  from: item.quantity, to: newQuantity, state: "pending",
+  idempotencyKey: crypto.randomUUID() } });
+
+let updated;
 try {
-  await stripe.subscriptions.update(subId, {
+  updated = await stripe.subscriptions.update(subId, {
     items: [{ id: item.id, quantity: newQuantity }],
     proration_behavior: "always_invoice",
     payment_behavior: "error_if_incomplete",     // upgrades only
-  });
+  }, { idempotencyKey: op.idempotencyKey });
 } catch (err) {
   if (err.type === "StripeCardError" || err.code === "invoice_payment_intent_requires_action") {
+    await db.operation.update({ where: { id: op.id }, data: { state: "failed" } });
     return json({ error: "payment failed", code: "payment_failed" }, 402);
+  }
+  if (err.type === "StripeConnectionError" || err.type === "StripeAPIError") {
+    // 2. A timeout after Stripe may have ACCEPTED the effect is not a
+    //    failure. Mark it unknown and leave it for reconciliation, which
+    //    retrieves the subscription (or replays the key) and settles the
+    //    row either way. Declaring it failed here is how a charged
+    //    customer keeps the old quantity.
+    await db.operation.update({ where: { id: op.id }, data: { state: "unknown" } });
+    return json({ error: "outcome unknown, reconciling", code: "pending" }, 202);
   }
   throw err;
 }
 
 try {
   await db.subscription.update({ where: { id }, data: { quantity: newQuantity } });
+  await db.operation.update({ where: { id: op.id }, data: { state: "applied" } });
 } catch (dbErr) {
-  await stripe.subscriptions.update(subId, {                  // compensating revert
-    items: [{ id: item.id, quantity: oldQuantity }],
-    proration_behavior: "none",                               // do not re-bill the revert
-  }).catch((e) => log.error("CRITICAL: revert failed, Stripe and DB disagree", { subId, e }));
+  // 3. Stripe CONFIRMED the new quantity and invoiced it. The database is
+  //    what failed — so the database is what gets repaired, from the
+  //    confirmed Stripe state, by reconciliation reading the op row. Do NOT
+  //    revert Stripe to match a broken local write: the proration invoice
+  //    has already charged, and quantity:oldQuantity with proration "none"
+  //    returns none of it.
+  await db.operation.update({ where: { id: op.id }, data: { state: "apply-pending" } })
+    .catch(() => log.error("CRITICAL: op row unreachable", { opId: op.id }));
   throw dbErr;
 }
 ```
 
+- **If the business genuinely wants a rollback** (the product decides the
+  change must not stand), that is a SECOND financial operation, not a flag:
+  revert the quantity AND issue the credit note for the settled proration
+  invoice (`stripe.creditNotes.create`), each with its own op row and state —
+  the money's return is tracked to `applied`, never assumed from the
+  quantity's.
 - **Downgrades** need no `payment_behavior`; they produce a credit.
 - **Reducing below what is in use** is a business decision, not an API call.
   Answer 409 with the list of things that must be released first, and let the
