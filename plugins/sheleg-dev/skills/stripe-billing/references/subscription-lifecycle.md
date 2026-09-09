@@ -143,19 +143,37 @@ user back to the plan chooser shows a paywall to somebody who just paid.
 ```ts
 if (invoice.billing_reason !== "subscription_cycle") return;   // see webhook-events.md
 
+// One LEDGER ROW per granted period, arbitrated by the database:
+//   grant_ledger: UNIQUE (subscriptionId, periodStart)
+// The row carries the item and the invoice as provenance; they are not part of
+// the uniqueness (a second invoice for one period must not grant it twice; a
+// multi-item subscription widens the key with the item).
 await db.$transaction(async (tx) => {
-  const sub = await tx.subscription.findUnique({ where: { id }, select: { lastGrantedPeriodStart: true } });
-  if (sub?.lastGrantedPeriodStart && sub.lastGrantedPeriodStart >= periodStart) return;  // replay
-
-  await tx.subscription.update({ where: { id }, data: { lastGrantedPeriodStart: periodStart } });
+  try {
+    await tx.grantLedger.create({ data: { subscriptionId: id, itemId, invoiceId: invoice.id,
+      periodStart, amount: allowance } });
+  } catch (e) {
+    if (isUniqueViolation(e)) return;               // this period is already granted
+    throw e;
+  }
   await tx.wallet.update({ where: { userId }, data: { credit: { increment: allowance } } });
   await tx.auditLog.create({ data: { userId, action: "grant", amount: allowance,
     source: "subscription-renewal", metadata: { invoiceId: invoice.id } } });
 });
 ```
 
-Marker and grant in **one** transaction. Two statements outside a transaction is
-the same bug as read-then-write, one level up.
+Key write and grant in **one** transaction, and the KEY is per period — never a
+high-water mark. `lastGrantedPeriodStart >= periodStart` looks like the same
+guard and is a different rule: events arrive out of order, and a January
+invoice landing after February's would read as a replay and be suppressed —
+the reordered-periods fixture (`out-of-order-pair-does-not-rewind-state`)
+forbids exactly that. And the guard must be the INSERT itself: a SELECT before
+the write is a round trip, and two concurrent grants of one period — the
+webhook and the reconciler, say — both pass the read and both credit
+(`concurrent-entry-points-grant-once` in
+[`fixtures/assert-money-invariants.mjs`](../fixtures/assert-money-invariants.mjs)
+is the assertion that measures it, against
+`fixtures/invoice-paid-subscription-cycle.json`).
 
 ## Seat and quantity changes
 

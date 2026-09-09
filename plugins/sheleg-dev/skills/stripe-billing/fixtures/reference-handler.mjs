@@ -38,6 +38,11 @@ export const RULES = Object.freeze([
   // (event id + effect kind). Without this rule a redelivered outbox row sends
   // the renewal notice and fires the conversion a second time.
   'outbox-consumer-key',
+  // The period grant is claimed by an ATOMIC keyed insert (subscription + item
+  // + period), not a read-then-mark. Without this rule two concurrent grants of
+  // one period — a webhook and the reconciler, say — both pass the read and
+  // both credit: the read is a round trip, and a round trip is a race.
+  'grant-key-atomic',
   'billing-reason',
   'grant-marker',
   'ordering',
@@ -92,6 +97,8 @@ export function createStore() {
       this.clock += ms;
     },
     grantedPeriods: new Map(), // subscription id -> Set of period starts already granted
+    grantKeys: new Set(), // atomic per-period claim keys: sub:item:period
+    grantLedger: [], // one row per granted period: { key, subId, itemId, invoiceId, periodStart }
     subscriptions: new Map(), // the mirrored row: period, status, quantity, price
     purchases: new Map(), // payment intent -> { amount, refundedTotal } (minor units)
     credits: new Map(), // user id -> integer
@@ -113,6 +120,8 @@ export function createStore() {
         processedEvents: new Map([...this.processedEvents]
           .map(([k, v]) => [k, { ...v }])),
         grantedPeriods: new Map([...this.grantedPeriods].map(([k, v]) => [k, new Set(v)])),
+        grantKeys: new Set(this.grantKeys),
+        grantLedger: this.grantLedger.map((r) => ({ ...r })),
         subscriptions: new Map([...this.subscriptions].map(([k, v]) => [k, { ...v }])),
         purchases: new Map([...this.purchases].map(([k, v]) => [k, { ...v }])),
         credits: new Map(this.credits),
@@ -169,6 +178,23 @@ export function createStore() {
     releaseEventClaim(id) {
       const row = this.processedEvents.get(id);
       if (row && row.state === 'processing') this.processedEvents.delete(id);
+    },
+
+    /** The DATABASE arbitrates: an INSERT on a UNIQUE period-grant key.
+     *  Synchronous — no round trip between the check and the write, which is the
+     *  whole difference from readGrantedPeriods-then-mark. The ledger row carries
+     *  subscription, item, invoice and period; UNIQUENESS is (subscription,
+     *  period) — this reference models one plan item per subscription, and a
+     *  multi-item subscription widens the key with the item. The invoice is
+     *  provenance, never part of the uniqueness: a second invoice for one period
+     *  must not grant the period twice. */
+    claimPeriodGrant(subId, itemId, invoiceId, periodStart) {
+      const key = `${subId}:${periodStart}`;
+      if (this.grantKeys.has(key)) return false;
+      this.grantKeys.add(key);
+      this.grantLedger.push({ key, subId, itemId, invoiceId, periodStart });
+      this.markPeriodGranted(subId, periodStart);   // the view existing readers use
+      return true;
     },
 
     async readGrantedPeriods(subId) {
@@ -298,12 +324,23 @@ export function createHandler(store, options = {}) {
     const metadata = invoiceMetadata(invoice);
     const userId = metadata.userId;
 
-    const granted = await store.readGrantedPeriods(subId);
-    if (has('grant-marker') && granted.has(period.start)) {
-      store.log.push({ event: event.id, decision: 'skipped: period already granted' });
-      return [];
+    const itemId = (period.line && period.line.id) || 'item';
+    if (has('grant-key-atomic')) {
+      if (has('grant-marker')
+          && !store.claimPeriodGrant(subId, itemId, invoice.id, period.start)) {
+        store.log.push({ event: event.id, decision: 'skipped: period already granted' });
+        return [];
+      }
+      if (!has('grant-marker')) store.claimPeriodGrant(subId, itemId, invoice.id, period.start);
+    } else {
+      // The pre-fix shape: a SELECT (a round trip), then a mark. Kept as the mutant.
+      const granted = await store.readGrantedPeriods(subId);
+      if (has('grant-marker') && granted.has(period.start)) {
+        store.log.push({ event: event.id, decision: 'skipped: period already granted' });
+        return [];
+      }
+      store.markPeriodGranted(subId, period.start);
     }
-    store.markPeriodGranted(subId, period.start);
     store.addCredits(userId, CREDITS_PER_PERIOD);
     store.grants.push({
       subscription: subId, userId, periodStart: period.start, source: 'webhook', event: event.id,
@@ -552,12 +589,26 @@ export function createHandler(store, options = {}) {
    * point that separates the two.
    */
   async function reconcile(subId, period, metadata) {
-    const granted = await store.readGrantedPeriods(subId);
-    if (has('grant-marker') && granted.has(period.start)) {
-      store.log.push({ event: 'reconcile', decision: 'skipped: period already granted' });
-      return { granted: false };
+    // The SAME key derivation as the webhook path — a reconciler keying the item
+    // differently is two ledgers for one period, i.e. the double grant back again.
+    const reconcileItemId = (period.line && period.line.id) || 'item';
+    if (has('grant-key-atomic')) {
+      if (has('grant-marker')
+          && !store.claimPeriodGrant(subId, reconcileItemId, 'reconcile', period.start)) {
+        store.log.push({ event: 'reconcile', decision: 'skipped: period already granted' });
+        return { granted: false };
+      }
+      if (!has('grant-marker')) {
+        store.claimPeriodGrant(subId, reconcileItemId, 'reconcile', period.start);
+      }
+    } else {
+      const granted = await store.readGrantedPeriods(subId);
+      if (has('grant-marker') && granted.has(period.start)) {
+        store.log.push({ event: 'reconcile', decision: 'skipped: period already granted' });
+        return { granted: false };
+      }
+      store.markPeriodGranted(subId, period.start);
     }
-    store.markPeriodGranted(subId, period.start);
     store.addCredits(metadata.userId, CREDITS_PER_PERIOD);
     store.grants.push({
       subscription: subId, userId: metadata.userId, periodStart: period.start,

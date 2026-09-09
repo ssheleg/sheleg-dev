@@ -170,6 +170,19 @@
    ]
   },
   {
+   "id": "concurrent-entry-points-grant-once",
+   "isolates": "grant-key-atomic",
+   "fixtures": [
+    "invoice-paid-subscription-cycle.json"
+   ],
+   "claimedBy": [
+    {
+     "document": "references/subscription-lifecycle.md",
+     "phrase": "both pass the read and both credit"
+    }
+   ]
+  },
+  {
    "id": "reconciliation-does-not-regrant",
    "isolates": "grant-marker",
    "fixtures": [

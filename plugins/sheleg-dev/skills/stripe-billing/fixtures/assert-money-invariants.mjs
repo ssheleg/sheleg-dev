@@ -266,6 +266,25 @@ export const INVARIANTS = [
     },
   },
   {
+    id: 'concurrent-entry-points-grant-once',
+    fixtures: [CYCLE_JAN],
+    states: 'a webhook and the reconciler racing for one period leave exactly one keyed ledger row — the claim is an INSERT, and a read is a round trip',
+    breaks: ['grant-key-atomic'],
+    async run({ store, handler, assert }) {
+      const event = fixture(CYCLE_JAN);
+      const subId = subscriptionIdOf(event.data.object);
+      await Promise.all([
+        handler.deliver(event),
+        handler.reconcile(subId, periodOfCycle(event), { userId: 'usr_PLACEHOLDER_alice' }),
+      ]);
+      // Judged on the LEDGER, deliberately: the keyed row is the atomic claim's own
+      // axis. Grant counts belong to the marker invariants; measuring them here would
+      // blur the two rules this pack keeps isolated.
+      assert.equal(store.grantLedger.length, 1,
+        `the race left ${store.grantLedger.length} keyed ledger rows for one period`);
+    },
+  },
+  {
     id: 'reconciliation-does-not-regrant',
     fixtures: [CYCLE_JAN],
     states: 'the nightly repair reuses the webhook marker — a nightly job is not a nightly gift',
