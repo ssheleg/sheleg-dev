@@ -88,14 +88,25 @@ on email (emails change, `sub` doesn't). On each Google login:
 
 ## Login-CSRF (cover BOTH delivery flows)
 
-- Form-POST flow (`login_uri` auto-POST): GIS double-submits `g_csrf_token`
-  in body AND cookie — compare constant-time (`hmac.compare_digest`);
-  reject if either side is missing.
-- JS-fetch flow: no `g_csrf_token` — enforce same-origin via Fetch-Metadata
-  (`Sec-Fetch-Site: same-origin`) with an Origin-allowlist fallback.
+The two delivery flows are **separate, explicitly typed paths**, chosen by
+Content-Type — not one handler that claims both. A skeleton that declares form
+support but only binds a JSON body does not actually run the form contract.
 
-Without this, an attacker's page can force-POST the *attacker's* credential
-and silently log the victim into the attacker's account.
+- **Form-POST flow** (`login_uri` auto-POST, `application/x-www-form-urlencoded`):
+  GIS double-submits `g_csrf_token` in the FORM BODY and the cookie — require
+  BOTH present and equal, constant-time (`hmac.compare_digest`). Missing either
+  side → reject. This token is the whole authorization for the form path.
+- **JS-fetch flow** (`application/json`): no `g_csrf_token`, so require a
+  trusted same-origin signal — `Sec-Fetch-Site: same-origin` (browser-set,
+  unforgeable), OR, only when that header is ABSENT, an exact `Origin` in an
+  allowlist. A **missing `Sec-Fetch-Site` is NOT assumed same-origin**;
+  `cross-site` and `none` are rejected; and with neither a trusted metadata
+  value nor an allowed Origin the request **fails closed**.
+
+The CSRF decision runs BEFORE the token is verified — no external call on a
+request that has not proven its origin. Without this, an attacker's page can
+force-POST the *attacker's* credential and silently log the victim into the
+attacker's account.
 
 ## Setup (GCP)
 

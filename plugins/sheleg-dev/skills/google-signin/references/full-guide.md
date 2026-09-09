@@ -328,12 +328,22 @@ attacker's account (victim then unknowingly feeds data/payments into it).
 
 Defense (`web/server.py:1657-1686`), covering both possible delivery flows:
 
-- **Form-POST flow** (GIS `login_uri` auto-POST): GIS double-submits
-  `g_csrf_token` in body *and* cookie — compare both, constant-time
-  (`hmac.compare_digest`). Reject if either is missing.
-- **JS-fetch flow** (this app): no `g_csrf_token`, so enforce same-origin via
-  **Fetch-Metadata** (`Sec-Fetch-Site: same-origin`) with an Origin-allowlist
-  fallback. These headers are browser-set and unforgeable by page script.
+The two flows are SEPARATE, explicitly typed paths chosen by Content-Type. A
+handler that claims form support but binds only a JSON body never runs the form
+contract — the CSRF check for the form flow (`g_csrf_token`) is on a request
+shape that flow never sends.
+
+- **Form-POST flow** (`login_uri` auto-POST, `application/x-www-form-urlencoded`):
+  GIS double-submits `g_csrf_token` in the FORM BODY and the cookie — require
+  BOTH present and equal, constant-time (`hmac.compare_digest`). Reject if
+  either is missing.
+- **JS-fetch flow** (`application/json`): no `g_csrf_token`, so require a
+  trusted same-origin signal — `Sec-Fetch-Site: same-origin`, OR (only when
+  that header is ABSENT) an exact `Origin` in an allowlist. A **missing
+  `Sec-Fetch-Site` is NOT assumed same-origin**; `cross-site` and `none` are
+  rejected; with neither a trusted metadata value nor an allowed Origin the
+  request **fails closed**. These headers are browser-set and unforgeable by
+  page script. The CSRF decision runs BEFORE token verification.
 
 ### 4.5 Session hygiene
 
@@ -388,7 +398,7 @@ Defense (`web/server.py:1657-1686`), covering both possible delivery flows:
 ```python
 # --- backend ---
 import os, hmac, secrets, time
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, Form, HTTPException, Request, Response
 from pydantic import BaseModel
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
@@ -400,9 +410,32 @@ app = FastAPI()
 NONCE_TTL = 600
 _nonce_store: dict[str, tuple[str, float]] = {}   # sid -> (nonce, expires); use Redis in prod
 
+ALLOWED_ORIGINS = {"https://app.example.com"}   # your own origin(s)
+
+
 class GoogleAuthRequest(BaseModel):
     credential: str
     g_csrf_token: str | None = None               # no nonce in the body — the server holds it
+
+
+def _csrf_ok_form(cookie_token, form_token):
+    # The form flow's whole authorization: both present and equal, constant-time.
+    if not form_token or not cookie_token:
+        return False
+    return hmac.compare_digest(cookie_token, form_token)
+
+
+def _csrf_ok_json(sec_fetch_site, origin):
+    # Trusted metadata first; Origin allowlist ONLY as an explicit fallback when
+    # the header is absent. A missing Sec-Fetch-Site is not same-origin, and
+    # `none`/`cross-site` are rejected — fail closed when neither proves origin.
+    if sec_fetch_site == "same-origin":
+        return True
+    if sec_fetch_site in ("cross-site", "same-site", "none"):
+        return False
+    if sec_fetch_site is None:                     # header absent → exact Origin, allowlisted
+        return bool(origin) and origin in ALLOWED_ORIGINS
+    return False
 
 @app.get("/api/auth/google/nonce")
 async def google_nonce(req: Request, response: Response):
@@ -413,18 +446,29 @@ async def google_nonce(req: Request, response: Response):
                         samesite="lax", max_age=NONCE_TTL, path="/")
     return {"nonce": nonce}
 
-@app.post("/api/auth/google")
-async def google_auth(req: Request, data: GoogleAuthRequest, response: Response):
-    # CSRF: double-submit for form-POST flow, Fetch-Metadata for JS flow
-    if data.g_csrf_token:
-        cookie = req.cookies.get("g_csrf_token") or ""
-        if not hmac.compare_digest(cookie, data.g_csrf_token):
-            raise HTTPException(403, "CSRF token mismatch")
-    elif req.headers.get("sec-fetch-site", "same-origin") not in ("same-origin", "none"):
-        raise HTTPException(403, "Cross-site request rejected")
+# Two explicitly typed routes. Content-Type picks the flow; each runs ONLY its
+# own CSRF contract; both fail closed; the check is before any token call.
 
+@app.post("/api/auth/google/form")             # application/x-www-form-urlencoded
+async def google_auth_form(req: Request, response: Response,
+                           credential: str = Form(...),
+                           g_csrf_token: str = Form(None)):
+    if not _csrf_ok_form(req.cookies.get("g_csrf_token"), g_csrf_token):
+        raise HTTPException(403, "CSRF: g_csrf_token missing or mismatched")
+    return await _finish_google_auth(req, response, credential)
+
+
+@app.post("/api/auth/google")                  # application/json (JS fetch)
+async def google_auth(req: Request, data: GoogleAuthRequest, response: Response):
+    sec = req.headers.get("sec-fetch-site")    # None when the header is absent
+    if not _csrf_ok_json(sec, req.headers.get("origin")):
+        raise HTTPException(403, "CSRF: request origin not proven (fail closed)")
+    return await _finish_google_auth(req, response, data.credential)
+
+
+async def _finish_google_auth(req: Request, response: Response, credential: str):
     try:
-        payload = id_token.verify_oauth2_token(data.credential, _transport, GOOGLE_CLIENT_ID)
+        payload = id_token.verify_oauth2_token(credential, _transport, GOOGLE_CLIENT_ID)
     except Exception as exc:
         raise HTTPException(401, f"Invalid Google token: {exc}")
     if not payload.get("email_verified"):
