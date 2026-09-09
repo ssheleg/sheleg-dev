@@ -1,0 +1,49 @@
+{
+ "contract": "offline artifact / fault-injection corpus (fix-dv-19.03) for google-auth — sibling of 19.01/19.02. Each case injects a fault, runs a state/output ORACLE (not a provider stub judging itself), records exit/trace/environment. DV-19: the counterexample FAILS pre-fix, PASSES post-fix, verified by STATE/OUTPUTS, release-tied.",
+ "release_tie": "the fix ships in a tagged release; a counterexample that passes pre-fix is not a fix",
+ "environment": {
+  "runtime": "python3 stdlib",
+  "network": "none — offline oracles",
+  "note": "OAuth/session stubs are inputs, never the oracle"
+ },
+ "cases": [
+  {
+   "id": "DV-07-secrets-in-signed-cookie",
+   "finding": "DV-07",
+   "fault": "client_secret/refresh_token stored in a signed (not encrypted) session cookie",
+   "counterexample": {
+    "store_in_cookie": true
+   },
+   "oracle": "no_secret_readable_from_the_cookie",
+   "prefix_expect": "FAIL (the holder base64-decodes client_secret from the signed cookie)",
+   "postfix_expect": "PASS (tokens kept server-side; the cookie carries only a session id)"
+  },
+  {
+   "id": "DV-08-adc-resolution-order",
+   "finding": "DV-08",
+   "fault": "credential resolution documented as attached-SA → local ADC → env",
+   "counterexample": {
+    "order": [
+     "attached-sa",
+     "local-adc",
+     "env"
+    ]
+   },
+   "oracle": "resolution_order_matches_google",
+   "prefix_expect": "FAIL (wrong order: an attached SA shadows an explicit env credential)",
+   "postfix_expect": "PASS (env → local ADC → attached SA, Google's documented order)"
+  },
+  {
+   "id": "DV-09-state-single-use",
+   "finding": "DV-09",
+   "fault": "one OAuth2 client mutated per request; state compared with undefined===undefined",
+   "counterexample": {
+    "shared_client": true,
+    "consume_state": false
+   },
+   "oracle": "missing_state_rejected_and_state_single_use",
+   "prefix_expect": "FAIL (a callback with no state passes; undefined===undefined)",
+   "postfix_expect": "PASS (per-request client; state stored, TTL, single-use consumed; missing rejected)"
+  }
+ ]
+}
