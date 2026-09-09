@@ -42,20 +42,30 @@ pip install google-auth google-auth-oauthlib google-api-python-client flask
 
 ### Node.js
 
+**One OAuth2 client PER request, never a shared singleton.** A module-level
+`oauth2Client` whose `setCredentials(tokens)` runs on every callback is mutated
+by every concurrent login — two users signing in at once end up with each
+other's tokens. Build the client inside the handler; the client id/secret are
+shared config, the CREDENTIALS are per principal and never assigned to a
+process-wide object.
+
 ```js
 const {google} = require('googleapis');
 const crypto = require('crypto');
 
-const oauth2Client = new google.auth.OAuth2(
-  YOUR_CLIENT_ID,
-  YOUR_CLIENT_SECRET,
-  YOUR_REDIRECT_URL
-);
+// A fresh client per request — the credentials it will hold are this user's.
+function newOAuthClient() {
+  return new google.auth.OAuth2(YOUR_CLIENT_ID, YOUR_CLIENT_SECRET, YOUR_REDIRECT_URL);
+}
 
+const oauthClient = newOAuthClient();
+
+// State is REQUIRED, crypto-random, single-use with a TTL, and bound to the
+// server session — not a value the client can echo back to itself.
 const state = crypto.randomBytes(32).toString('hex');
-req.session.state = state;
+req.session.oauthState = { value: state, expires: Date.now() + 10 * 60 * 1000 };
 
-const authorizationUrl = oauth2Client.generateAuthUrl({
+const authorizationUrl = oauthClient.generateAuthUrl({
   access_type: 'offline',          // 'online' (default) or 'offline' (gets refresh_token)
   scope: [
     'https://www.googleapis.com/auth/drive.metadata.readonly',
@@ -169,16 +179,21 @@ app.get('/oauth2callback', async (req, res) => {
   const q = url.parse(req.url, true).query;
 
   if (q.error) {
-    console.log('Error: ' + q.error);
-    return res.status(400).send('Authorization failed');
+    return res.status(400).send('Authorization failed');   // never log the raw error/token
   }
 
-  if (q.state !== req.session.state) {
-    return res.status(403).send('State mismatch. Possible CSRF attack');
+  // Validate state BEFORE the token exchange: it must be PRESENT on both sides
+  // (undefined === undefined must NOT pass), unexpired, and consumed atomically
+  // so a replay of the same callback cannot reuse it.
+  const saved = req.session.oauthState;
+  delete req.session.oauthState;                            // single-use: consume it now
+  if (!q.state || !saved || saved.value !== q.state || Date.now() > saved.expires) {
+    return res.status(403).send('State invalid, missing, expired or already used');
   }
 
-  const {tokens} = await oauth2Client.getToken(q.code);
-  oauth2Client.setCredentials(tokens);
+  const oauthClient = newOAuthClient();                     // a client for THIS request
+  const {tokens} = await oauthClient.getToken(q.code);
+  oauthClient.setCredentials(tokens);                       // credentials stay on the local client
 
   // tokens.access_token — short-lived access token
   // tokens.refresh_token — long-lived (only on first auth!)
@@ -416,19 +431,20 @@ const {google} = require('googleapis');
 const app = express();
 app.use(session({secret: 'your-secret', resave: false, saveUninitialized: false}));
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  'http://localhost:3000/oauth2callback'
-);
+// A client per request — client id/secret are config, credentials are per user.
+function newOAuthClient() {
+  return new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET,
+    'http://localhost:3000/oauth2callback');
+}
 
 const SCOPES = ['https://www.googleapis.com/auth/userinfo.profile'];
 
 app.get('/auth', (req, res) => {
   const state = crypto.randomBytes(32).toString('hex');
-  req.session.state = state;
+  req.session.oauthState = { value: state, expires: Date.now() + 10 * 60 * 1000 };
 
-  const url = oauth2Client.generateAuthUrl({
+  const url = newOAuthClient().generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
     state,
@@ -439,18 +455,22 @@ app.get('/auth', (req, res) => {
 
 app.get('/oauth2callback', async (req, res) => {
   if (req.query.error) return res.redirect('/error');
-  if (req.query.state !== req.session.state) return res.status(403).send('CSRF');
+  const saved = req.session.oauthState;
+  delete req.session.oauthState;                    // single-use
+  if (!req.query.state || !saved || saved.value !== req.query.state
+      || Date.now() > saved.expires) return res.status(403).send('CSRF');
 
-  const {tokens} = await oauth2Client.getToken(req.query.code);
+  const {tokens} = await newOAuthClient().getToken(req.query.code);
   req.session.tokens = tokens;
   res.redirect('/profile');
 });
 
 app.get('/profile', async (req, res) => {
   if (!req.session.tokens) return res.redirect('/auth');
-  oauth2Client.setCredentials(req.session.tokens);
+  const oauthClient = newOAuthClient();             // local to this request
+  oauthClient.setCredentials(req.session.tokens);
 
-  const oauth2 = google.oauth2({version: 'v2', auth: oauth2Client});
+  const oauth2 = google.oauth2({version: 'v2', auth: oauthClient});
   const {data} = await oauth2.userinfo.get();
   res.json(data);
 });
