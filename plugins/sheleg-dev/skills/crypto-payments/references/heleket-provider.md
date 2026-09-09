@@ -394,7 +394,7 @@ model CryptoPayment {
   heleketuuid      String              @unique @map("heleket_uuid")
   orderId          String              @unique @map("order_id")
   amountUsd        Float               @map("amount_usd")          // base amount user requested
-  tokenAmount      Float               @map("token_amount")        // base + buffer = amount sent to Heleket
+  tokenAmount      Float               @map("token_amount")        // ASSET amount (invoice token): base + buffer sent to Heleket — never plan units, never added to USD fields without a dated FX quote
   status           CryptoPaymentStatus @default(pending)
   paymentUrl       String?             @map("payment_url")
   currency         String?                                          // pricing currency, "USD"

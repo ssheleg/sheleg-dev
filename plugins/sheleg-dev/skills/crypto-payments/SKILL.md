@@ -255,18 +255,26 @@ Write them on the settling webhook, in the same update that flips the status.
 
 ## Crediting: the amount waterfall
 
-What do you credit when the numbers disagree? Prefer the most authoritative,
-fall back in a fixed order, and log which one won:
+Four dimensions, and they never mix implicitly: **Money** (currency + minor
+units — never floats), **Asset** (network + token + decimal amount),
+**Entitlement** (plan units) and a **dated FX quote** (rate + source + time).
+`paidAmountUsd` and `amountUsd` are Money; `tokenAmount` is an **Asset amount**
+(the invoiced base + buffer — NOT plan units). A `??` across dimensions is an implicit
+conversion, so first bring each candidate to USD minor — an Asset amount
+converts only via a dated quote from a known source; an unknown or missing
+quote **blocks** the conversion rather than guessing:
 
 ```ts
-const credit = payment.paidAmountUsd     // gateway's valuation of what arrived
-            ?? payment.tokenAmount        // what the plan says this purchase grants
-            ?? payment.amountUsd;         // the original intent — last resort
+const usd = [payment.paidAmountUsd            // Money: gateway's valuation
+  , toUsdMinor(payment.tokenAmount, quote)    // Asset -> Money, dated quote or BLOCKED
+  , payment.amountUsd];                       // Money: the intent — last resort
+const credit = usd.find(v => v != null);
 ```
 
 The order matters: valuing an over-payment at the intent silently keeps the
 excess, and valuing an under-payment at the intent gives away product. Write an
-audit row naming the source, or the first disputed balance is unprovable.
+audit row naming the source AND the quote used, or the first disputed balance
+is unprovable.
 
 ---
 
