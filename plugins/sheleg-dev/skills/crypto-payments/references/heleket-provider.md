@@ -1248,27 +1248,36 @@ Without a buffer, a $30 invoice frequently lands as `payment_amount_usd: 29.97`,
 your balance is debited at $30 to provision a subscription, the user gets stuck on a
 "insufficient balance" error 30 seconds after paying.
 
-**The fix**: add 1% on the invoice side, credit the **full invoice amount** (not the
-base) to the user's balance.
+**The fix**: add 1% on the invoice side — and then WHAT HAPPENS TO THE EXCESS is a
+**required business policy, not a template default**. The template carries the enum and
+no preselected price:
+
+```ts
+// REQUIRED — the template does not choose for you. A missing policy BLOCKS
+// invoice creation and asks; it never silently invents a fee.
+type ExcessPolicy = 'refund_excess' | 'credit_excess' | 'buffer_fee';
+```
+
+One unit-safe example per variant (all Money in USD minor, per the dimensional
+contract — the buffer never mixes with Asset amounts):
+
+- **`refund_excess`** — pay 3030¢ against a 3000¢ subscription → 30¢ goes BACK to the
+  payer (an on-chain or balance refund row with its own audit line).
+- **`credit_excess`** — the 30¢ lands as 30¢ of BALANCE after provisioning; the UI
+  breakdown says "credited to your balance", and the user keeps it.
+- **`buffer_fee`** — the 30¢ is retained as a disclosed fee: it appears as "buffer
+  fee: 30¢" on the invoice BEFORE payment, never discovered afterwards.
 
 ```ts
 const bufferAmount  = Math.ceil(amountUsd * 0.01 * 100) / 100;   // 0.30 for $30
 const invoiceAmount = Math.round((amountUsd + bufferAmount) * 100) / 100;  // 30.30
-const tokenAmount   = invoiceAmount;       // user gets the buffer back as balance
+// tokenAmount = invoiceAmount is the ASSET amount sent to Heleket either way;
+// the ExcessPolicy decides the LEDGER, not the invoice.
 ```
 
-Show the breakdown in the UI:
-
-```
-Subscription:    $30.00
-Crypto buffer:   +$0.30  (covers conversion losses, credited to your balance)
-Invoice total:   $30.30
-```
-
-Why credit the full invoice (not just `paymentAmountUsd`)? Because if the user pays
-exactly $30.30, they should keep $0.30 in balance after the subscription is provisioned.
-If Heleket reports `payment_amount_usd: 30.27` (a 0.1% loss), use that instead — the
-credit waterfall `paymentAmountUsd ?? tokenAmount ?? amountUsd` does this automatically.
+If Heleket reports `payment_amount_usd: 30.27` (a 0.1% loss), the waterfall values the
+payment at that figure — and the excess policy then applies to whatever remains above
+the base, in USD minor.
 
 ---
 
