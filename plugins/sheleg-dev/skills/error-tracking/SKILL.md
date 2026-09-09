@@ -220,12 +220,27 @@ Observed 2026-08-24: a bot token was rotated, and for ten minutes the platform
 reported the dyno `up` with a clean log while the API returned `401` to every
 call and no user was served. Nothing in the system could tell the difference.
 
-**Liveness must assert the thing the service exists to do**, not that a process
-exists. For anything holding a long-lived authenticated connection, check the
-credential periodically and exit non-zero when it fails — a crash loop is
-visible, a silent zombie is not. Sentry helps only if something raises; a
-connection that stopped working without raising produces no event at all. Cron
-monitors (`sentry monitor`) cover the shape where a job stops running.
+**Three health states, because "up" is not one question.** *Liveness* — the
+process exists and its loop runs. *Readiness* — it can do its job right now
+(the credential works); a live process with a dead credential is **live but
+NOT ready**, and a load balancer or supervisor reads readiness, not liveness.
+*degraded_auth* — auth is failing, and its two sub-cases take OPPOSITE actions:
+
+- **transient** (a rotated token, a network blip, a `401` a fresh connect
+  fixes): bounded retry with backoff, and a restart is legitimate because the
+  next start picks up the new credential — this is where "exit non-zero, a
+  crash loop is visible" is right.
+- **terminal / revoked** (the session was killed server-side): a restart just
+  re-loops a login that can never succeed. **Stop work, go NOT ready, alert
+  with the account named, and wait for FRESH auth** — never a restart loop. A
+  bounded retry count separates the two: retries exhausted against the same
+  auth error is terminal, not "try harder".
+
+Sentry helps only if something raises; a connection that stopped working
+without raising produces no event at all. Cron monitors (`sentry monitor`)
+cover the shape where a job stops running. This is the same rule
+`telegram-userbots` states for a revoked MTProto session — one contract across
+both skills.
 
 ## Degradation
 
