@@ -76,15 +76,28 @@ Thresholds and the classification verified against `web.dev/articles/vitals`,
 - **Use `font-display: swap`** -- Prevents invisible text during load (FOIT).
 - **Remove unused preconnects** -- If fonts are self-hosted, `preconnect` to font CDNs is dead weight.
 
+**Before any of these changes: MEASURE, don't prescribe.** The items below are
+optimization HEURISTICS, not blanket rules — each is conditional on evidence,
+and applied blind it can lose function for a score. Before changing anything,
+check three things: the **performance trace + the scenarios** (what a low-end
+device on a slow network actually waits for), the **browser-support contract**
+(who must the page still work for), and the **accessibility owner** (structure
+is theirs, not the score's). A change ships only with acceptance covering:
+low-end/slow-network scenarios, keyboard + heading structure intact, the
+supported-browser matrix still served, NO new unapproved CSP origin, and
+several comparable before/after measurements showing the win **with no
+functional loss**.
+
 ### JavaScript (TBT, FCP, LCP)
 
-- **Code split aggressively** -- Lazy-load below-the-fold sections. Only hero + nav in initial bundle.
+- **Code split by the MEASURED waterfall** -- lazy-load what the trace shows the first paint does not need; "only hero + nav in the initial bundle" is a starting hypothesis, not a rule — a section the scenario needs above the fold stays, whatever the score says.
 - **Defer third-party scripts** -- GA, analytics, chat widgets load after interactive (`afterInteractive` or `defer`).
-- **Target modern browsers** -- Set `browserslist` to avoid shipping polyfills for `Array.prototype.at`, `Object.fromEntries`, etc.:
+- **Target the browsers your USERS run** -- `browserslist` follows a stated user-support policy (your analytics, your contract), not a default "last 2". The `last 2` line below is an EXAMPLE; shipping it without checking who it drops is how a working browser stops being served for a polyfill saving:
   ```
+  # example only — replace with your measured support matrix
   last 2 Chrome versions, last 2 Firefox versions, last 2 Safari versions, last 2 Edge versions
   ```
-- **Tree-shake imports** -- Named imports only. No `import * as`.
+- **Tree-shake imports** -- prefer named imports where the bundle analyzer shows `import * as` pulling dead weight; it is a tree-shaking aid, not a ban — a namespace import that costs nothing measured is not a defect.
 - **Analyze bundles** -- Use `@next/bundle-analyzer`, `source-map-explorer`, or `vite-plugin-visualizer`.
 
 ### CSS & Animations (CLS)
@@ -113,7 +126,7 @@ Thresholds and the classification verified against `web.dev/articles/vitals`,
 
 ### Content Security Policy (Best Practices)
 
-- **Whitelist all loaded origins** -- CSP blocks = console errors = lower Best Practices score.
+- **Approve origins by FUNCTIONAL NECESSITY, not for the score** -- an origin enters the CSP because the page genuinely needs it, and each is reviewed; whitelisting everything the page happens to load to silence console errors trades the whole point of a CSP for a Best-Practices number. No new origin ships unapproved.
 - **Audit after every third-party change** -- Adding analytics, fonts, or CDN scripts requires CSP updates.
 - **Tighten after migration** -- If you move from external fonts to self-hosted, remove the old CSP entries.
 - **Common CSP origins**:
@@ -126,7 +139,7 @@ Thresholds and the classification verified against `web.dev/articles/vitals`,
 These directly affect the Lighthouse Accessibility score:
 
 - **Contrast ratio** -- WCAG AA requires 4.5:1 for normal text, 3:1 for large text. Avoid opacity modifiers on text colors (e.g., `text-primary/80` in Tailwind reduces contrast). Use full-opacity color tokens.
-- **Heading hierarchy** -- Sequential: `h1` -> `h2` -> `h3`. Never skip levels. Use non-heading elements (`<p>`) for visual-only "headings" (e.g., footer column titles).
+- **Heading hierarchy follows STRUCTURE, decided with the accessibility owner** -- sequential `h1`->`h2`->`h3`, no skipped levels. Demote a heading to `<p>` only when it is genuinely NOT a section title; downgrading a real footer-section heading to `<p>` to quiet a Lighthouse audit removes structure a screen-reader user navigates by. Accessibility is the owner here, not the score.
 - **Alt text** -- Decorative images next to identical text get `alt=""`. Informative images get descriptive alt. Never duplicate adjacent text.
 - **Tap targets** -- Minimum 48x48px on mobile. Applies to buttons, links, form inputs.
 
