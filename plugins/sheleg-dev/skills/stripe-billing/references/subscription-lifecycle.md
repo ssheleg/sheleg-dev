@@ -354,25 +354,45 @@ expires 5 minutes after creation if unused, so mint it in the request that redir
 
 ## Refund clawback
 
+`charge.amount_refunded` is CUMULATIVE and delivered out of order: a 4000 and
+a 9000 refund of one charge can arrive in either order, and two handlers can
+read the SAME `stored.refundedTotal` at once. The whole clawback — read,
+delta, marker AND ledger — happens inside ONE serializable transaction, and a
+CAS loser RE-READS and retries rather than returning: the old code's loser
+went home, so the second refund clawed back nothing.
+
 ```ts
-const totalRefunded = charge.amount_refunded / 100;
-const increment = totalRefunded - stored.refundedTotal;
-if (increment <= 0) return;
+// Money in MINOR UNITS end to end. `amount_refunded` is already integer cents;
+// `/ 100` turns 995 into 9.95 and reintroduces the float error the integer
+// avoids — never divide until you format for a human.
+const totalRefunded = charge.amount_refunded;          // cents, integer
 
-const { count } = await db.purchase.updateMany({
-  where: { id: stored.id, refundedTotal: stored.refundedTotal },
-  data:  { refundedTotal: totalRefunded },
-});
-if (count === 0) return;                       // concurrent delivery won
-
-try {
-  await clawBack(stored.userId, increment);    // idempotent, keyed on charge id + total
-} catch (err) {
-  await db.purchase.update({ where: { id: stored.id },
-    data: { refundedTotal: stored.refundedTotal } });   // put the marker back
-  throw err;
+for (let attempt = 0; attempt < RETRIES; attempt++) {
+  try {
+    await db.$transaction(async (tx) => {
+      const row = await tx.purchase.findUnique({
+        where: { id: stored.id }, ...forUpdate });      // row lock
+      const seen = Math.max(row.refundedTotal, totalRefunded);  // monotone: never rewind
+      const increment = seen - row.refundedTotal;
+      if (increment <= 0) return;                       // this delta already counted
+      // Marker and ledger move TOGETHER — a marker written without its
+      // clawback (or the reverse) is the split the old code shipped.
+      await tx.purchase.update({ where: { id: stored.id },
+        data: { refundedTotal: seen } });
+      await clawBack(tx, stored.userId, increment,
+        { key: `${charge.id}:${seen}` });               // idempotent per (charge,total)
+    }, { isolation: "Serializable" });
+    return;
+  } catch (err) {
+    if (isSerializationConflict(err) && attempt < RETRIES - 1) continue;  // re-read, retry
+    throw err;
+  }
 }
 ```
+
+The invariant the fixtures pin: cumulative 4000 then 9000 (or 9000 then 4000),
+a crash after the marker, and a retry of the old event all converge on
+`refundedTotal = 9000` and a summed clawback of exactly 9000 — once.
 
 Clamp the deduction at zero. A user who already spent the credit goes to a
 negative balance or to a collections decision — pick one deliberately and log
