@@ -86,7 +86,7 @@ request = google.auth.transport.requests.Request()
 credentials.refresh(request)
 ```
 
-ADC search order: attached service account → `gcloud auth application-default login` file → `GOOGLE_APPLICATION_CREDENTIALS` env var.
+ADC search order (env var FIRST — this line was reversed): `GOOGLE_APPLICATION_CREDENTIALS` env var → `gcloud auth application-default login` file → attached service account (metadata). Print the RESOLVED principal and source (no secret) before configuring — with more than one present, only the resolved source names which you are actually using.
 
 For detailed ADC setup and service account usage, see [references/adc-and-service-accounts.md](references/adc-and-service-accounts.md).
 
