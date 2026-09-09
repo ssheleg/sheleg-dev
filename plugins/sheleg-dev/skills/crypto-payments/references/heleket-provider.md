@@ -1301,16 +1301,26 @@ Heleket refunds are **merchant-initiated only** (user cannot self-refund). They 
    manually via the dashboard).
 2. The user's destination wallet address (you have it as `fromAddress`).
 
-Webhook handling:
+Webhook handling — refunds and holds are a SEPARATE ledger, not a branch of the
+paid path, and they are never dropped as a "duplicate" just because the invoice
+already reached `paid` (DV-05). A refund event arriving after `paid` is the
+NORMAL case, not a replay: the CAS that guards the paid→credit transition
+treats an already-final invoice as a duplicate, so the refund/hold statuses
+take their own path BEFORE that guard.
 
 | Status | Action |
 |--------|--------|
-| `refund_process` | Update DB row to `refund_process`, no balance change. |
-| `refund_paid` | Update DB row to `refund_paid`. **Optionally** debit the user's balance manually if you previously credited them — the reference implementation leaves this to ops to avoid accidental negative balances. |
-| `refund_fail` | Update DB row to `failed`, alert ops. |
+| `refund_process` | Record a `refund_ledger` row `(paymentId, "refund_process")`, no balance change. |
+| `refund_paid` | Record `refund_ledger` `(paymentId, "refund_paid")` and, if the invoice was credited, debit the credited amount — **inside one transaction, keyed by `(paymentId, "refund_paid")`** so a redelivered refund webhook debits ONCE, never twice. A negative-balance clamp and its ops decision are DV-04's rule. |
+| `refund_hold` / `on_hold` | Record `refund_ledger` `(paymentId, status)`; pause downstream side effects, no debit yet. |
+| `refund_fail` | Record `refund_ledger` `(paymentId, "refund_fail")`, alert ops. |
 
-There is no chargeback mechanism in crypto — once `paid` is on-chain, the only path back
-is a refund initiated by you. Set up a financial alarm at, e.g., $500/month of refunds.
+The refund ledger is keyed by `(paymentId, status)` and its writes are
+idempotent: a repeated refund webhook finds the row and stops, so a
+paid→refund sequence adjusts the balance exactly once and a redelivery adds
+nothing. There is no chargeback mechanism in crypto — once `paid` is on-chain,
+the only path back is a refund initiated by you. Set up a financial alarm at,
+e.g., $500/month of refunds.
 
 ---
 
