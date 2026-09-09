@@ -1,0 +1,45 @@
+{
+ "contract": "offline artifact / fault-injection corpus (fix-dv-19.05) for ad-tracking — sibling of 19.01–19.04. Each case injects a fault, runs a state/output ORACLE (not a provider stub judging itself), records exit/trace/environment. DV-19: the counterexample FAILS pre-fix, PASSES post-fix, verified by STATE/OUTPUTS, release-tied.",
+ "release_tie": "the fix ships in a tagged release; a counterexample that passes pre-fix is not a fix",
+ "environment": {
+  "runtime": "python3 stdlib",
+  "network": "none — offline oracles",
+  "note": "GTM/GA4/Meta pixel stubs are inputs, never the oracle"
+ },
+ "cases": [
+  {
+   "id": "DV-13-basic-mode-modeling",
+   "finding": "DV-13",
+   "fault": "Basic consent mode described as 'No conversion modeling'",
+   "counterexample": {
+    "basic_no_modeling": true
+   },
+   "oracle": "basic_mode_reports_general_modeling",
+   "prefix_expect": "FAIL (Basic labelled 'no modeling' — Google applies a general model)",
+   "postfix_expect": "PASS (Basic = general modeling; Advanced = advertiser-specific)"
+  },
+  {
+   "id": "DV-13-cmp-scope",
+   "finding": "DV-13",
+   "fault": "certified CMP declared mandatory for ALL Google ad products",
+   "counterexample": {
+    "cmp_required_everywhere": true
+   },
+   "oracle": "cmp_requirement_publisher_scoped",
+   "prefix_expect": "FAIL (a certified CMP demanded on the advertiser side too)",
+   "postfix_expect": "PASS (required for publisher products; a recommendation on advertiser)"
+  },
+  {
+   "id": "DV-14-meta-noscript-before-consent",
+   "finding": "DV-14",
+   "fault": "Meta noscript <img> renders before consent; GA4 tag still carries allow_enhanced_conversions",
+   "counterexample": {
+    "meta_noscript_ungated": true,
+    "enhanced_before_consent": true
+   },
+   "oracle": "no_pixel_fires_before_consent",
+   "prefix_expect": "FAIL (the Meta noscript pixel fires and enhanced conversions run pre-consent)",
+   "postfix_expect": "PASS (nothing fires before consent; the noscript pixel is behind the same gate)"
+  }
+ ]
+}
