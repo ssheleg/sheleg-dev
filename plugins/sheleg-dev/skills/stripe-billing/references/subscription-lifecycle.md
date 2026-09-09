@@ -252,6 +252,51 @@ try {
 - Do not add seats to a subscription flagged `cancel_at_period_end` — reactivate
   first, or the seats vanish at period end.
 
+## Reconciliation — repair the record, and money moves only by policy
+
+The reconciler walks every operation row in `unknown` or `apply-pending` and
+asks Stripe what actually happened — the op's idempotency key makes the
+question safe to repeat and the answer attributable:
+
+```ts
+for (const op of await db.operation.findMany({ where: { state: { in: ["unknown", "apply-pending"] } } })) {
+  const sub = await stripe.subscriptions.retrieve(op.subId);
+  const applied = sub.items.data[0].quantity === op.to;
+  if (applied) {
+    // RECONCILE-FIRST, the default: the database is repaired FROM the
+    // confirmed Stripe state. This is a record repair — updating the local
+    // count is never called a refund, because no money moved.
+    await db.subscription.update({ where: { id: op.subId }, data: { quantity: op.to } });
+    await db.operation.update({ where: { id: op.id }, data: { state: "applied" } });
+  } else {
+    await db.operation.update({ where: { id: op.id }, data: { state: "failed" } });
+  }
+}
+```
+
+Two rules the loop must keep:
+
+- **Idempotent by construction.** Every transition above is absorbing —
+  `applied` and `failed` are terminal, and re-running the loop over settled
+  rows changes nothing and charges nothing. A reconciler that can move money
+  on a replay is a billing bug wearing a repair's name.
+- **A refund is a POLICY, never a reflex.** The reconciler repairs records;
+  it does not decide that money should come back. Only an explicitly
+  configured business policy (`rollbackPolicy: "revert-and-credit"` on the
+  operation's kind) triggers the credit-note flow from the section above —
+  and that flow issues AT MOST ONCE per operation: the credit note is keyed
+  by op id, so a repeated reconciliation finds the existing note and stops.
+
+```ts
+if (policy(op.kind) === "revert-and-credit" && !op.creditNoteId) {
+  const note = await stripe.creditNotes.create(
+    { invoice: op.invoiceId, amount: op.chargedAmount },
+    { idempotencyKey: `${op.idempotencyKey}:credit` });
+  await db.operation.update({ where: { id: op.id },
+    data: { creditNoteId: note.id, state: "compensated" } });
+}
+```
+
 ## Plan changes
 
 Same shape as a quantity change, with `items: [{ id: item.id, price: newPriceId }]`.
