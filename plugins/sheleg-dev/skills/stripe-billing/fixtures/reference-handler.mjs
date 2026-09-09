@@ -43,6 +43,10 @@ export const RULES = Object.freeze([
   // one period — a webhook and the reconciler, say — both pass the read and
   // both credit: the read is a round trip, and a round trip is a race.
   'grant-key-atomic',
+  // A serialization conflict retries, BOUNDED, inside the same claim. Without
+  // this rule a conflicted transaction is dropped and the route still answers
+  // 200 — the renewal silently never lands, and Stripe was told it did.
+  'tx-retry-bounded',
   'billing-reason',
   'grant-marker',
   'ordering',
@@ -89,6 +93,12 @@ const tick = () => new Promise((resolve) => setImmediate(resolve));
 /** The crash simulation's marker: a process death, not a thrown handler error. */
 class SystemError_ extends Error {}
 
+/** A database serialization failure — retryable by definition, never a verdict. */
+class SerializationConflict_ extends Error {}
+
+/** How many serialization conflicts one delivery absorbs before answering 5xx. */
+export const TX_RETRIES = 3;
+
 export function createStore() {
   return {
     processedEvents: new Map(), // event id -> { state: 'processing'|'completed', claimedAt }
@@ -106,6 +116,8 @@ export function createStore() {
     clawbacks: [], // { paymentIntent, amount } in minor units
     conversions: [], // what the server sent to the ad platforms
     outbox: [], // side-effect rows written IN the grant transaction: { key, apply, state }
+    failNextTransactions: 0, // test hook: how many commits raise a serialization conflict
+    txAttempts: 0, // how many transaction attempts actually ran
     sentKeys: new Set(), // the consumer's own dedup — survives a redelivered row
     retentionOffers: [], // { customerId, offerId, couponId, subscriptionId, redeemedAt }
     saves: [], // one row per cancellation deflected, recorded from the discount event
@@ -546,21 +558,45 @@ export function createHandler(store, options = {}) {
     // ONE transaction: entitlement, dedup marker, completion mark and the outbox rows
     // commit together, or none of them exist. A crash inside leaves nothing applied —
     // the claim row still says 'processing', and the retry runs the whole thing again.
-    const snap = has('atomic-application') ? store.snapshot() : null;
-    try {
-      const effects = await handle(event);
-      // Receipt becomes completion in the same commit as the grant. A handler that
-      // answers 200 without this line has told Stripe "done" about work only received.
-      if (has('claim') && has('claim-completion')) store.completeEvent(event.id);
-      for (const e of effects) {
-        store.outbox.push({ key: e.key, apply: e.apply, state: 'pending' });
+    // A serialization conflict aborts THIS attempt and retries inside the same
+    // claim — bounded at TX_RETRIES, because a database under real contention
+    // conflicts more than once and a loop with no bound is an outage. Beyond the
+    // bound the route answers 5xx with the claim released, so Stripe's redelivery
+    // brings the renewal back: a conflict may DELAY a grant, never lose it.
+    let attempts = 0;
+    for (;;) {
+      const snap = has('atomic-application') ? store.snapshot() : null;
+      try {
+        store.txAttempts += 1;
+        attempts += 1;
+        const effects = await handle(event);
+        // Receipt becomes completion in the same commit as the grant. A handler that
+        // answers 200 without this line has told Stripe "done" about work only received.
+        if (has('claim') && has('claim-completion')) store.completeEvent(event.id);
+        for (const e of effects) {
+          store.outbox.push({ key: e.key, apply: e.apply, state: 'pending' });
+        }
+        if (store.failNextTransactions > 0) {
+          store.failNextTransactions -= 1;
+          throw new SerializationConflict_();
+        }
+        if (opts.crashBeforeCommit) throw new SystemError_('killed inside the transaction');
+        break;
+      } catch (error) {
+        if (snap) store.restore(snap);
+        if (error instanceof SerializationConflict_) {
+          if (has('tx-retry-bounded') && attempts <= TX_RETRIES) continue; // same claim, fresh attempt
+          if (!has('tx-retry-bounded')) {
+            // The mutant: the conflict is swallowed and the route lies "done".
+            return { status: 200, body: { received: true } };
+          }
+          if (has('claim')) store.releaseEventClaim(event.id);
+          return { status: 500, body: { error: 'serialization conflict — retry' } };
+        }
+        if (error instanceof SystemError_) return { status: 0, body: null }; // process died
+        if (has('claim')) store.releaseEventClaim(event.id);
+        return { status: 500, body: { error: 'handler error' } };
       }
-      if (opts.crashBeforeCommit) throw new SystemError_('killed inside the transaction');
-    } catch (error) {
-      if (snap) store.restore(snap);
-      if (error instanceof SystemError_) return { status: 0, body: null }; // process died
-      if (has('claim')) store.releaseEventClaim(event.id);
-      return { status: 500, body: { error: 'handler error' } };
     }
     // After the commit the outbox drains — inline here; a worker in production, with
     // the same at-least-once semantics and therefore the same need for a consumer key.

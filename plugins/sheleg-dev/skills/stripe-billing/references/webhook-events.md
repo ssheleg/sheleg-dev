@@ -283,6 +283,17 @@ not participate in your transaction, and the consumer key is the only thing
 standing between a queue hiccup and a second "your renewal" email with a
 double-counted conversion.
 
+**The mirror is state; the ledger is history — and conflicts only delay.**
+The subscription mirror (current period, status, quantity) lives apart from
+the grant ledger: the mirror moves FORWARD only (a late-arriving older event
+never rewinds a confirmed period — the ordering rule), while the ledger keeps
+one row per granted period forever. And a database serialization conflict
+retries inside the same claim, bounded (three attempts in the reference);
+past the bound the route answers 5xx with the claim released, so the
+redelivery brings the renewal back — a conflict may delay a grant, never
+lose it, and a swallowed conflict answered 200 is a renewal that silently
+never happened.
+
 **The crash between receipt and completion is proved too.**
 `crash-after-receipt-is-retryable` kills the worker after the claim and requires the
 retry arriving past the claim expiry to be let in and to grant;
@@ -299,6 +310,10 @@ and no completion to survive; `crash-before-commit-applies-nothing` lets the
 retry in through the expired claim and requires everything applied exactly
 once; `committed-retry-sends-once` redelivers every outbox row and requires
 the notice and the conversion to fire once — the consumer key at work.
+`serialization-conflict-does-not-lose-the-renewal` injects a conflict and
+requires the retried transaction to land the grant;
+`exhausted-retries-answer-5xx-and-the-redelivery-lands` exhausts the bound
+and requires an honest 5xx followed by exactly one grant on redelivery.
 
 ## What to log
 

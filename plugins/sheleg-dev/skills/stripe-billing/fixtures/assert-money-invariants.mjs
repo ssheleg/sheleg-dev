@@ -29,6 +29,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {
   createStore, createHandler, subscriptionIdOf, RULES, CREDITS_PER_PERIOD, CLAIM_TTL_MS,
+  TX_RETRIES,
 } from './reference-handler.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -282,6 +283,39 @@ export const INVARIANTS = [
       // blur the two rules this pack keeps isolated.
       assert.equal(store.grantLedger.length, 1,
         `the race left ${store.grantLedger.length} keyed ledger rows for one period`);
+    },
+  },
+  {
+    id: 'serialization-conflict-does-not-lose-the-renewal',
+    fixtures: [CYCLE_JAN],
+    states: 'a conflicted transaction retries inside the same claim and the renewal lands — a conflict delays a grant, never loses it',
+    breaks: ['tx-retry-bounded', 'grant-on-renewal'],
+    async run({ store, handler, assert }) {
+      store.failNextTransactions = 1;
+      const r = await handler.deliver(fixture(CYCLE_JAN));
+      assert.unmutated.equal(r.status, 200);
+      assert.equal(store.grants.length, 1,
+        'the conflicted transaction was dropped and the renewal never landed');
+      assert.equal(store.txAttempts, 2, 'the retry did not actually run a second attempt');
+    },
+  },
+  {
+    id: 'exhausted-retries-answer-5xx-and-the-redelivery-lands',
+    fixtures: [CYCLE_JAN, CYCLE_JAN_REDELIVERY],
+    states: 'past the bound the route answers 5xx with the claim released, and the redelivery grants exactly once',
+    // atomic-application is here because without the rollback, the conflicted
+    // attempts leave their halves behind and every count below drifts.
+    breaks: ['atomic-application', 'tx-retry-bounded', 'grant-on-renewal'],
+    async run({ store, handler, assert }) {
+      store.failNextTransactions = TX_RETRIES + 1;
+      const first = await handler.deliver(fixture(CYCLE_JAN));
+      assert.equal(first.status, 500,
+        `exhausted retries answered ${first.status} — a swallowed conflict lies "done"`);
+      assert.equal(store.grants.length, 0,
+        'grants landed from attempts that were supposed to roll back');
+      const retry = await handler.deliver(fixture(CYCLE_JAN_REDELIVERY));
+      assert.equal(retry.status, 200, 'the redelivery was not let back in');
+      assert.equal(store.grants.length, 1, 'the redelivery did not land the renewal exactly once');
     },
   },
   {

@@ -71,6 +71,8 @@ Run `node assert-money-invariants.mjs` and each line names the invariant it hold
 | `committed-retry-sends-once` | cycle, outbox redelivered | sends "your renewal" twice and counts the revenue twice |
 | `sequential-redelivery-grants-once-by-count-alone` | cycle + redelivery | *nothing* — kept because that is the finding; see below |
 | `concurrent-entry-points-grant-once` | cycle, webhook + reconciler in flight together | both pass the marker's read and one period is granted twice |
+| `serialization-conflict-does-not-lose-the-renewal` | cycle, one injected conflict | drops the conflicted transaction and answers 200 — the renewal silently never lands |
+| `exhausted-retries-answer-5xx-and-the-redelivery-lands` | cycle + redelivery, conflicts past the bound | swallows the conflict instead of answering 5xx, so nothing ever retries |
 | `reconciliation-does-not-regrant` | cycle | the nightly repair grants a period the webhook already granted |
 | `out-of-order-pair-does-not-rewind-state` | February then January | stores the older period, so the renewal date points at a period that ended |
 | `refund-total-is-cumulative` | both refunds | claws back $130 against a $90 charge |
@@ -94,6 +96,7 @@ a line a generated handler routinely omits:
 | `atomic-application` | the snapshot/restore around the business application | applies the grant and loses the completion when a crash lands mid-way |
 | `outbox-consumer-key` | the consumer's own dedup across redelivered rows | sends every redelivered outbox row again |
 | `grant-key-atomic` | the keyed INSERT claim on the period grant | falls back to read-then-mark — two concurrent grants of one period both pass the read |
+| `tx-retry-bounded` | the bounded serialization-retry loop | a conflicted transaction is dropped and the route answers 200 |
 | `billing-reason` | `if (invoice.billing_reason !== 'subscription_cycle') return` | handles `invoice.paid` as "a payment arrived" |
 | `grant-marker` | `if (granted.has(period.start)) return` | grants whenever an event says paid, including from the reconciliation job |
 | `ordering` | `if (period.start > mirror.periodStart)` around the mirror write | writes whatever arrived last |

@@ -183,6 +183,33 @@
    ]
   },
   {
+   "id": "serialization-conflict-does-not-lose-the-renewal",
+   "isolates": "tx-retry-bounded",
+   "fixtures": [
+    "invoice-paid-subscription-cycle.json"
+   ],
+   "claimedBy": [
+    {
+     "document": "references/webhook-events.md",
+     "phrase": "a conflict may delay a grant, never lose it"
+    }
+   ]
+  },
+  {
+   "id": "exhausted-retries-answer-5xx-and-the-redelivery-lands",
+   "isolates": null,
+   "fixtures": [
+    "invoice-paid-subscription-cycle.json",
+    "invoice-paid-subscription-cycle-redelivery.json"
+   ],
+   "claimedBy": [
+    {
+     "document": "references/webhook-events.md",
+     "phrase": "a swallowed conflict answered 200 is a renewal that silently never happened"
+    }
+   ]
+  },
+  {
    "id": "reconciliation-does-not-regrant",
    "isolates": "grant-marker",
    "fixtures": [
