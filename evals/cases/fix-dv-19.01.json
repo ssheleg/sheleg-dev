@@ -1,0 +1,46 @@
+{
+ "contract": "offline artifact / fault-injection corpus (fix-dv-19.01) — each case injects a fault, runs a state/output ORACLE (not a protocol/provider stub judging itself), and records exit/trace/environment. The DV-19 rule: the original COUNTEREXAMPLE must FAIL on the pre-fix behaviour and PASS after the fix; a positive is verified by STATE and OUTPUTS, tied to the release the fix shipped in. Judged by test/audit_regressions/fix-dv-19.01.py, stdlib only.",
+ "release_tie": "the fix ships in a tagged release; a counterexample that passes pre-fix is not a fix",
+ "environment": {
+  "runtime": "python3 stdlib",
+  "network": "none — offline oracles",
+  "note": "provider/protocol stubs are inputs, never the oracle"
+ },
+ "cases": [
+  {
+   "id": "DV-01-webhook-idempotency",
+   "finding": "DV-01",
+   "fault": "SIGKILL between the processed_event marker INSERT and the business effect",
+   "counterexample": {
+    "marker_committed": true,
+    "effect_committed": false,
+    "atomic": false
+   },
+   "oracle": "effect_applied_exactly_once",
+   "prefix_expect": "FAIL (event eaten: marker present, effect never applied)",
+   "postfix_expect": "PASS (marker+effect one transaction/outbox → effect applied once)"
+  },
+  {
+   "id": "DV-02-grant-both-periods",
+   "finding": "DV-02",
+   "fault": "February→January: a shorter period arrives after a longer one",
+   "counterexample": {
+    "drop_if_le_last_granted": true
+   },
+   "oracle": "both_periods_granted",
+   "prefix_expect": "FAIL (Jan dropped because periodStart <= lastGrantedPeriodStart)",
+   "postfix_expect": "PASS (both periods granted; reconciliation carries event.id)"
+  },
+  {
+   "id": "DV-04-refund-cas",
+   "finding": "DV-04",
+   "fault": "two concurrent refunds (4000 then 9000) both read the same stored total",
+   "counterexample": {
+    "blind_write": true
+   },
+   "oracle": "refunded_total_is_max_not_clobbered",
+   "prefix_expect": "FAIL (9000 blind-writes over 4000-based total; a rollback clobbers newer)",
+   "postfix_expect": "PASS (CAS/re-read under lock; the loser re-reads, newer total wins)"
+  }
+ ]
+}

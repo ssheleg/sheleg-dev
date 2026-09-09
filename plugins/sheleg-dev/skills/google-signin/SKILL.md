@@ -33,19 +33,27 @@ implementation this skill ships.
 
 ## Core flow (ID-token)
 
-1. Frontend: `google.accounts.id.initialize({ client_id, callback, nonce })`
-   + `renderButton()`. Generate a **fresh random nonce per render**
-   (`crypto.randomUUID()`). The GSI script loads async — retry rendering
-   (e.g. 20 × 150 ms) instead of silently dropping the button.
+1. Frontend: fetch a **server-issued nonce** first (`GET /api/auth/google/nonce`
+   — the server stores it with a TTL, bound to a pre-auth HttpOnly cookie),
+   then `google.accounts.id.initialize({ client_id, callback, nonce })`
+   + `renderButton()`. A client-generated nonce POSTed back proves nothing:
+   the value would be read out of the very JWT it is meant to check. The GSI
+   script loads async — retry rendering (e.g. 20 × 150 ms) instead of
+   silently dropping the button.
 2. Callback receives `{ credential }` — a Google-signed ID token (JWT).
-   POST it with the nonce to your backend. Never treat it as a session.
+   POST it alone to your backend (no nonce in the body). Never treat it as a
+   session.
 3. Backend: verify with the official lib — Python
    `google.oauth2.id_token.verify_oauth2_token(credential, transport, CLIENT_ID)`,
    Node `google-auth-library` `verifyIdToken({ idToken, audience })`. That
    checks signature (Google JWKS), `aud`, `iss`, `exp`. Never hand-decode
    and trust the payload.
-4. Additionally require `email_verified == true` and token `nonce` claim ==
-   submitted nonce.
+4. Additionally require `email_verified == true` and **pop the expected nonce
+   from the pre-auth session (one-time consume) and require the token `nonce`
+   claim to equal it exactly** — a missing claim, a missing expectation, an
+   expired or an already-consumed nonce all reject. This is what makes a
+   stolen token non-replayable: a replay from a new session meets a different
+   expectation, a replay in the same session meets a consumed one.
 5. Find-or-create the user, then issue YOUR OWN session (app JWT) as an
    **HttpOnly + Secure + SameSite=Strict cookie**. Google's token is
    verified once, never stored, never logged.
@@ -56,25 +64,49 @@ Key the user on `sub` (stable Google user ID; store as `google_id`) — never
 on email (emails change, `sub` doesn't). On each Google login:
 
 1. Record with this `google_id` exists → login (refresh name/picture).
-2. Email matches an existing account without `google_id` → link, BUT apply
-   the **pre-hijacking guard**: if that account is password-based and its
-   email was never verified, REFUSE the auto-link ("sign in with your
-   password instead"). Otherwise an attacker who pre-registered the
-   victim's email with a known password captures the victim's first Google
-   login into the attacker's record.
-3. No match → create the user with `email_verified=True`, empty password
-   hash.
+2. Email matches an existing account without `google_id` → **do NOT auto-link
+   on `email_verified` alone.** `email_verified` is Google saying it verified
+   the inbox ONCE, not that this person owns the LOCAL account, and for a
+   third-party address Google is not even authoritative that they still own the
+   inbox. Default: link only after a **fresh re-auth of the existing local
+   account** (its password / existing factor), so the person proves they hold
+   the account Google is being attached to.
+   - Auto-link WITHOUT that re-auth is allowed only when Google is
+     **authoritative for the address** — `email_verified` AND (the address is
+     `@gmail.com` OR the token carries an `hd` Workspace-domain claim) — AND
+     the existing account's own email ownership was proven. For any other
+     (third-party) address, run an **independent challenge** (a link to that
+     inbox) before linking; Google's one-time verification is not current proof.
+   - If the existing account is a password account whose email was **never
+     verified** (a possible pre-registration hijack), send the person into a
+     **safe account-recovery flow** — never "sign in with the existing
+     password", which may be the attacker's.
+3. No match → create the user. Mark `email_verified=True` only when Google is
+   authoritative for the address (Gmail or `hd`); for a third-party address
+   record it unverified and challenge the inbox before granting anything that
+   trusts the email.
 
 ## Login-CSRF (cover BOTH delivery flows)
 
-- Form-POST flow (`login_uri` auto-POST): GIS double-submits `g_csrf_token`
-  in body AND cookie — compare constant-time (`hmac.compare_digest`);
-  reject if either side is missing.
-- JS-fetch flow: no `g_csrf_token` — enforce same-origin via Fetch-Metadata
-  (`Sec-Fetch-Site: same-origin`) with an Origin-allowlist fallback.
+The two delivery flows are **separate, explicitly typed paths**, chosen by
+Content-Type — not one handler that claims both. A skeleton that declares form
+support but only binds a JSON body does not actually run the form contract.
 
-Without this, an attacker's page can force-POST the *attacker's* credential
-and silently log the victim into the attacker's account.
+- **Form-POST flow** (`login_uri` auto-POST, `application/x-www-form-urlencoded`):
+  GIS double-submits `g_csrf_token` in the FORM BODY and the cookie — require
+  BOTH present and equal, constant-time (`hmac.compare_digest`). Missing either
+  side → reject. This token is the whole authorization for the form path.
+- **JS-fetch flow** (`application/json`): no `g_csrf_token`, so require a
+  trusted same-origin signal — `Sec-Fetch-Site: same-origin` (browser-set,
+  unforgeable), OR, only when that header is ABSENT, an exact `Origin` in an
+  allowlist. A **missing `Sec-Fetch-Site` is NOT assumed same-origin**;
+  `cross-site` and `none` are rejected; and with neither a trusted metadata
+  value nor an allowed Origin the request **fails closed**.
+
+The CSRF decision runs BEFORE the token is verified — no external call on a
+request that has not proven its origin. Without this, an attacker's page can
+force-POST the *attacker's* credential and silently log the victim into the
+attacker's account.
 
 ## Setup (GCP)
 

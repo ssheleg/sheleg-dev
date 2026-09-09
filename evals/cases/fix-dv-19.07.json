@@ -1,0 +1,34 @@
+{
+ "contract": "offline artifact / fault-injection corpus (fix-dv-19.07) for frontend-performance. Each case injects a fault, runs a state/output ORACLE (not a provider stub judging itself), records exit/trace/environment. DV-19: the counterexample FAILS pre-fix, PASSES post-fix, verified by STATE/OUTPUTS, release-tied.",
+ "release_tie": "the fix ships in a tagged release; a counterexample that passes pre-fix is not a fix",
+ "environment": {
+  "runtime": "python3 stdlib",
+  "network": "none — offline oracles",
+  "note": "Lighthouse/CrUX stubs are inputs, never the oracle"
+ },
+ "cases": [
+  {
+   "id": "DV-17-fcp-field-measurable",
+   "finding": "DV-17",
+   "fault": "only the three CWV declared field-measurable; FCP filed lab-only; INP 'passed by TBT'",
+   "counterexample": {
+    "only_three_field": true,
+    "inp_passed_by_tbt": true
+   },
+   "oracle": "axes_and_inp_evidence_correct",
+   "prefix_expect": "FAIL (FCP=lab-only; INP reported passed on TBT with no field data)",
+   "postfix_expect": "PASS (FCP is field-measurable; CrUX-FCP+TBT+no-field-INP → FCP supported, INP unknown)"
+  },
+  {
+   "id": "DV-18-heuristics-not-prohibitions",
+   "finding": "DV-18",
+   "fault": "optimization heuristics applied as blanket rules without measurement",
+   "counterexample": {
+    "blanket": true
+   },
+   "oracle": "change_gated_on_measurement_no_functional_loss",
+   "prefix_expect": "FAIL (CSP allow-all for score / footer headings→p / last-two targets applied blind)",
+   "postfix_expect": "PASS (each change gated on trace+scenarios, browser matrix, accessibility; no functional loss)"
+  }
+ ]
+}

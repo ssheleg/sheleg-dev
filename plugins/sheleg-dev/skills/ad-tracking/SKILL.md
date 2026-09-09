@@ -75,8 +75,10 @@ defaults after the script has loaded looks correct in every test that begins by
 accepting consent, and loses the denied population entirely.
 
 **Denied is not off.** With Advanced mode Google still receives cookieless
-pings and models conversions from them — roughly two thirds of the otherwise
-lost data. Blocking the script instead throws that away.
+pings and models conversions from them (Google's own dated case studies cite
+~65–70%; yours is unknown until measured). Whether pre-consent pings are
+lawful in your jurisdiction is counsel's call — Basic is the conservative
+mode, and it still gets Google's general modeling.
 ## Google Analytics 4
 
 ### Setup
@@ -112,7 +114,10 @@ lost data. Blocking the script instead throws that away.
 <!-- 3. Configure -->
 <script>
   gtag('js', new Date());
-  gtag('config', 'G-XXXXXXXXXX', { allow_enhanced_conversions: true });
+  // GA4 config carries NO allow_enhanced_conversions — that flag belongs on the
+  // Google Ads `AW-` tag only (see the Enhanced-conversions section); on a `G-`
+  // tag it enables nothing and contradicts this skill's own rule.
+  gtag('config', 'G-XXXXXXXXXX');
 </script>
 ```
 
@@ -230,14 +235,25 @@ fbq('init', 'PIXEL_ID');
 fbq('track', 'PageView');
 ```
 
-**noscript fallback (required for pixel verification):**
+**noscript fallback — consent-gated, or omitted.** A bare `<noscript>` Meta
+pixel FIRES on every JS-disabled page view — no banner, no `fbq`, no consent —
+contradicting this stack's rule that Meta is *not rendered until consent*. So
+emit it from the SERVER, only when a **server-verifiable consent** (a signed
+HttpOnly cookie the server reads before writing the HTML) already exists. Cannot
+verify consent server-side? **Omit it** — Meta's verification does not need it,
+and a request that fired cannot be taken back:
 
 ```html
-<noscript>
-  <img height="1" width="1" style="display:none"
-    src="https://www.facebook.com/tr?id=PIXEL_ID&ev=PageView&noscript=1"/>
-</noscript>
+<!-- server-side: render ONLY when consent is proven -->
+{% if consent_cookie_verified and consent.ad_storage == "granted" %}
+<noscript><img height="1" width="1" style="display:none"
+  src="https://www.facebook.com/tr?id=PIXEL_ID&ev=PageView&noscript=1"/></noscript>
+{% endif %}
 ```
+
+Snippets here come from EXECUTABLE templates, so a static check refuses the two
+mistakes this section prevents: `allow_enhanced_conversions` on a `G-` tag, and
+a `noscript` Meta pixel not behind a server-verified consent condition.
 
 ### Standard Events
 

@@ -143,49 +143,105 @@ user back to the plan chooser shows a paywall to somebody who just paid.
 ```ts
 if (invoice.billing_reason !== "subscription_cycle") return;   // see webhook-events.md
 
+// One LEDGER ROW per granted period, arbitrated by the database:
+//   grant_ledger: UNIQUE (subscriptionId, periodStart)
+// The row carries the item and the invoice as provenance; they are not part of
+// the uniqueness (a second invoice for one period must not grant it twice; a
+// multi-item subscription widens the key with the item).
 await db.$transaction(async (tx) => {
-  const sub = await tx.subscription.findUnique({ where: { id }, select: { lastGrantedPeriodStart: true } });
-  if (sub?.lastGrantedPeriodStart && sub.lastGrantedPeriodStart >= periodStart) return;  // replay
-
-  await tx.subscription.update({ where: { id }, data: { lastGrantedPeriodStart: periodStart } });
+  try {
+    await tx.grantLedger.create({ data: { subscriptionId: id, itemId, invoiceId: invoice.id,
+      periodStart, amount: allowance } });
+  } catch (e) {
+    if (isUniqueViolation(e)) return;               // this period is already granted
+    throw e;
+  }
   await tx.wallet.update({ where: { userId }, data: { credit: { increment: allowance } } });
   await tx.auditLog.create({ data: { userId, action: "grant", amount: allowance,
     source: "subscription-renewal", metadata: { invoiceId: invoice.id } } });
 });
 ```
 
-Marker and grant in **one** transaction. Two statements outside a transaction is
-the same bug as read-then-write, one level up.
+Key write and grant in **one** transaction, and the KEY is per period — never a
+high-water mark. `lastGrantedPeriodStart >= periodStart` looks like the same
+guard and is a different rule: events arrive out of order, and a January
+invoice landing after February's would read as a replay and be suppressed —
+the reordered-periods fixture (`out-of-order-pair-does-not-rewind-state`)
+forbids exactly that. And the guard must be the INSERT itself: a SELECT before
+the write is a round trip, and two concurrent grants of one period — the
+webhook and the reconciler, say — both pass the read and both credit
+(`concurrent-entry-points-grant-once` in
+[`fixtures/assert-money-invariants.mjs`](../fixtures/assert-money-invariants.mjs)
+is the assertion that measures it, against
+`fixtures/invoice-paid-subscription-cycle.json`).
 
 ## Seat and quantity changes
+
+A quantity upgrade with `always_invoice` CHARGES the customer at the moment
+Stripe accepts it. Everything below follows from that: a revert of the
+quantity does not return the money — the proration invoice already settled —
+so "compensate by putting the number back" compensates the count and keeps
+the charge. The operation is recorded BEFORE the effect, an ambiguous outcome
+stays `unknown`, and the database repairs itself FROM Stripe rather than
+reverting Stripe to match a failed local write.
 
 ```ts
 const item = (await stripe.subscriptions.retrieve(subId)).items.data[0];
 
+// 1. Durable intent, BEFORE the effect: an operation row with its own
+//    idempotency key. If we crash past this point, reconciliation finds the
+//    row and asks Stripe what actually happened — the key makes the retry
+//    safe and the answer attributable.
+const op = await db.operation.create({ data: { kind: "quantity-change", subId,
+  from: item.quantity, to: newQuantity, state: "pending",
+  idempotencyKey: crypto.randomUUID() } });
+
+let updated;
 try {
-  await stripe.subscriptions.update(subId, {
+  updated = await stripe.subscriptions.update(subId, {
     items: [{ id: item.id, quantity: newQuantity }],
     proration_behavior: "always_invoice",
     payment_behavior: "error_if_incomplete",     // upgrades only
-  });
+  }, { idempotencyKey: op.idempotencyKey });
 } catch (err) {
   if (err.type === "StripeCardError" || err.code === "invoice_payment_intent_requires_action") {
+    await db.operation.update({ where: { id: op.id }, data: { state: "failed" } });
     return json({ error: "payment failed", code: "payment_failed" }, 402);
+  }
+  if (err.type === "StripeConnectionError" || err.type === "StripeAPIError") {
+    // 2. A timeout after Stripe may have ACCEPTED the effect is not a
+    //    failure. Mark it unknown and leave it for reconciliation, which
+    //    retrieves the subscription (or replays the key) and settles the
+    //    row either way. Declaring it failed here is how a charged
+    //    customer keeps the old quantity.
+    await db.operation.update({ where: { id: op.id }, data: { state: "unknown" } });
+    return json({ error: "outcome unknown, reconciling", code: "pending" }, 202);
   }
   throw err;
 }
 
 try {
   await db.subscription.update({ where: { id }, data: { quantity: newQuantity } });
+  await db.operation.update({ where: { id: op.id }, data: { state: "applied" } });
 } catch (dbErr) {
-  await stripe.subscriptions.update(subId, {                  // compensating revert
-    items: [{ id: item.id, quantity: oldQuantity }],
-    proration_behavior: "none",                               // do not re-bill the revert
-  }).catch((e) => log.error("CRITICAL: revert failed, Stripe and DB disagree", { subId, e }));
+  // 3. Stripe CONFIRMED the new quantity and invoiced it. The database is
+  //    what failed — so the database is what gets repaired, from the
+  //    confirmed Stripe state, by reconciliation reading the op row. Do NOT
+  //    revert Stripe to match a broken local write: the proration invoice
+  //    has already charged, and quantity:oldQuantity with proration "none"
+  //    returns none of it.
+  await db.operation.update({ where: { id: op.id }, data: { state: "apply-pending" } })
+    .catch(() => log.error("CRITICAL: op row unreachable", { opId: op.id }));
   throw dbErr;
 }
 ```
 
+- **If the business genuinely wants a rollback** (the product decides the
+  change must not stand), that is a SECOND financial operation, not a flag:
+  revert the quantity AND issue the credit note for the settled proration
+  invoice (`stripe.creditNotes.create`), each with its own op row and state —
+  the money's return is tracked to `applied`, never assumed from the
+  quantity's.
 - **Downgrades** need no `payment_behavior`; they produce a credit.
 - **Reducing below what is in use** is a business decision, not an API call.
   Answer 409 with the list of things that must be released first, and let the
@@ -195,6 +251,51 @@ try {
   $17.43" into a number the user already agreed to.
 - Do not add seats to a subscription flagged `cancel_at_period_end` — reactivate
   first, or the seats vanish at period end.
+
+## Reconciliation — repair the record, and money moves only by policy
+
+The reconciler walks every operation row in `unknown` or `apply-pending` and
+asks Stripe what actually happened — the op's idempotency key makes the
+question safe to repeat and the answer attributable:
+
+```ts
+for (const op of await db.operation.findMany({ where: { state: { in: ["unknown", "apply-pending"] } } })) {
+  const sub = await stripe.subscriptions.retrieve(op.subId);
+  const applied = sub.items.data[0].quantity === op.to;
+  if (applied) {
+    // RECONCILE-FIRST, the default: the database is repaired FROM the
+    // confirmed Stripe state. This is a record repair — updating the local
+    // count is never called a refund, because no money moved.
+    await db.subscription.update({ where: { id: op.subId }, data: { quantity: op.to } });
+    await db.operation.update({ where: { id: op.id }, data: { state: "applied" } });
+  } else {
+    await db.operation.update({ where: { id: op.id }, data: { state: "failed" } });
+  }
+}
+```
+
+Two rules the loop must keep:
+
+- **Idempotent by construction.** Every transition above is absorbing —
+  `applied` and `failed` are terminal, and re-running the loop over settled
+  rows changes nothing and charges nothing. A reconciler that can move money
+  on a replay is a billing bug wearing a repair's name.
+- **A refund is a POLICY, never a reflex.** The reconciler repairs records;
+  it does not decide that money should come back. Only an explicitly
+  configured business policy (`rollbackPolicy: "revert-and-credit"` on the
+  operation's kind) triggers the credit-note flow from the section above —
+  and that flow issues AT MOST ONCE per operation: the credit note is keyed
+  by op id, so a repeated reconciliation finds the existing note and stops.
+
+```ts
+if (policy(op.kind) === "revert-and-credit" && !op.creditNoteId) {
+  const note = await stripe.creditNotes.create(
+    { invoice: op.invoiceId, amount: op.chargedAmount },
+    { idempotencyKey: `${op.idempotencyKey}:credit` });
+  await db.operation.update({ where: { id: op.id },
+    data: { creditNoteId: note.id, state: "compensated" } });
+}
+```
 
 ## Plan changes
 
@@ -253,25 +354,45 @@ expires 5 minutes after creation if unused, so mint it in the request that redir
 
 ## Refund clawback
 
+`charge.amount_refunded` is CUMULATIVE and delivered out of order: a 4000 and
+a 9000 refund of one charge can arrive in either order, and two handlers can
+read the SAME `stored.refundedTotal` at once. The whole clawback — read,
+delta, marker AND ledger — happens inside ONE serializable transaction, and a
+CAS loser RE-READS and retries rather than returning: the old code's loser
+went home, so the second refund clawed back nothing.
+
 ```ts
-const totalRefunded = charge.amount_refunded / 100;
-const increment = totalRefunded - stored.refundedTotal;
-if (increment <= 0) return;
+// Money in MINOR UNITS end to end. `amount_refunded` is already integer cents;
+// `/ 100` turns 995 into 9.95 and reintroduces the float error the integer
+// avoids — never divide until you format for a human.
+const totalRefunded = charge.amount_refunded;          // cents, integer
 
-const { count } = await db.purchase.updateMany({
-  where: { id: stored.id, refundedTotal: stored.refundedTotal },
-  data:  { refundedTotal: totalRefunded },
-});
-if (count === 0) return;                       // concurrent delivery won
-
-try {
-  await clawBack(stored.userId, increment);    // idempotent, keyed on charge id + total
-} catch (err) {
-  await db.purchase.update({ where: { id: stored.id },
-    data: { refundedTotal: stored.refundedTotal } });   // put the marker back
-  throw err;
+for (let attempt = 0; attempt < RETRIES; attempt++) {
+  try {
+    await db.$transaction(async (tx) => {
+      const row = await tx.purchase.findUnique({
+        where: { id: stored.id }, ...forUpdate });      // row lock
+      const seen = Math.max(row.refundedTotal, totalRefunded);  // monotone: never rewind
+      const increment = seen - row.refundedTotal;
+      if (increment <= 0) return;                       // this delta already counted
+      // Marker and ledger move TOGETHER — a marker written without its
+      // clawback (or the reverse) is the split the old code shipped.
+      await tx.purchase.update({ where: { id: stored.id },
+        data: { refundedTotal: seen } });
+      await clawBack(tx, stored.userId, increment,
+        { key: `${charge.id}:${seen}` });               // idempotent per (charge,total)
+    }, { isolation: "Serializable" });
+    return;
+  } catch (err) {
+    if (isSerializationConflict(err) && attempt < RETRIES - 1) continue;  // re-read, retry
+    throw err;
+  }
 }
 ```
+
+The invariant the fixtures pin: cumulative 4000 then 9000 (or 9000 then 4000),
+a crash after the marker, and a retry of the old event all converge on
+`refundedTotal = 9000` and a summed clawback of exactly 9000 — once.
 
 Clamp the deduction at zero. A user who already spent the credit goes to a
 negative balance or to a collections decision — pick one deliberately and log

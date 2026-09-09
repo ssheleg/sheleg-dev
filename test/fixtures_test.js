@@ -157,9 +157,11 @@ const PLANTS = [
     file: 'reference-handler.mjs',
     // Wire the marker in unconditionally and it stops being a mutant: no run of the suite
     // has then watched the pack fail without it, which is the state the audit rated as no
-    // evidence. The `breaks` bookkeeping is what notices.
-    from: "    if (has('grant-marker') && granted.has(period.start)) {",
-    to: "    if (granted.has(period.start)) {",
+    // evidence. The `breaks` bookkeeping is what notices. Re-aimed with FIX-DV-02.01:
+    // the live gate is the atomic keyed claim, not the legacy read-then-mark branch.
+    from: "      if (has('grant-marker')\n"
+      + "          && !store.claimPeriodGrant(subId, itemId, invoice.id, period.start)) {",
+    to: "      if (!store.claimPeriodGrant(subId, itemId, invoice.id, period.start)) {",
   },
   {
     name: 'a NON-FIRST assertion neutered inside a multi-assert invariant '

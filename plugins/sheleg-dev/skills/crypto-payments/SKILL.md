@@ -179,26 +179,16 @@ Verify the signature **before** parsing anything into your domain, and return
 
 Do not read-then-write. Make the database refuse the second delivery:
 
-```ts
-const { count } = await db.payment.updateMany({
-  where: {
-    invoiceId,
-    status: { notIn: FINAL_STATUSES },   // ← the guard: a settled payment cannot re-settle
-  },
-  data: { status: mapped, paidAmount, txid, network, settledAt: new Date() },
-});
-
-if (count === 0) {
-  // already final: a retry, or a late duplicate. Acknowledge and do nothing.
-  return res.status(200).json({ ok: true, duplicate: true });
-}
-
-await creditUser(...);   // only reachable once per invoice
-```
-
-`updateMany` + a status guard is a compare-and-swap. `findFirst` followed by
-`update` is a race, and the two deliveries that arrive 40ms apart will both pass
-the read.
+Three things are separate — the payment's LIFECYCLE status, the immutable
+GRANT a confirmed settlement earns, and any refund/hold — and conflating them
+credits money that never settled. The CAS (`updateMany` with a `status notIn
+FINAL_STATUSES` guard) advances the LIFECYCLE only: it returns `count: 1` for
+a transition to FAILED exactly as it does for PAID, so it is not permission to
+credit. **Credit only a confirmed settlement (`mapped === 'PAID'`), once,
+behind a UNIQUE per-invoice grant-ledger row atomic with the credit; refunds
+and holds take their own path and are never swallowed as a duplicate.** The
+worked handler is in
+[`references/callback-route-hardening.md`](references/callback-route-hardening.md).
 
 **Always return 200 for a duplicate.** A 409 makes the provider retry forever.
 
@@ -265,18 +255,26 @@ Write them on the settling webhook, in the same update that flips the status.
 
 ## Crediting: the amount waterfall
 
-What do you credit when the numbers disagree? Prefer the most authoritative,
-fall back in a fixed order, and log which one won:
+Four dimensions, and they never mix implicitly: **Money** (currency + minor
+units — never floats), **Asset** (network + token + decimal amount),
+**Entitlement** (plan units) and a **dated FX quote** (rate + source + time).
+`paidAmountUsd` and `amountUsd` are Money; `tokenAmount` is an **Asset amount**
+(the invoiced base + buffer — NOT plan units). A `??` across dimensions is an implicit
+conversion, so first bring each candidate to USD minor — an Asset amount
+converts only via a dated quote from a known source; an unknown or missing
+quote **blocks** the conversion rather than guessing:
 
 ```ts
-const credit = payment.paidAmountUsd     // gateway's valuation of what arrived
-            ?? payment.tokenAmount        // what the plan says this purchase grants
-            ?? payment.amountUsd;         // the original intent — last resort
+const usd = [payment.paidAmountUsd            // Money: gateway's valuation
+  , toUsdMinor(payment.tokenAmount, quote)    // Asset -> Money, dated quote or BLOCKED
+  , payment.amountUsd];                       // Money: the intent — last resort
+const credit = usd.find(v => v != null);
 ```
 
 The order matters: valuing an over-payment at the intent silently keeps the
 excess, and valuing an under-payment at the intent gives away product. Write an
-audit row naming the source, or the first disputed balance is unprovable.
+audit row naming the source AND the quote used, or the first disputed balance
+is unprovable.
 
 ---
 

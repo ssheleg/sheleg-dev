@@ -42,20 +42,30 @@ pip install google-auth google-auth-oauthlib google-api-python-client flask
 
 ### Node.js
 
+**One OAuth2 client PER request, never a shared singleton.** A module-level
+`oauth2Client` whose `setCredentials(tokens)` runs on every callback is mutated
+by every concurrent login — two users signing in at once end up with each
+other's tokens. Build the client inside the handler; the client id/secret are
+shared config, the CREDENTIALS are per principal and never assigned to a
+process-wide object.
+
 ```js
 const {google} = require('googleapis');
 const crypto = require('crypto');
 
-const oauth2Client = new google.auth.OAuth2(
-  YOUR_CLIENT_ID,
-  YOUR_CLIENT_SECRET,
-  YOUR_REDIRECT_URL
-);
+// A fresh client per request — the credentials it will hold are this user's.
+function newOAuthClient() {
+  return new google.auth.OAuth2(YOUR_CLIENT_ID, YOUR_CLIENT_SECRET, YOUR_REDIRECT_URL);
+}
 
+const oauthClient = newOAuthClient();
+
+// State is REQUIRED, crypto-random, single-use with a TTL, and bound to the
+// server session — not a value the client can echo back to itself.
 const state = crypto.randomBytes(32).toString('hex');
-req.session.state = state;
+req.session.oauthState = { value: state, expires: Date.now() + 10 * 60 * 1000 };
 
-const authorizationUrl = oauth2Client.generateAuthUrl({
+const authorizationUrl = oauthClient.generateAuthUrl({
   access_type: 'offline',          // 'online' (default) or 'offline' (gets refresh_token)
   scope: [
     'https://www.googleapis.com/auth/drive.metadata.readonly',
@@ -73,6 +83,7 @@ const authorizationUrl = oauth2Client.generateAuthUrl({
 ```python
 from google_auth_oauthlib.flow import Flow
 import secrets
+import time
 
 flow = Flow.from_client_secrets_file(
     'client_secret.json',
@@ -84,7 +95,8 @@ flow = Flow.from_client_secrets_file(
 )
 
 state = secrets.token_hex(32)
-session['state'] = state
+# Server-bound, random, with a TTL: the callback consumes it atomically.
+session['oauth_state'] = {'value': state, 'expires': time.time() + 600}
 
 authorization_url, state = flow.authorization_url(
     access_type='offline',             # gets refresh_token
@@ -125,6 +137,41 @@ return redirect(authorization_url)
 
 ## Step 3: Handle Callback
 
+### The session cookie is opaque — credentials live server-side, encrypted
+
+**A signed cookie is not an encrypted one.** Flask's default session and
+Starlette's `SessionMiddleware` SIGN the cookie (tamper-evident) but do NOT
+encrypt it — anyone holding the cookie can base64-decode and read every value
+in it, which the official docs confirm. So the cookie carries **only a random
+opaque session id**; the Google credentials (`token`, `refresh_token`,
+`client_secret`) go into a **server-side encrypted store**, fetched by
+`(session_id, principal)` — never into the cookie, the redirect URL, or the
+response body.
+
+```python
+# The cookie holds ONLY an opaque id. Credentials are server-side, encrypted.
+session['sid'] = session.get('sid') or secrets.token_urlsafe(32)
+credential_store.put(                      # encrypted at rest, keyed by (sid, principal)
+    sid=session['sid'], principal=userinfo['sub'],
+    credentials={'token': credentials.token,
+                 'refresh_token': credentials.refresh_token,
+                 'client_secret': credentials.client_secret, ...})
+# Never: session['credentials'] = {...}     ← readable in the cookie
+# Never: log or return the tokens            ← no console.log(tokens.access_token)
+```
+
+Four more, because a leaked secret does not announce itself: **never log a
+token or a credential** (no `console.log(tokens.access_token)`; sanitize logs
+by allow-list, so no token, `client_secret` or `refresh_token` reaches a line,
+a stack trace or an error message); the session signing secret is a **required
+production secret with NO dev fallback** (a hardcoded default signs every
+deployment's cookies with a key in the repo — missing in production is
+**fail-closed**, refuse to boot); the auth cookie is **`Secure`, and the
+callback refuses plain HTTP** — an OAuth code or token over `http://` is a code
+or token on the wire; and **a credential-store read or write that FAILS is an
+auth failure** — re-prompt the user or return 503, never proceed as if the
+credentials loaded (a silent empty read logs the user in as nobody).
+
 ### Node.js
 
 ```js
@@ -134,16 +181,21 @@ app.get('/oauth2callback', async (req, res) => {
   const q = url.parse(req.url, true).query;
 
   if (q.error) {
-    console.log('Error: ' + q.error);
-    return res.status(400).send('Authorization failed');
+    return res.status(400).send('Authorization failed');   // never log the raw error/token
   }
 
-  if (q.state !== req.session.state) {
-    return res.status(403).send('State mismatch. Possible CSRF attack');
+  // Validate state BEFORE the token exchange: it must be PRESENT on both sides
+  // (undefined === undefined must NOT pass), unexpired, and consumed atomically
+  // so a replay of the same callback cannot reuse it.
+  const saved = req.session.oauthState;
+  delete req.session.oauthState;                            // single-use: consume it now
+  if (!q.state || !saved || saved.value !== q.state || Date.now() > saved.expires) {
+    return res.status(403).send('State invalid, missing, expired or already used');
   }
 
-  const {tokens} = await oauth2Client.getToken(q.code);
-  oauth2Client.setCredentials(tokens);
+  const oauthClient = newOAuthClient();                     // a client for THIS request
+  const {tokens} = await oauthClient.getToken(q.code);
+  oauthClient.setCredentials(tokens);                       // credentials stay on the local client
 
   // tokens.access_token — short-lived access token
   // tokens.refresh_token — long-lived (only on first auth!)
@@ -162,14 +214,20 @@ def oauth2callback():
     if request.args.get('error'):
         return 'Authorization failed', 400
 
-    if request.args.get('state') != session.get('state'):
-        abort(403, 'State mismatch. Possible CSRF attack')
+    # Validate state BEFORE the token exchange, and consume it atomically:
+    # pop() removes it in the same step, so a replayed callback finds nothing.
+    # Presence is required on BOTH sides — None == None must NOT pass.
+    saved = session.pop('oauth_state', None)
+    got = request.args.get('state')
+    if (not got or not saved or saved['value'] != got
+            or time.time() > saved['expires']):
+        abort(403, 'State invalid, missing, expired or already used')
 
     flow = Flow.from_client_secrets_file(
         'client_secret.json',
         scopes=SCOPES,
         redirect_uri=YOUR_REDIRECT_URL,
-        state=session['state']
+        state=saved['value']
     )
     flow.fetch_token(authorization_response=request.url)
 
@@ -179,20 +237,26 @@ def oauth2callback():
     # credentials.expiry — expiration datetime
     # credentials.scopes — granted scopes
 
-    session['credentials'] = {
+    # Cookie: opaque id only. Credentials: server-side, encrypted, keyed by
+    # (session id, principal) — never serialized into the signed cookie.
+    session['sid'] = session.get('sid') or secrets.token_urlsafe(32)
+    credential_store.put(session['sid'], principal=userinfo['sub'], credentials={
         'token': credentials.token,
         'refresh_token': credentials.refresh_token,
         'token_uri': credentials.token_uri,
         'client_id': credentials.client_id,
         'client_secret': credentials.client_secret,
-        'scopes': list(credentials.scopes)
-    }
+        'scopes': list(credentials.scopes),
+    })
     return redirect('/profile')
 ```
 
 ### Python (FastAPI)
 
 ```python
+import secrets
+import time
+
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 from google_auth_oauthlib.flow import Flow
@@ -202,15 +266,19 @@ async def oauth2callback(request: Request):
     if request.query_params.get('error'):
         raise HTTPException(400, 'Authorization failed')
 
-    state = request.session.get('state')
-    if request.query_params.get('state') != state:
-        raise HTTPException(403, 'State mismatch')
+    # Consume atomically (pop) and validate BEFORE the exchange; a wrong,
+    # expired or replayed state must never start a token exchange.
+    saved = request.session.pop('oauth_state', None)
+    got = request.query_params.get('state')
+    if (not got or not saved or saved['value'] != got
+            or time.time() > saved['expires']):
+        raise HTTPException(403, 'State invalid, missing, expired or already used')
 
     flow = Flow.from_client_secrets_file(
         'client_secret.json',
         scopes=SCOPES,
         redirect_uri=YOUR_REDIRECT_URL,
-        state=state
+        state=saved['value']
     )
     flow.fetch_token(code=request.query_params.get('code'))
     credentials = flow.credentials
@@ -262,7 +330,8 @@ oauth2Client.on('tokens', (tokens) => {
   if (tokens.refresh_token) {
     // Store in database — only sent once!
   }
-  console.log('New access_token:', tokens.access_token);
+  // Never log a token or a credential (FIX-DV-07) — a token in a log is a
+  // token anyone with log access holds.
 });
 ```
 
@@ -377,19 +446,20 @@ const {google} = require('googleapis');
 const app = express();
 app.use(session({secret: 'your-secret', resave: false, saveUninitialized: false}));
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  'http://localhost:3000/oauth2callback'
-);
+// A client per request — client id/secret are config, credentials are per user.
+function newOAuthClient() {
+  return new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET,
+    'http://localhost:3000/oauth2callback');
+}
 
 const SCOPES = ['https://www.googleapis.com/auth/userinfo.profile'];
 
 app.get('/auth', (req, res) => {
   const state = crypto.randomBytes(32).toString('hex');
-  req.session.state = state;
+  req.session.oauthState = { value: state, expires: Date.now() + 10 * 60 * 1000 };
 
-  const url = oauth2Client.generateAuthUrl({
+  const url = newOAuthClient().generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
     state,
@@ -400,18 +470,22 @@ app.get('/auth', (req, res) => {
 
 app.get('/oauth2callback', async (req, res) => {
   if (req.query.error) return res.redirect('/error');
-  if (req.query.state !== req.session.state) return res.status(403).send('CSRF');
+  const saved = req.session.oauthState;
+  delete req.session.oauthState;                    // single-use
+  if (!req.query.state || !saved || saved.value !== req.query.state
+      || Date.now() > saved.expires) return res.status(403).send('CSRF');
 
-  const {tokens} = await oauth2Client.getToken(req.query.code);
+  const {tokens} = await newOAuthClient().getToken(req.query.code);
   req.session.tokens = tokens;
   res.redirect('/profile');
 });
 
 app.get('/profile', async (req, res) => {
   if (!req.session.tokens) return res.redirect('/auth');
-  oauth2Client.setCredentials(req.session.tokens);
+  const oauthClient = newOAuthClient();             // local to this request
+  oauthClient.setCredentials(req.session.tokens);
 
-  const oauth2 = google.oauth2({version: 'v2', auth: oauth2Client});
+  const oauth2 = google.oauth2({version: 'v2', auth: oauthClient});
   const {data} = await oauth2.userinfo.get();
   res.json(data);
 });
@@ -452,7 +526,7 @@ def auth():
         redirect_uri=REDIRECT_URI
     )
     state = secrets.token_hex(32)
-    session['state'] = state
+    session['oauth_state'] = {'value': state, 'expires': time.time() + 600}
     authorization_url, _ = flow.authorization_url(
         access_type='offline',
         include_granted_scopes='true',
@@ -465,8 +539,11 @@ def auth():
 def oauth2callback():
     if request.args.get('error'):
         return 'Authorization failed', 400
-    if request.args.get('state') != session.get('state'):
-        abort(403, 'State mismatch')
+    saved = session.pop('oauth_state', None)   # single-use: consume BEFORE exchange
+    got = request.args.get('state')
+    if (not got or not saved or saved['value'] != got
+            or time.time() > saved['expires']):
+        abort(403, 'State invalid, missing, expired or already used')
 
     flow = Flow.from_client_config(
         {
@@ -479,26 +556,28 @@ def oauth2callback():
         },
         scopes=SCOPES,
         redirect_uri=REDIRECT_URI,
-        state=session['state']
+        state=saved['value']
     )
     flow.fetch_token(authorization_response=request.url)
     creds = flow.credentials
-    session['credentials'] = {
-        'token': creds.token,
-        'refresh_token': creds.refresh_token,
-        'token_uri': creds.token_uri,
-        'client_id': creds.client_id,
-        'client_secret': creds.client_secret,
-        'scopes': list(creds.scopes or [])
-    }
+    userinfo = build('oauth2', 'v2', credentials=creds).userinfo().get().execute()
+    # Opaque id in the cookie; credentials in the server-side encrypted store.
+    session['sid'] = session.get('sid') or secrets.token_urlsafe(32)
+    credential_store.put(session['sid'], principal=userinfo['id'], credentials={
+        'token': creds.token, 'refresh_token': creds.refresh_token,
+        'token_uri': creds.token_uri, 'client_id': creds.client_id,
+        'client_secret': creds.client_secret, 'scopes': list(creds.scopes or []),
+    })
+    session['principal'] = userinfo['id']
     return redirect('/profile')
 
 
 @app.route('/profile')
 def profile():
-    if 'credentials' not in session:
+    stored = credential_store.get(session.get('sid'), session.get('principal'))
+    if not stored:
         return redirect('/auth')
-    creds = Credentials(**session['credentials'])
+    creds = Credentials(**stored)
     service = build('oauth2', 'v2', credentials=creds)
     user_info = service.userinfo().get().execute()
     return jsonify(user_info)
@@ -544,7 +623,7 @@ CLIENT_CONFIG = {
 async def auth(request: Request):
     flow = Flow.from_client_config(CLIENT_CONFIG, scopes=SCOPES, redirect_uri=REDIRECT_URI)
     state = secrets.token_hex(32)
-    request.session['state'] = state
+    request.session['oauth_state'] = {'value': state, 'expires': time.time() + 600}
     authorization_url, _ = flow.authorization_url(
         access_type='offline',
         include_granted_scopes='true',
@@ -557,31 +636,38 @@ async def auth(request: Request):
 async def oauth2callback(request: Request):
     if request.query_params.get('error'):
         raise HTTPException(400, 'Authorization failed')
-    if request.query_params.get('state') != request.session.get('state'):
-        raise HTTPException(403, 'State mismatch')
+    saved = request.session.pop('oauth_state', None)   # single-use: consume BEFORE exchange
+    got = request.query_params.get('state')
+    if (not got or not saved or saved['value'] != got
+            or time.time() > saved['expires']):
+        raise HTTPException(403, 'State invalid, missing, expired or already used')
 
     flow = Flow.from_client_config(
         CLIENT_CONFIG, scopes=SCOPES, redirect_uri=REDIRECT_URI,
-        state=request.session['state']
+        state=saved['value']
     )
     flow.fetch_token(code=request.query_params.get('code'))
     creds = flow.credentials
-    request.session['credentials'] = {
-        'token': creds.token,
-        'refresh_token': creds.refresh_token,
-        'token_uri': creds.token_uri,
-        'client_id': creds.client_id,
-        'client_secret': creds.client_secret,
-        'scopes': list(creds.scopes or [])
-    }
+    userinfo = build('oauth2', 'v2', credentials=creds).userinfo().get().execute()
+    # Opaque id in the cookie; credentials in the server-side encrypted store.
+    sid = request.session.get('sid') or secrets.token_urlsafe(32)
+    request.session['sid'] = sid
+    request.session['principal'] = userinfo['id']
+    credential_store.put(sid, principal=userinfo['id'], credentials={
+        'token': creds.token, 'refresh_token': creds.refresh_token,
+        'token_uri': creds.token_uri, 'client_id': creds.client_id,
+        'client_secret': creds.client_secret, 'scopes': list(creds.scopes or []),
+    })
     return RedirectResponse('/profile')
 
 
 @app.get('/profile')
 async def profile(request: Request):
-    if 'credentials' not in request.session:
+    stored = credential_store.get(request.session.get('sid'),
+                                  request.session.get('principal'))
+    if not stored:
         return RedirectResponse('/auth')
-    creds = Credentials(**request.session['credentials'])
+    creds = Credentials(**stored)
     service = build('oauth2', 'v2', credentials=creds)
     user_info = service.userinfo().get().execute()
     return user_info

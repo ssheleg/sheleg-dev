@@ -111,7 +111,7 @@ sequenceDiagram
   H->>W: POST { type:"payment", status:"paid", uuid, sign, ... }
   W->>W: Verify caller IP + MD5 signature
   W->>W: Type guard, idempotency check
-  W->>DB: $transaction:<br/>  updateMany(status notIn final)<br/>  creditAccountPurchasedTokens<br/>  logTokenAudit(action:"crypto_topup")<br/>  optional createBalanceSubscription / seat upgrade
+  W->>DB: $transaction (only if status==paid):<br/>  updateMany(status notIn final)<br/>  INSERT grantLedger(invoiceId) UNIQUE<br/>  creditAccountPurchasedTokens<br/>  logTokenAudit(action:"crypto_topup")<br/>  optional createBalanceSubscription / seat upgrade
   W-->>H: 200 { status: "ok" }
   H-->>U: Redirect to url_success
   U->>FE: Polls /api/billing/crypto/status?orderId=...
@@ -394,7 +394,7 @@ model CryptoPayment {
   heleketuuid      String              @unique @map("heleket_uuid")
   orderId          String              @unique @map("order_id")
   amountUsd        Float               @map("amount_usd")          // base amount user requested
-  tokenAmount      Float               @map("token_amount")        // base + buffer = amount sent to Heleket
+  tokenAmount      Float               @map("token_amount")        // ASSET amount (invoice token): base + buffer sent to Heleket — never plan units, never added to USD fields without a dated FX quote
   status           CryptoPaymentStatus @default(pending)
   paymentUrl       String?             @map("payment_url")
   currency         String?                                          // pricing currency, "USD"
@@ -1248,27 +1248,36 @@ Without a buffer, a $30 invoice frequently lands as `payment_amount_usd: 29.97`,
 your balance is debited at $30 to provision a subscription, the user gets stuck on a
 "insufficient balance" error 30 seconds after paying.
 
-**The fix**: add 1% on the invoice side, credit the **full invoice amount** (not the
-base) to the user's balance.
+**The fix**: add 1% on the invoice side — and then WHAT HAPPENS TO THE EXCESS is a
+**required business policy, not a template default**. The template carries the enum and
+no preselected price:
+
+```ts
+// REQUIRED — the template does not choose for you. A missing policy BLOCKS
+// invoice creation and asks; it never silently invents a fee.
+type ExcessPolicy = 'refund_excess' | 'credit_excess' | 'buffer_fee';
+```
+
+One unit-safe example per variant (all Money in USD minor, per the dimensional
+contract — the buffer never mixes with Asset amounts):
+
+- **`refund_excess`** — pay 3030¢ against a 3000¢ subscription → 30¢ goes BACK to the
+  payer (an on-chain or balance refund row with its own audit line).
+- **`credit_excess`** — the 30¢ lands as 30¢ of BALANCE after provisioning; the UI
+  breakdown says "credited to your balance", and the user keeps it.
+- **`buffer_fee`** — the 30¢ is retained as a disclosed fee: it appears as "buffer
+  fee: 30¢" on the invoice BEFORE payment, never discovered afterwards.
 
 ```ts
 const bufferAmount  = Math.ceil(amountUsd * 0.01 * 100) / 100;   // 0.30 for $30
 const invoiceAmount = Math.round((amountUsd + bufferAmount) * 100) / 100;  // 30.30
-const tokenAmount   = invoiceAmount;       // user gets the buffer back as balance
+// tokenAmount = invoiceAmount is the ASSET amount sent to Heleket either way;
+// the ExcessPolicy decides the LEDGER, not the invoice.
 ```
 
-Show the breakdown in the UI:
-
-```
-Subscription:    $30.00
-Crypto buffer:   +$0.30  (covers conversion losses, credited to your balance)
-Invoice total:   $30.30
-```
-
-Why credit the full invoice (not just `paymentAmountUsd`)? Because if the user pays
-exactly $30.30, they should keep $0.30 in balance after the subscription is provisioned.
-If Heleket reports `payment_amount_usd: 30.27` (a 0.1% loss), use that instead — the
-credit waterfall `paymentAmountUsd ?? tokenAmount ?? amountUsd` does this automatically.
+If Heleket reports `payment_amount_usd: 30.27` (a 0.1% loss), the waterfall values the
+payment at that figure — and the excess policy then applies to whatever remains above
+the base, in USD minor.
 
 ---
 
@@ -1301,16 +1310,26 @@ Heleket refunds are **merchant-initiated only** (user cannot self-refund). They 
    manually via the dashboard).
 2. The user's destination wallet address (you have it as `fromAddress`).
 
-Webhook handling:
+Webhook handling — refunds and holds are a SEPARATE ledger, not a branch of the
+paid path, and they are never dropped as a "duplicate" just because the invoice
+already reached `paid` (DV-05). A refund event arriving after `paid` is the
+NORMAL case, not a replay: the CAS that guards the paid→credit transition
+treats an already-final invoice as a duplicate, so the refund/hold statuses
+take their own path BEFORE that guard.
 
 | Status | Action |
 |--------|--------|
-| `refund_process` | Update DB row to `refund_process`, no balance change. |
-| `refund_paid` | Update DB row to `refund_paid`. **Optionally** debit the user's balance manually if you previously credited them — the reference implementation leaves this to ops to avoid accidental negative balances. |
-| `refund_fail` | Update DB row to `failed`, alert ops. |
+| `refund_process` | Record a `refund_ledger` row `(paymentId, "refund_process")`, no balance change. |
+| `refund_paid` | Record `refund_ledger` `(paymentId, "refund_paid")` and, if the invoice was credited, debit the credited amount — **inside one transaction, keyed by `(paymentId, "refund_paid")`** so a redelivered refund webhook debits ONCE, never twice. A negative-balance clamp and its ops decision are DV-04's rule. |
+| `refund_hold` / `on_hold` | Record `refund_ledger` `(paymentId, status)`; pause downstream side effects, no debit yet. |
+| `refund_fail` | Record `refund_ledger` `(paymentId, "refund_fail")`, alert ops. |
 
-There is no chargeback mechanism in crypto — once `paid` is on-chain, the only path back
-is a refund initiated by you. Set up a financial alarm at, e.g., $500/month of refunds.
+The refund ledger is keyed by `(paymentId, status)` and its writes are
+idempotent: a repeated refund webhook finds the row and stops, so a
+paid→refund sequence adjusts the balance exactly once and a redelivery adds
+nothing. There is no chargeback mechanism in crypto — once `paid` is on-chain,
+the only path back is a refund initiated by you. Set up a financial alarm at,
+e.g., $500/month of refunds.
 
 ---
 

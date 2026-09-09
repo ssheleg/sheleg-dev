@@ -1,0 +1,248 @@
+{
+ "contract": "outcome-case/1 (schemas/outcome-case.schema.json + test/outcome_harness.py in ssheleg/sshlg-skills)",
+ "note": "Outcome corpus for google-signin (FIX-EV-01.21), anchored to the audit's own findings DV-10/DV-11/DV-12/DV-19. Judged on ARTIFACTS via the family harness: the runner records the actual output oracle verdict AND the raw result per case; with/without-skill arms are the harness's baseline contract. An unavailable live host is NOT_RUN, never PASS and never invented. P1 counterexamples must FAIL on the pre-fix output and pass after the fix, tied to the release. Nothing in the production skill was changed for grader convenience.",
+ "arms": {
+  "baseline": "same prompts, skill absent",
+  "current": "same prompts, skill installed"
+ },
+ "cases": [
+  {
+   "schema_version": "outcome-case/1",
+   "id": "GS-OUT-001-positive-nonce-server-challenge",
+   "skill": "google-signin",
+   "prompt": {
+    "text": "Design the GIS credential verification: the nonce is a SERVER-issued challenge (generated server-side, stored, single-use consumed on verify), the ID token's nonce claim is compared against the stored challenge, and a credential arriving with NO nonce is REJECTED — the check is never skipped when the field is absent (DV-10). Write nonce-design.md."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "d801aed05ad8143ac13c5512922c8af2a9e3105116f48f58fcc959b84f511006"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "google-signin"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "design exists",
+      "kind": "artifact-exists",
+      "target": "nonce-design.md"
+     },
+     {
+      "name": "server-issued challenge pinned (DV-10)",
+      "kind": "artifact-contains",
+      "target": "nonce-design.md",
+      "expect": "server"
+     },
+     {
+      "name": "absent nonce rejected (DV-10)",
+      "kind": "artifact-contains",
+      "target": "nonce-design.md",
+      "expect": "reject"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "GS-OUT-002-negative-routing",
+   "skill": "google-signin",
+   "prompt": {
+    "text": "Explain in two sentences the difference between TCP and UDP."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "c915be5f57e3b1ce1bc653811cfa87673ba723078a235bc48ce8fac42eae4f37"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [],
+     "expect_not_loaded": [
+      "google-signin"
+     ]
+    },
+    "outcome": [
+     {
+      "name": "no signin artifact appears",
+      "kind": "command-exit-0",
+      "target": "test ! -f nonce-design.md"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "GS-OUT-003-auto-link-policy",
+   "skill": "google-signin",
+   "prompt": {
+    "text": "Review an account auto-link flow that treats email_verified=true as proof of CURRENT inbox ownership for any domain. Google's claim covers Gmail and hd-bearing workspace accounts; third-party email ownership can change after the original verification (DV-11). Write autolink-review.md: auto-link only where the claim is authoritative, re-verification otherwise."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "9a0a77ac3ea8407ff82375ec8b5d851c570b6883f8083c4d9bd269e5e1b998fc"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "google-signin"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "the domain split is drawn (DV-11)",
+      "kind": "artifact-contains",
+      "target": "autolink-review.md",
+      "expect": "hd"
+     },
+     {
+      "name": "re-verification for third-party email (DV-11)",
+      "kind": "artifact-contains",
+      "target": "autolink-review.md",
+      "expect": "re-verif"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "GS-OUT-004-csrf-form-post",
+   "skill": "google-signin",
+   "prompt": {
+    "text": "Harden the GIS sign-in endpoint that claims to accept the form POST: accept application/x-www-form-urlencoded (not only a JSON body), verify the double-submit g_csrf_token cookie/body pair, and treat a MISSING Sec-Fetch-Site as NOT same-origin with an Origin-header fallback — 'none' is not allowed (DV-12). Write csrf-hardening.md."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "bbde2b87e61b240935ee3d414659c8b9c6474000c700e206fbe6a0b762b87a47"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "google-signin"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "double-submit pair verified (DV-12)",
+      "kind": "artifact-contains",
+      "target": "csrf-hardening.md",
+      "expect": "g_csrf_token"
+     },
+     {
+      "name": "missing Sec-Fetch-Site is not same-origin (DV-12)",
+      "kind": "artifact-contains",
+      "target": "csrf-hardening.md",
+      "expect": "Origin"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "GS-OUT-005-hostile-pre-fix-must-fail",
+   "skill": "google-signin",
+   "prompt": {
+    "text": "Audit the PRE-FIX flow where the CLIENT generated the nonce and POSTed it beside the credential, and the backend skipped the comparison when the nonce was absent: the audit must FAIL it (the P1 counterexample — a stolen token replays with the nonce field deleted), name the finding, and record the release the server-challenge design shipped in (DV-19). Write hostile-audit.md."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "d7cdf9825f86cce57bafc69acb238e9a19e38272c315201819c5efaa316cfb09"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "google-signin"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "the old flow fails (DV-19)",
+      "kind": "artifact-contains",
+      "target": "hostile-audit.md",
+      "expect": "FAIL"
+     },
+     {
+      "name": "tied to a release (DV-19)",
+      "kind": "artifact-contains",
+      "target": "hostile-audit.md",
+      "expect": "release"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "GS-OUT-006-live-gis-gated",
+   "skill": "google-signin",
+   "prompt": {
+    "text": "Verify a live GIS credential against the client in GOOGLE_SIGNIN_CLIENT_ID using Google's tokeninfo endpoint and write live-verify.md with the audience and nonce fields observed. If GOOGLE_SIGNIN_CLIENT_ID or GIS_TEST_CREDENTIAL is absent, the case is NOT_RUN — never a PASS and never an invented result."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "213bd587dec6795590ae6256e505e9c700e1f54a30f48fb3b75581ac42e40e02"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "live client present",
+      "command": "test -n \"$GOOGLE_SIGNIN_CLIENT_ID\" && test -n \"$GIS_TEST_CREDENTIAL\""
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "google-signin"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "live verify records the audience",
+      "kind": "artifact-contains",
+      "target": "live-verify.md",
+      "expect": "aud"
+     }
+    ]
+   }
+  }
+ ]
+}

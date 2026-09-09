@@ -1,0 +1,207 @@
+{
+ "contract": "outcome-case/1 (schemas/outcome-case.schema.json + test/outcome_harness.py in ssheleg/sshlg-skills)",
+ "note": "Outcome corpus for frontend-performance (FIX-EV-01.19), anchored to the audit's own findings DV-17/DV-18/DV-19. Judged on ARTIFACTS via the family harness: the runner records the actual output oracle verdict AND the raw result per case; with/without-skill arms are the harness's baseline contract. An unavailable live host is NOT_RUN, never PASS and never invented. P1 counterexamples must FAIL on the pre-fix output and pass after the fix, tied to the release. Nothing in the production skill was changed for grader convenience.",
+ "arms": {
+  "baseline": "same prompts, skill absent",
+  "current": "same prompts, skill installed"
+ },
+ "cases": [
+  {
+   "schema_version": "outcome-case/1",
+   "id": "FP-OUT-001-positive-lcp-audit",
+   "skill": "frontend-performance",
+   "prompt": {
+    "text": "Audit this page fixture: a render-blocking stylesheet in <head>, a 2 MB unoptimized hero <img> without dimensions, and a web font loaded without font-display. Write perf-audit.md naming the LCP bottleneck, the CLS risk, and for each metric say whether it is measurable in the FIELD, in the LAB, or both — FCP is BOTH (DV-17)."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "0cee6de0158af71b9884ae15400695ad70aa2ed3e5e01cf709d78d730b0232f2"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "frontend-performance"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "audit exists",
+      "kind": "artifact-exists",
+      "target": "perf-audit.md"
+     },
+     {
+      "name": "LCP bottleneck named",
+      "kind": "artifact-contains",
+      "target": "perf-audit.md",
+      "expect": "LCP"
+     },
+     {
+      "name": "FCP is field-measurable too (DV-17)",
+      "kind": "artifact-contains",
+      "target": "perf-audit.md",
+      "expect": "field"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "FP-OUT-002-negative-routing",
+   "skill": "frontend-performance",
+   "prompt": {
+    "text": "Explain in two sentences how a git rebase differs from a merge."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "d5358ff4b646885eb4cf9eae4a1f5bebbfa5c792db7d9cb190fb2bd9ed5a32c2"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [],
+     "expect_not_loaded": [
+      "frontend-performance"
+     ]
+    },
+    "outcome": [
+     {
+      "name": "no perf artifact appears",
+      "kind": "command-exit-0",
+      "target": "test ! -f perf-audit.md"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "FP-OUT-003-diagnostics-not-prescriptions",
+   "skill": "frontend-performance",
+   "prompt": {
+    "text": "Review these Lighthouse-driven recommendations for a page that must keep a strict CSP and supports older browsers: (a) allow every already-loaded origin in the CSP to raise the score, (b) replace all footer headings with <p>, (c) target only the last two browser versions, (d) named imports only. Write recommendations-review.md: each item judged CONDITIONALLY against THIS page's constraints, and any advice that trades security or user support for a score is REJECTED (DV-18)."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "ca374b5917fd23aeff4b53fd4ef162a53328ee00d32bdc2909acb8fcb3b4c37f"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "frontend-performance"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "the CSP-for-score advice is rejected (DV-18)",
+      "kind": "artifact-contains",
+      "target": "recommendations-review.md",
+      "expect": "REJECTED"
+     },
+     {
+      "name": "judgement is conditional, not a prescription (DV-18)",
+      "kind": "artifact-contains",
+      "target": "recommendations-review.md",
+      "expect": "conditional"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "FP-OUT-004-hostile-pre-fix-must-fail",
+   "skill": "frontend-performance",
+   "prompt": {
+    "text": "Audit the PRE-FIX skill text that claimed only three Core Web Vitals are field-measurable and filed FCP as lab-only: the audit must FAIL it against web.dev's own listing of FCP field tools (the P1 counterexample), name the finding, and record the release the corrected text shipped in (DV-19). Write hostile-audit.md."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "e44ee9c79eaa939f5ce581271fc7a560c7a6a3a4776904b32406afb9e60d0e75"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "frontend-performance"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "the old text fails (DV-19)",
+      "kind": "artifact-contains",
+      "target": "hostile-audit.md",
+      "expect": "FAIL"
+     },
+     {
+      "name": "tied to a release (DV-19)",
+      "kind": "artifact-contains",
+      "target": "hostile-audit.md",
+      "expect": "release"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "FP-OUT-005-live-psi-gated",
+   "skill": "frontend-performance",
+   "prompt": {
+    "text": "Run a live PageSpeed Insights audit of the URL in PERF_AUDIT_URL and write psi-result.md with the field and lab metric split. If PERF_AUDIT_URL or PSI_API_KEY is absent, the case is NOT_RUN — never a PASS and never an invented result."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "ca193f304a040ee378f2e9b1da8f7af6f246061ce5e997765cb5f915cd166e63"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "live host and key present",
+      "command": "test -n \"$PERF_AUDIT_URL\" && test -n \"$PSI_API_KEY\""
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "frontend-performance"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "live result separates field from lab",
+      "kind": "artifact-contains",
+      "target": "psi-result.md",
+      "expect": "field"
+     }
+    ]
+   }
+  }
+ ]
+}

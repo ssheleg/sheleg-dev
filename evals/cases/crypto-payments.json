@@ -1,0 +1,207 @@
+{
+ "contract": "outcome-case/1 (schemas/outcome-case.schema.json + test/outcome_harness.py in ssheleg/sshlg-skills)",
+ "note": "Outcome corpus for crypto-payments (FIX-EV-01.17), anchored to the audit's own findings DV-05/DV-06/DV-19. Judged on ARTIFACTS via the family harness: the runner records the actual output oracle verdict AND the raw result per case; with/without-skill arms are the harness's baseline contract. P1 counterexamples must FAIL on the pre-fix output and pass after the fix, tied to the release. Nothing in the production skill was changed for grader convenience.",
+ "arms": {
+  "baseline": "same prompts, skill absent",
+  "current": "same prompts, skill installed"
+ },
+ "cases": [
+  {
+   "schema_version": "outcome-case/1",
+   "id": "CP-OUT-001-positive-lifecycle-idempotency",
+   "skill": "crypto-payments",
+   "prompt": {
+    "text": "Design the webhook credit path for the full lifecycle pending→confirming→paid→refund_process→refund_paid with repeated pending deliveries, two concurrent paid deliveries, and a crash before AND after the commit: ZERO grants before paid, exactly ONE after, the refund reflected in its own ledger row (DV-05). Write lifecycle-plan.md."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "8cffac89d7aaeb28edd3c385b532eb7b5e3aec37626f89f0e10e66b1a8f03012"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "crypto-payments"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "plan exists",
+      "kind": "artifact-exists",
+      "target": "lifecycle-plan.md"
+     },
+     {
+      "name": "one grant after paid, zero before (DV-05)",
+      "kind": "artifact-contains",
+      "target": "lifecycle-plan.md",
+      "expect": "exactly one"
+     },
+     {
+      "name": "the refund has its own row (DV-05)",
+      "kind": "artifact-contains",
+      "target": "lifecycle-plan.md",
+      "expect": "refund"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "CP-OUT-002-negative-routing",
+   "skill": "crypto-payments",
+   "prompt": {
+    "text": "Explain in two sentences what a webhook is."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "a5da94aa03520bb6226ea88328a75ab6d7e3985c73a0e90a1379bf168fead57e"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [],
+     "expect_not_loaded": [
+      "crypto-payments"
+     ]
+    },
+    "outcome": [
+     {
+      "name": "no payments artifact appears",
+      "kind": "command-exit-0",
+      "target": "test ! -f lifecycle-plan.md"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "CP-OUT-003-amount-waterfall-units",
+   "skill": "crypto-payments",
+   "prompt": {
+    "text": "Build the amount reconciliation table for topup/plan/overpay/underpay/fee/FX cases: a TYPE check forbids adding USD to tokens, and the reconciliation proves gross = net + fees ± FX with the user's entitlement decided by the named policy (DV-06). Write amounts-table.md."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "e16e11fd7300ce06a35f3cd219b67d25ee8f97d5dbc903cc0bfd5cce4b8cb166"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "crypto-payments"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "the unit type check is present (DV-06)",
+      "kind": "artifact-contains",
+      "target": "amounts-table.md",
+      "expect": "USD"
+     },
+     {
+      "name": "gross=net+fees±FX proven (DV-06)",
+      "kind": "artifact-contains",
+      "target": "amounts-table.md",
+      "expect": "gross"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "CP-OUT-004-hostile-pre-fix-must-fail",
+   "skill": "crypto-payments",
+   "prompt": {
+    "text": "Audit the PRE-FIX credit snippet that granted on any status and blocked the lifecycle after paid: the audit must FAIL it (the P1 counterexample), name the finding, and record the release the fixed doctrine shipped in (DV-19). Write hostile-audit.md."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "97e78988f184b50dcd5877930f4ec36c0525f0e55fb21e83d1b00ff8dce90208"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "crypto-payments"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "the old output fails (DV-19)",
+      "kind": "artifact-contains",
+      "target": "hostile-audit.md",
+      "expect": "FAIL"
+     },
+     {
+      "name": "tied to a release (DV-19)",
+      "kind": "artifact-contains",
+      "target": "hostile-audit.md",
+      "expect": "release"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "CP-OUT-005-noop-correct-ledger-untouched",
+   "skill": "crypto-payments",
+   "prompt": {
+    "text": "Review a credit path already keyed by (paymentId,status) with a UNIQUE grant ledger and refund rows: report it clean and change NOTHING — write review-note.md only."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "d0d02286c443465156e3cdb593cda229fd3adb89e87380455f018f52044642b2"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "crypto-payments"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "a correct ledger is reported clean, not rewritten",
+      "kind": "artifact-contains",
+      "target": "review-note.md",
+      "expect": "clean"
+     }
+    ]
+   }
+  }
+ ]
+}

@@ -41,21 +41,25 @@ secrets, no redirect URIs, no token storage for Google APIs.
  Browser                       Google                        Your backend
  ───────                       ──────                        ────────────
  1. load gsi/client script
- 2. google.accounts.id.initialize({client_id, callback, nonce})
+ 0. GET /api/auth/google/nonce ────────────────────────────► server issues nonce,
+    (pre-auth HttpOnly cookie set)                              stores it w/ TTL
+ 2. google.accounts.id.initialize({client_id, callback, nonce: serverIssued})
  3. renderButton(#container)
  4. user clicks button ──────► account-chooser popup
                                (user picks account,
                                 consents on first use)
  5. callback receives  ◄────── ID token (JWT, RS256-signed
     {credential: "<jwt>"}       by Google's private key)
- 6. POST /api/auth/google {credential, nonce} ─────────────► 7. verify ID token:
+ 6. POST /api/auth/google {credential} ────────────────────► 7. verify ID token:
                                                                 - signature vs Google JWKS
                                                                   (https://www.googleapis.com/oauth2/v3/certs)
                                                                 - aud == YOUR client_id
                                                                 - iss == accounts.google.com
                                                                 - exp not passed
                                                                 - email_verified == true
-                                                                - nonce matches
+                                                                - nonce claim == server
+                                                                  expectation (popped:
+                                                                  one-time consume)
                                                              8. find-or-create user,
                                                                 link accounts
                                                              9. issue YOUR OWN session
@@ -81,7 +85,7 @@ Payload claims you care about:
   "email_verified": true,
   "name": "Ada Lovelace",
   "picture": "https://lh3.googleusercontent.com/…",
-  "nonce": "d9b2d63d-…",       // echoed from initialize() — replay defense
+  "nonce": "d9b2d63d-…",       // the SERVER-issued value passed to initialize()
   "iat": 1719410000,
   "exp": 1719413600            // ~1 hour lifetime
 }
@@ -107,7 +111,7 @@ Payload claims you care about:
 // app.js (essentials)
 var _googleNonce = '';
 
-function _renderGoogleButton() {
+async function _renderGoogleButton() {
   var clientId = _getGoogleClientId();          // read from the <meta> tag
   if (!clientId) return;                        // Google auth not configured → hide, degrade honestly
   if (typeof google === 'undefined' || !google.accounts) {
@@ -115,7 +119,10 @@ function _renderGoogleButton() {
     if (_googleRenderRetries++ < 20) setTimeout(_renderGoogleButton, 150);
     return;
   }
-  _googleNonce = crypto.randomUUID();           // fresh nonce per render — replay defense
+  // SERVER-issued nonce: the backend stores it (TTL, pre-auth HttpOnly cookie)
+  // and will pop it on the callback — the client never invents the value.
+  var nr = await fetch('/api/auth/google/nonce');
+  _googleNonce = (await nr.json()).nonce;
 
   google.accounts.id.initialize({
     client_id: clientId,
@@ -135,7 +142,7 @@ async function handleGoogleCredential(response) {
   var resp = await fetch('/api/auth/google', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ credential: response.credential, nonce: _googleNonce }),
+    body: JSON.stringify({ credential: response.credential }),
   });
   var data = await resp.json();
   if (!resp.ok) { showError(data.detail); return; }
@@ -185,14 +192,21 @@ Every Google login resolves to exactly one of three cases:
 
 1. **Returning Google user** — a record with this `google_id` (`sub`) exists
    → issue session. Refresh `name`/`picture` if they changed.
-2. **Existing email/password account, no `google_id`** — link Google to it
-   (set `google_id`, mark `email_verified=True`) → issue session.
-   ⚠️ **Pre-hijacking guard** (see §4.3): only auto-link if the existing
-   account's email ownership was verified. Otherwise refuse with "sign in
-   with your password".
-3. **Brand-new user** — create the account with `email_verified=True` (the
-   Google token already proved inbox ownership), empty password hash → issue
-   session.
+2. **Existing account, no `google_id`** — `email_verified` is NOT authority to
+   attach Google to it. It means Google verified the inbox once; it does not
+   mean this person owns the LOCAL account, and for a third-party address it
+   does not even mean they still own the inbox. Default: link only after a
+   **fresh re-auth of the existing local account** (§4.3). Auto-link without
+   re-auth is permitted only when `google_authoritative(payload)` — the address
+   is `@gmail.com` or the token carries an `hd` Workspace claim — AND the
+   existing record's own email ownership was proven; for any other address run
+   an **independent inbox challenge** first. If the existing account is a
+   password account whose email was **never verified**, route to **safe
+   account recovery** (§4.3), never to the existing password.
+3. **Brand-new user** — create the account, empty password hash. Mark
+   `email_verified=True` only when `google_authoritative(payload)`; for a
+   third-party address (non-Gmail, no `hd`) create it UNVERIFIED and challenge
+   the inbox before anything trusts the email → issue session.
 
 Then issue your own session. Prowl issues an HS256 app JWT (72 h, `ver` claim
 for global revocation) delivered as an **HttpOnly, Secure, SameSite=Strict
@@ -261,11 +275,17 @@ npm i google-auth-library      # Node
 
 ### 4.2 Nonce — replay defense
 
-Generate a fresh random nonce per button render, pass it to
-`google.accounts.id.initialize({nonce})`, send it alongside the credential,
-compare server-side with the token's `nonce` claim
-(`web/auth.py:375-376`). A stolen/logged ID token can't be replayed later
-because the nonce won't match the new session's nonce.
+**The server issues the nonce; the client never invents one.** A
+client-generated nonce POSTed back beside the credential proves nothing — the
+"expected" value would be read out of the very JWT it is meant to check, so a
+stolen token replays with its own nonce forever. Fetch the nonce from
+`GET /api/auth/google/nonce` (the server stores it with a TTL, bound to a
+pre-auth HttpOnly session cookie), pass it to
+`google.accounts.id.initialize({nonce})`, and on the callback the server POPs
+the expectation (one-time consume) and requires the token's `nonce` claim to
+equal it exactly. Missing claim, missing expectation, expiry and re-use all
+reject. First sign-in passes; a replay from a new session meets a different
+expectation; a replay in the same session meets a consumed one.
 
 ### 4.3 Account pre-hijacking guard (P3-01 in Prowl)
 
@@ -274,10 +294,31 @@ victim ever visits. Later the victim clicks "Sign in with Google". Naïve
 auto-linking attaches victim's Google to the **attacker's** record — attacker
 keeps password access to the merged account (its data and wallet).
 
-Defense (`web/auth.py:392-417`): when a Google login matches an existing
-**password** account whose email was **never verified**, refuse to auto-link;
-tell the user to sign in with the password. Link only when email ownership of
-the existing record is proven.
+Defense: `email_verified` is not proof of ownership OF THE LOCAL ACCOUNT, and
+Google is only authoritative for the *address* when it is Gmail or carries an
+`hd` Workspace claim — for a third-party email, ownership can have changed
+since Google verified it (Google's own guidance excludes non-Gmail without
+`hd`). So:
+
+```python
+def google_authoritative(payload):
+    email = (payload.get("email") or "").lower()
+    return bool(payload.get("email_verified")
+                and (email.endswith("@gmail.com") or payload.get("hd")))
+```
+
+- **Default** — link only after a **fresh re-auth of the existing local
+  account** (its password or existing factor). Proving you hold the account is
+  the only thing that authorizes attaching a new identity to it.
+- **Auto-link without re-auth** — permitted only when
+  `google_authoritative(payload)` AND the existing record's email ownership was
+  already proven. For any other address, run an **independent challenge** (a
+  verification link to that inbox) first.
+- **Unverified pre-registration** — when the existing password account's email
+  was never verified, DO NOT tell the victim to "sign in with the password":
+  that password may be the attacker's. Route them into a **safe
+  account-recovery flow** (reset via a fresh inbox challenge), which takes the
+  account away from whoever pre-registered it rather than handing it over.
 
 ### 4.4 Login-CSRF (P3-03 in Prowl)
 
@@ -287,12 +328,22 @@ attacker's account (victim then unknowingly feeds data/payments into it).
 
 Defense (`web/server.py:1657-1686`), covering both possible delivery flows:
 
-- **Form-POST flow** (GIS `login_uri` auto-POST): GIS double-submits
-  `g_csrf_token` in body *and* cookie — compare both, constant-time
-  (`hmac.compare_digest`). Reject if either is missing.
-- **JS-fetch flow** (this app): no `g_csrf_token`, so enforce same-origin via
-  **Fetch-Metadata** (`Sec-Fetch-Site: same-origin`) with an Origin-allowlist
-  fallback. These headers are browser-set and unforgeable by page script.
+The two flows are SEPARATE, explicitly typed paths chosen by Content-Type. A
+handler that claims form support but binds only a JSON body never runs the form
+contract — the CSRF check for the form flow (`g_csrf_token`) is on a request
+shape that flow never sends.
+
+- **Form-POST flow** (`login_uri` auto-POST, `application/x-www-form-urlencoded`):
+  GIS double-submits `g_csrf_token` in the FORM BODY and the cookie — require
+  BOTH present and equal, constant-time (`hmac.compare_digest`). Reject if
+  either is missing.
+- **JS-fetch flow** (`application/json`): no `g_csrf_token`, so require a
+  trusted same-origin signal — `Sec-Fetch-Site: same-origin`, OR (only when
+  that header is ABSENT) an exact `Origin` in an allowlist. A **missing
+  `Sec-Fetch-Site` is NOT assumed same-origin**; `cross-site` and `none` are
+  rejected; with neither a trusted metadata value nor an allowed Origin the
+  request **fails closed**. These headers are browser-set and unforgeable by
+  page script. The CSRF decision runs BEFORE token verification.
 
 ### 4.5 Session hygiene
 
@@ -346,8 +397,8 @@ Defense (`web/server.py:1657-1686`), covering both possible delivery flows:
 
 ```python
 # --- backend ---
-import os, hmac
-from fastapi import FastAPI, HTTPException, Request, Response
+import os, hmac, secrets, time
+from fastapi import FastAPI, Form, HTTPException, Request, Response
 from pydantic import BaseModel
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
@@ -356,29 +407,79 @@ GOOGLE_CLIENT_ID = os.environ["GOOGLE_CLIENT_ID"]
 _transport = google_requests.Request()
 app = FastAPI()
 
+NONCE_TTL = 600
+_nonce_store: dict[str, tuple[str, float]] = {}   # sid -> (nonce, expires); use Redis in prod
+
+ALLOWED_ORIGINS = {"https://app.example.com"}   # your own origin(s)
+
+
 class GoogleAuthRequest(BaseModel):
     credential: str
-    nonce: str | None = None
-    g_csrf_token: str | None = None
+    g_csrf_token: str | None = None               # no nonce in the body — the server holds it
 
-@app.post("/api/auth/google")
+
+def _csrf_ok_form(cookie_token, form_token):
+    # The form flow's whole authorization: both present and equal, constant-time.
+    if not form_token or not cookie_token:
+        return False
+    return hmac.compare_digest(cookie_token, form_token)
+
+
+def _csrf_ok_json(sec_fetch_site, origin):
+    # Trusted metadata first; Origin allowlist ONLY as an explicit fallback when
+    # the header is absent. A missing Sec-Fetch-Site is not same-origin, and
+    # `none`/`cross-site` are rejected — fail closed when neither proves origin.
+    if sec_fetch_site == "same-origin":
+        return True
+    if sec_fetch_site in ("cross-site", "same-site", "none"):
+        return False
+    if sec_fetch_site is None:                     # header absent → exact Origin, allowlisted
+        return bool(origin) and origin in ALLOWED_ORIGINS
+    return False
+
+@app.get("/api/auth/google/nonce")
+async def google_nonce(req: Request, response: Response):
+    sid = req.cookies.get("preauth") or secrets.token_urlsafe(32)
+    nonce = secrets.token_urlsafe(32)
+    _nonce_store[sid] = (nonce, time.time() + NONCE_TTL)
+    response.set_cookie("preauth", sid, httponly=True, secure=True,
+                        samesite="lax", max_age=NONCE_TTL, path="/")
+    return {"nonce": nonce}
+
+# Two explicitly typed routes. Content-Type picks the flow; each runs ONLY its
+# own CSRF contract; both fail closed; the check is before any token call.
+
+@app.post("/api/auth/google/form")             # application/x-www-form-urlencoded
+async def google_auth_form(req: Request, response: Response,
+                           credential: str = Form(...),
+                           g_csrf_token: str = Form(None)):
+    if not _csrf_ok_form(req.cookies.get("g_csrf_token"), g_csrf_token):
+        raise HTTPException(403, "CSRF: g_csrf_token missing or mismatched")
+    return await _finish_google_auth(req, response, credential)
+
+
+@app.post("/api/auth/google")                  # application/json (JS fetch)
 async def google_auth(req: Request, data: GoogleAuthRequest, response: Response):
-    # CSRF: double-submit for form-POST flow, Fetch-Metadata for JS flow
-    if data.g_csrf_token:
-        cookie = req.cookies.get("g_csrf_token") or ""
-        if not hmac.compare_digest(cookie, data.g_csrf_token):
-            raise HTTPException(403, "CSRF token mismatch")
-    elif req.headers.get("sec-fetch-site", "same-origin") not in ("same-origin", "none"):
-        raise HTTPException(403, "Cross-site request rejected")
+    sec = req.headers.get("sec-fetch-site")    # None when the header is absent
+    if not _csrf_ok_json(sec, req.headers.get("origin")):
+        raise HTTPException(403, "CSRF: request origin not proven (fail closed)")
+    return await _finish_google_auth(req, response, data.credential)
 
+
+async def _finish_google_auth(req: Request, response: Response, credential: str):
     try:
-        payload = id_token.verify_oauth2_token(data.credential, _transport, GOOGLE_CLIENT_ID)
+        payload = id_token.verify_oauth2_token(credential, _transport, GOOGLE_CLIENT_ID)
     except Exception as exc:
         raise HTTPException(401, f"Invalid Google token: {exc}")
     if not payload.get("email_verified"):
         raise HTTPException(401, "Google account email is not verified")
-    if data.nonce and payload.get("nonce") != data.nonce:
-        raise HTTPException(401, "Nonce mismatch")
+    # One-time consume BEFORE any account work: pop() removes the expectation
+    # in the same step, so a replayed callback finds nothing. Mandatory — a
+    # missing claim or a missing expectation rejects; the body carries no nonce.
+    sid = req.cookies.get("preauth") or ""
+    expected, expires = _nonce_store.pop(sid, (None, 0.0))
+    if not expected or time.time() > expires or payload.get("nonce") != expected:
+        raise HTTPException(401, "Nonce missing, expired, replayed or not server-issued")
 
     user = await find_or_create_user(          # your 3-way linking here (§2.4, §4.3)
         google_id=payload["sub"], email=payload["email"].lower().strip(),
@@ -395,8 +496,8 @@ async def google_auth(req: Request, data: GoogleAuthRequest, response: Response)
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <div id="gbtn"></div>
 <script>
-  const NONCE = crypto.randomUUID();
-  window.onload = () => {
+  window.onload = async () => {
+    const NONCE = (await (await fetch("/api/auth/google/nonce")).json()).nonce;
     google.accounts.id.initialize({
       client_id: "YOUR_CLIENT_ID.apps.googleusercontent.com",
       nonce: NONCE,
@@ -404,7 +505,7 @@ async def google_auth(req: Request, data: GoogleAuthRequest, response: Response)
         const r = await fetch("/api/auth/google", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ credential, nonce: NONCE }),
+          body: JSON.stringify({ credential }),
         });
         if (r.ok) location.href = "/app";
       },

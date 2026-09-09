@@ -20,9 +20,19 @@ Application Default Credentials (ADC) automatically finds credentials based on t
 
 ## ADC Search Order
 
-1. **Attached service account** — via GCP metadata server (Compute Engine, Cloud Run, GKE, etc.)
-2. **`gcloud auth application-default login`** — local credential file
-3. **`GOOGLE_APPLICATION_CREDENTIALS`** — env var pointing to a credential JSON file
+Google resolves these **in this order — env var FIRST**, and the earlier match
+wins. The old text here had it reversed (attached account first), which points
+you at the wrong lever when the resolved identity is not what you expect:
+
+1. **`GOOGLE_APPLICATION_CREDENTIALS`** — env var pointing to a credential JSON file
+2. **`gcloud auth application-default login`** — local credential file (well-known path)
+3. **Attached service account** — via GCP metadata server (Compute Engine, Cloud Run, GKE, etc.)
+
+**Before configuring, print the ACTUALLY-resolved principal and source** — which
+of the three won, and the account email — **without the secret**. On a VM with a
+metadata identity AND an env var set, only the resolved source tells you which
+one your code is actually using; a config change made against the wrong source
+is a change that does nothing.
 
 Credential file locations from `gcloud auth application-default login`:
 - **macOS/Linux**: `$HOME/.config/gcloud/application_default_credentials.json`

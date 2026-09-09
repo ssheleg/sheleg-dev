@@ -21,6 +21,32 @@
 
 export const RULES = Object.freeze([
   'claim',
+  // A claim records RECEIPT, and only `completeEvent` records completion. Without this
+  // rule the row never leaves 'processing', so a retry arriving after the claim expiry
+  // takes the event over and grants a second time — received quietly read as completed.
+  'claim-completion',
+  // The recovery half of the same split: a 'processing' claim older than CLAIM_TTL_MS
+  // belonged to a worker that died between receipt and completion, and a retry may take
+  // it over. Without this rule the crashed claim answers "in flight" forever and the
+  // payment is swallowed.
+  'claim-expiry',
+  // Entitlement, dedup marker, completion and the outbox rows commit TOGETHER.
+  // Without this rule a crash mid-application leaves the grant applied and the
+  // completion missing — half a payment, which no retry can see or repair.
+  'atomic-application',
+  // The outbox delivers at least once, so the CONSUMER dedups on its own key
+  // (event id + effect kind). Without this rule a redelivered outbox row sends
+  // the renewal notice and fires the conversion a second time.
+  'outbox-consumer-key',
+  // The period grant is claimed by an ATOMIC keyed insert (subscription + item
+  // + period), not a read-then-mark. Without this rule two concurrent grants of
+  // one period — a webhook and the reconciler, say — both pass the read and
+  // both credit: the read is a round trip, and a round trip is a race.
+  'grant-key-atomic',
+  // A serialization conflict retries, BOUNDED, inside the same claim. Without
+  // this rule a conflicted transaction is dropped and the route still answers
+  // 200 — the renewal silently never lands, and Stripe was told it did.
+  'tx-retry-bounded',
   'billing-reason',
   'grant-marker',
   'ordering',
@@ -50,6 +76,11 @@ export const RULES = Object.freeze([
 /** Credits one paid period is worth. Arbitrary; the assertions count grants, not credits. */
 export const CREDITS_PER_PERIOD = 500;
 
+/** How long a 'processing' claim may sit before a retry may take it over. In production:
+ *  comfortably longer than your slowest handler run (say, twice the route timeout). The
+ *  store keeps a logical clock, so the assertions can age a claim without waiting. */
+export const CLAIM_TTL_MS = 5 * 60 * 1000;
+
 /** The save offer this handler is willing to make. Yours, not Stripe's -- a coupon cannot
  *  be restricted to one customer, so the identity of the offer has to live on your side. */
 export const RETENTION_OFFER_ID = 'cancel-50-once';
@@ -59,29 +90,123 @@ export const RETENTION_DECLINE_LIMIT = 2;
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
+/** The crash simulation's marker: a process death, not a thrown handler error. */
+class SystemError_ extends Error {}
+
+/** A database serialization failure — retryable by definition, never a verdict. */
+class SerializationConflict_ extends Error {}
+
+/** How many serialization conflicts one delivery absorbs before answering 5xx. */
+export const TX_RETRIES = 3;
+
 export function createStore() {
   return {
-    processedEvents: new Set(),
+    processedEvents: new Map(), // event id -> { state: 'processing'|'completed', claimedAt }
+    clock: 0, // logical ms; advanced by tests, never read from the wall
+    advanceClock(ms) {
+      this.clock += ms;
+    },
     grantedPeriods: new Map(), // subscription id -> Set of period starts already granted
+    grantKeys: new Set(), // atomic per-period claim keys: sub:item:period
+    grantLedger: [], // one row per granted period: { key, subId, itemId, invoiceId, periodStart }
     subscriptions: new Map(), // the mirrored row: period, status, quantity, price
     purchases: new Map(), // payment intent -> { amount, refundedTotal } (minor units)
     credits: new Map(), // user id -> integer
     grants: [], // one row per grant actually applied
     clawbacks: [], // { paymentIntent, amount } in minor units
     conversions: [], // what the server sent to the ad platforms
+    outbox: [], // side-effect rows written IN the grant transaction: { key, apply, state }
+    failNextTransactions: 0, // test hook: how many commits raise a serialization conflict
+    txAttempts: 0, // how many transaction attempts actually ran
+    sentKeys: new Set(), // the consumer's own dedup — survives a redelivered row
     retentionOffers: [], // { customerId, offerId, couponId, subscriptionId, redeemedAt }
     saves: [], // one row per cancellation deflected, recorded from the discount event
     notifications: [], // side effects that must not run twice
     log: [],
 
-    /** An INSERT on a primary key: atomic, and the only claim that survives a race. */
+    /** All-or-nothing for the business application: what the fixture calls a
+     *  transaction. A crash inside the callback restores every collection, so a
+     *  half-applied grant cannot exist — which is the property the retry relies on. */
+    snapshot() {
+      return {
+        processedEvents: new Map([...this.processedEvents]
+          .map(([k, v]) => [k, { ...v }])),
+        grantedPeriods: new Map([...this.grantedPeriods].map(([k, v]) => [k, new Set(v)])),
+        grantKeys: new Set(this.grantKeys),
+        grantLedger: this.grantLedger.map((r) => ({ ...r })),
+        subscriptions: new Map([...this.subscriptions].map(([k, v]) => [k, { ...v }])),
+        purchases: new Map([...this.purchases].map(([k, v]) => [k, { ...v }])),
+        credits: new Map(this.credits),
+        grants: this.grants.slice(),
+        clawbacks: this.clawbacks.slice(),
+        conversions: this.conversions.slice(),
+        retentionOffers: this.retentionOffers.map((o) => ({ ...o })),
+        saves: this.saves.slice(),
+        notifications: this.notifications.slice(),
+        outbox: this.outbox.map((r) => ({ ...r })),
+        sentKeys: new Set(this.sentKeys),
+        log: this.log.slice(),
+      };
+    },
+    restore(snap) {
+      Object.assign(this, snap);
+    },
+
+    /** An INSERT on a primary key: atomic, and the only claim that survives a race.
+     *  The row it writes says 'processing' — a RECEIPT. What the caller does with an
+     *  existing row is a decision about states, so this returns one:
+     *  'claimed' (new row), 'completed' (real duplicate), 'expired' (a worker died
+     *  holding it), 'in_flight' (someone fresh is on it — answer retry-later). */
     claimEvent(id) {
-      if (this.processedEvents.has(id)) return false;
-      this.processedEvents.add(id);
+      const row = this.processedEvents.get(id);
+      if (!row) {
+        this.processedEvents.set(id, { state: 'processing', claimedAt: this.clock });
+        return 'claimed';
+      }
+      if (row.state === 'completed') return 'completed';
+      return this.clock - row.claimedAt >= CLAIM_TTL_MS ? 'expired' : 'in_flight';
+    },
+    /** The takeover: an UPDATE guarded by the same staleness test it was granted for —
+     *  atomic, so two retries racing for one corpse cannot both win. */
+    reclaimEvent(id) {
+      const row = this.processedEvents.get(id);
+      if (!row || row.state !== 'processing'
+          || this.clock - row.claimedAt < CLAIM_TTL_MS) return false;
+      row.claimedAt = this.clock;
       return true;
     },
+    /** Receipt becomes completion, explicitly — inside the grant transaction, so a row
+     *  that says 'completed' is one whose business write committed. */
+    completeEvent(id) {
+      const row = this.processedEvents.get(id);
+      if (row && row.state === 'processing') {
+        row.state = 'completed';
+        row.completedAt = this.clock;
+      }
+    },
+    /** Only for a handler that THREW and answered 5xx: the claim goes back so the retry
+     *  need not wait out the expiry. A crashed worker never reaches this line — that is
+     *  what the expiry is for. */
     releaseEventClaim(id) {
-      this.processedEvents.delete(id);
+      const row = this.processedEvents.get(id);
+      if (row && row.state === 'processing') this.processedEvents.delete(id);
+    },
+
+    /** The DATABASE arbitrates: an INSERT on a UNIQUE period-grant key.
+     *  Synchronous — no round trip between the check and the write, which is the
+     *  whole difference from readGrantedPeriods-then-mark. The ledger row carries
+     *  subscription, item, invoice and period; UNIQUENESS is (subscription,
+     *  period) — this reference models one plan item per subscription, and a
+     *  multi-item subscription widens the key with the item. The invoice is
+     *  provenance, never part of the uniqueness: a second invoice for one period
+     *  must not grant the period twice. */
+    claimPeriodGrant(subId, itemId, invoiceId, periodStart) {
+      const key = `${subId}:${periodStart}`;
+      if (this.grantKeys.has(key)) return false;
+      this.grantKeys.add(key);
+      this.grantLedger.push({ key, subId, itemId, invoiceId, periodStart });
+      this.markPeriodGranted(subId, periodStart);   // the view existing readers use
+      return true;
     },
 
     async readGrantedPeriods(subId) {
@@ -211,12 +336,23 @@ export function createHandler(store, options = {}) {
     const metadata = invoiceMetadata(invoice);
     const userId = metadata.userId;
 
-    const granted = await store.readGrantedPeriods(subId);
-    if (has('grant-marker') && granted.has(period.start)) {
-      store.log.push({ event: event.id, decision: 'skipped: period already granted' });
-      return [];
+    const itemId = (period.line && period.line.id) || 'item';
+    if (has('grant-key-atomic')) {
+      if (has('grant-marker')
+          && !store.claimPeriodGrant(subId, itemId, invoice.id, period.start)) {
+        store.log.push({ event: event.id, decision: 'skipped: period already granted' });
+        return [];
+      }
+      if (!has('grant-marker')) store.claimPeriodGrant(subId, itemId, invoice.id, period.start);
+    } else {
+      // The pre-fix shape: a SELECT (a round trip), then a mark. Kept as the mutant.
+      const granted = await store.readGrantedPeriods(subId);
+      if (has('grant-marker') && granted.has(period.start)) {
+        store.log.push({ event: event.id, decision: 'skipped: period already granted' });
+        return [];
+      }
+      store.markPeriodGranted(subId, period.start);
     }
-    store.markPeriodGranted(subId, period.start);
     store.addCredits(userId, CREDITS_PER_PERIOD);
     store.grants.push({
       subscription: subId, userId, periodStart: period.start, source: 'webhook', event: event.id,
@@ -239,14 +375,20 @@ export function createHandler(store, options = {}) {
     const conversionId = conversionIdFor(invoice);
     store.log.push({ event: event.id, decision: 'granted' });
     return [
-      () => store.notifications.push({ userId, kind: 'renewal', periodStart: period.start }),
-      () => store.conversions.push({
-        eventId: conversionId,
-        eventName: 'Purchase',
-        source: 'webhook',
-        value: invoice.amount_paid / 100,
-        currency: (invoice.currency || '').toUpperCase(),
-      }),
+      {
+        key: `${event.id}:renewal-notice`,
+        apply: () => store.notifications.push({ userId, kind: 'renewal', periodStart: period.start }),
+      },
+      {
+        key: `${event.id}:conversion`,
+        apply: () => store.conversions.push({
+          eventId: conversionId,
+          eventName: 'Purchase',
+          source: 'webhook',
+          value: invoice.amount_paid / 100,
+          currency: (invoice.currency || '').toUpperCase(),
+        }),
+      },
     ];
   }
 
@@ -393,20 +535,88 @@ export function createHandler(store, options = {}) {
     }
   }
 
-  /** The route Stripe posts to. Signature verification is the caller's; see SKILL.md. */
-  async function deliver(event) {
-    if (has('claim') && !store.claimEvent(event.id)) {
-      return { status: 200, body: { received: true, duplicate: true } };
+  /** The route Stripe posts to. Signature verification is the caller's; see SKILL.md.
+   *  `opts.crashAfterClaim` simulates the process dying between receipt and completion:
+   *  no release, no completion, no answer — the case a boolean claim turns into a
+   *  swallowed payment, because the row already says "seen". */
+  async function deliver(event, opts = {}) {
+    if (has('claim')) {
+      let claim = store.claimEvent(event.id);
+      if (claim === 'expired') {
+        claim = has('claim-expiry') && store.reclaimEvent(event.id) ? 'claimed' : 'in_flight';
+      }
+      if (claim === 'completed') {
+        return { status: 200, body: { received: true, duplicate: true } };
+      }
+      if (claim === 'in_flight') {
+        // Honest answer: somebody is (or may still be) working this event. 5xx makes
+        // Stripe retry THIS delivery too, so whichever worker dies, the event survives.
+        return { status: 500, body: { error: 'in flight' } };
+      }
     }
-    let afterCommit = [];
-    try {
-      afterCommit = await handle(event);
-    } catch (error) {
-      if (has('claim')) store.releaseEventClaim(event.id);
-      return { status: 500, body: { error: 'handler error' } };
+    if (opts.crashAfterClaim) return { status: 0, body: null }; // the worker is gone
+    // ONE transaction: entitlement, dedup marker, completion mark and the outbox rows
+    // commit together, or none of them exist. A crash inside leaves nothing applied —
+    // the claim row still says 'processing', and the retry runs the whole thing again.
+    // A serialization conflict aborts THIS attempt and retries inside the same
+    // claim — bounded at TX_RETRIES, because a database under real contention
+    // conflicts more than once and a loop with no bound is an outage. Beyond the
+    // bound the route answers 5xx with the claim released, so Stripe's redelivery
+    // brings the renewal back: a conflict may DELAY a grant, never lose it.
+    let attempts = 0;
+    for (;;) {
+      const snap = has('atomic-application') ? store.snapshot() : null;
+      try {
+        store.txAttempts += 1;
+        attempts += 1;
+        const effects = await handle(event);
+        // Receipt becomes completion in the same commit as the grant. A handler that
+        // answers 200 without this line has told Stripe "done" about work only received.
+        if (has('claim') && has('claim-completion')) store.completeEvent(event.id);
+        for (const e of effects) {
+          store.outbox.push({ key: e.key, apply: e.apply, state: 'pending' });
+        }
+        if (store.failNextTransactions > 0) {
+          store.failNextTransactions -= 1;
+          throw new SerializationConflict_();
+        }
+        if (opts.crashBeforeCommit) throw new SystemError_('killed inside the transaction');
+        break;
+      } catch (error) {
+        if (snap) store.restore(snap);
+        if (error instanceof SerializationConflict_) {
+          if (has('tx-retry-bounded') && attempts <= TX_RETRIES) continue; // same claim, fresh attempt
+          if (!has('tx-retry-bounded')) {
+            // The mutant: the conflict is swallowed and the route lies "done".
+            return { status: 200, body: { received: true } };
+          }
+          if (has('claim')) store.releaseEventClaim(event.id);
+          return { status: 500, body: { error: 'serialization conflict — retry' } };
+        }
+        if (error instanceof SystemError_) return { status: 0, body: null }; // process died
+        if (has('claim')) store.releaseEventClaim(event.id);
+        return { status: 500, body: { error: 'handler error' } };
+      }
     }
-    for (const effect of afterCommit) effect(); // side effects run after the commit
+    // After the commit the outbox drains — inline here; a worker in production, with
+    // the same at-least-once semantics and therefore the same need for a consumer key.
+    drainOutbox();
     return { status: 200, body: { received: true } };
+  }
+
+  /** The outbox consumer. The queue redelivers, so the consumer carries its OWN
+   *  dedup key — the row's `key` (event id + effect kind), remembered across rows. */
+  function drainOutbox() {
+    for (const row of store.outbox) {
+      if (row.state === 'sent') continue;
+      if (has('outbox-consumer-key') && store.sentKeys.has(row.key)) {
+        row.state = 'sent';
+        continue;
+      }
+      row.apply();
+      if (has('outbox-consumer-key')) store.sentKeys.add(row.key);
+      row.state = 'sent';
+    }
   }
 
   /**
@@ -415,12 +625,26 @@ export function createHandler(store, options = {}) {
    * point that separates the two.
    */
   async function reconcile(subId, period, metadata) {
-    const granted = await store.readGrantedPeriods(subId);
-    if (has('grant-marker') && granted.has(period.start)) {
-      store.log.push({ event: 'reconcile', decision: 'skipped: period already granted' });
-      return { granted: false };
+    // The SAME key derivation as the webhook path — a reconciler keying the item
+    // differently is two ledgers for one period, i.e. the double grant back again.
+    const reconcileItemId = (period.line && period.line.id) || 'item';
+    if (has('grant-key-atomic')) {
+      if (has('grant-marker')
+          && !store.claimPeriodGrant(subId, reconcileItemId, 'reconcile', period.start)) {
+        store.log.push({ event: 'reconcile', decision: 'skipped: period already granted' });
+        return { granted: false };
+      }
+      if (!has('grant-marker')) {
+        store.claimPeriodGrant(subId, reconcileItemId, 'reconcile', period.start);
+      }
+    } else {
+      const granted = await store.readGrantedPeriods(subId);
+      if (has('grant-marker') && granted.has(period.start)) {
+        store.log.push({ event: 'reconcile', decision: 'skipped: period already granted' });
+        return { granted: false };
+      }
+      store.markPeriodGranted(subId, period.start);
     }
-    store.markPeriodGranted(subId, period.start);
     store.addCredits(metadata.userId, CREDITS_PER_PERIOD);
     store.grants.push({
       subscription: subId, userId: metadata.userId, periodStart: period.start,
@@ -453,5 +677,5 @@ export function createHandler(store, options = {}) {
     return offer;
   }
 
-  return { deliver, reconcile, offerRetention };
+  return { deliver, reconcile, offerRetention, drainOutbox };
 }

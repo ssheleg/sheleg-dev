@@ -34,6 +34,16 @@ jobs:
       - name: Structural validator
         run: python3 test/validate.py
 
+      # One file per closed sherlock-audit finding: doctrine phrases, the documented SQL
+      # semantics executed in sqlite, and the shipped packs re-run as processes.
+      - name: Audit regressions (sherlock plan)
+        run: |
+          set -e
+          for t in test/audit_regressions/*.py; do
+            echo "== $t"
+            python3 "$t"
+          done
+
       # The manual gate's own fixtures, both directions. They run the pure decision module
       # with no HOME and then the real hook as a process, because "fails silent" and
       # "exit 0" are properties of the script rather than of the module.
@@ -1108,9 +1118,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ssheleg/make-skill
-          ref: 991cbb415be3e856f05c974e631423df552883e3
+          ref: 5ca5c367ba24295d4dd99ff670dbef97234140e7
           path: .skill-auditor
           persist-credentials: false
+
+      - name: Install a real tokenizer (the budget is MEASURED, never estimated)
+        run: python3 -m pip install --quiet tiktoken
 
       - name: Audit every shipped Agent Skill
         run: |

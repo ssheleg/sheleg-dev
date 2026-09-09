@@ -228,8 +228,7 @@ from pydantic import BaseModel
 
 class GoogleLoginRequest(BaseModel):
     credential: str
-    g_csrf_token: str | None = None
-    nonce: str | None = None
+    g_csrf_token: str | None = None   # no nonce field — the server holds the expectation
 
 @router.post("/google")
 async def google_login(request: Request, body: GoogleLoginRequest):
@@ -265,37 +264,53 @@ def google_login():
 
 ## Nonce Verification
 
-Pass a nonce to `google.accounts.id.initialize()` on the client, then verify it server-side against the token's `nonce` claim.
+**The server issues the nonce; the client never invents one.** A
+client-generated nonce sent back beside the credential proves nothing: the
+"expected" value would be read out of the very JWT it is meant to check, so a
+stolen token replays with its own nonce. The contract (shared with
+`google-signin` — one contract, both skills):
+
+1. `GET /api/auth/google/nonce` — the server mints a random value, stores it
+   with a TTL bound to a **pre-auth HttpOnly session cookie**, returns it.
+2. The client passes that value to `google.accounts.id.initialize({nonce})`.
+3. On the callback the server **pops the expectation (one-time consume) and
+   requires the token's `nonce` claim to equal it exactly.** Missing claim,
+   missing expectation, expiry and re-use all reject; the POST body carries
+   no nonce and plays no part in the check.
 
 **Client-side:**
 
 ```js
-const nonce = crypto.randomUUID();  // or any random string
+const nonce = (await (await fetch('/api/auth/google/nonce')).json()).nonce;
 google.accounts.id.initialize({
   client_id: CLIENT_ID,
-  callback: handleResponse,
-  nonce: nonce
+  callback: handleResponse,   // POSTs { credential } only
+  nonce
 });
-// Send nonce alongside credential to your backend
 ```
 
 **Server-side (Node.js):**
 
 ```js
+const sid = req.cookies.preauth || '';
+const expected = await nonceStore.pop(sid);        // one-time consume, with TTL
 const payload = ticket.getPayload();
-if (payload.nonce !== expectedNonce) {
-  throw new Error('Nonce mismatch');
+if (!expected || payload.nonce !== expected) {
+  throw new Error('Nonce missing, expired, replayed or not server-issued');
 }
 ```
 
 **Server-side (Python):**
 
 ```python
-if body.nonce:
-    token_nonce = payload.get('nonce')
-    if not token_nonce or token_nonce != body.nonce:
-        raise ValueError('Nonce mismatch')
+sid = request.cookies.get('preauth') or ''
+expected = nonce_store.pop(sid)                    # one-time consume, with TTL
+if not expected or payload.get('nonce') != expected:
+    raise ValueError('Nonce missing, expired, replayed or not server-issued')
 ```
+
+First sign-in passes; a replay from a new session meets a different
+expectation; a replay after consume meets none.
 
 ## ID Token Payload Fields
 
@@ -474,8 +489,7 @@ CLIENT_ID = settings.google_client_id
 
 class GoogleLoginRequest(BaseModel):
     credential: str
-    g_csrf_token: str | None = None
-    nonce: str | None = None
+    g_csrf_token: str | None = None   # no nonce field — the server holds the expectation
 
 @router.post("/auth/google")
 async def google_login(request: Request, body: GoogleLoginRequest):
@@ -494,10 +508,13 @@ async def google_login(request: Request, body: GoogleLoginRequest):
     if not payload.get("email_verified", False):
         raise HTTPException(status_code=401, detail="Email not verified")
 
-    # 3. Verify nonce
-    if body.nonce:
-        if payload.get("nonce") != body.nonce:
-            raise HTTPException(status_code=401, detail="Nonce mismatch")
+    # 3. Verify nonce — MANDATORY, against the server's own expectation.
+    # pop() consumes it in the same step (one-time); the body carries no nonce.
+    sid = request.cookies.get("preauth") or ""
+    expected = nonce_store.pop(sid)          # server-issued, TTL'd (see §Nonce Verification)
+    if not expected or payload.get("nonce") != expected:
+        raise HTTPException(status_code=401,
+                            detail="Nonce missing, expired, replayed or not server-issued")
 
     # 4. Find or create user, issue app JWT...
     user, is_new = await find_or_create_google_user(db, payload)

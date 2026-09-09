@@ -1,0 +1,33 @@
+{
+ "contract": "offline artifact / fault-injection corpus (fix-dv-19.06) for error-tracking — last of the DV-19 family. Each case injects a fault, runs a state/output ORACLE (not a provider stub judging itself), records exit/trace/environment. DV-19: the counterexample FAILS pre-fix, PASSES post-fix, verified by STATE/OUTPUTS, release-tied.",
+ "release_tie": "the fix ships in a tagged release; a counterexample that passes pre-fix is not a fix",
+ "environment": {
+  "runtime": "python3 stdlib",
+  "network": "none — offline oracles",
+  "note": "Sentry/transport stubs are inputs, never the oracle"
+ },
+ "cases": [
+  {
+   "id": "DV-15-secret-scrubbing",
+   "finding": "DV-15",
+   "fault": "the reference string scrubber requires a non-empty username, missing redis://:pw@ and bot-token URLs",
+   "counterexample": {
+    "require_nonempty_username": true
+   },
+   "oracle": "no_secret_reaches_the_transport",
+   "prefix_expect": "FAIL (redis://:pw@host and /bot<id>:<token>/ reach the transport unredacted)",
+   "postfix_expect": "PASS (every canary — empty-username redis, AMQP, bot path, access_token, nested — is scrubbed)"
+  },
+  {
+   "id": "DV-16-revoked-session-recovery",
+   "finding": "DV-16",
+   "fault": "recovery rules give opposite actions for a revoked session (restart vs stop)",
+   "counterexample": {
+    "restart_on_revoked": true
+   },
+   "oracle": "revoked_session_stops_bounded_no_crash_loop",
+   "prefix_expect": "FAIL (a revoked session restarts forever — an infinite crash loop, alert storm)",
+   "postfix_expect": "PASS (one actionable alert, work stopped, bounded retries, no crash loop)"
+  }
+ ]
+}

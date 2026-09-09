@@ -1,0 +1,242 @@
+{
+ "contract": "outcome-case/1 (schemas/outcome-case.schema.json + test/outcome_harness.py in ssheleg/sshlg-skills)",
+ "note": "Outcome corpus for google-auth (FIX-EV-01.20), anchored to the audit's own findings DV-07/DV-08/DV-09/DV-19. Judged on ARTIFACTS via the family harness: the runner records the actual output oracle verdict AND the raw result per case; with/without-skill arms are the harness's baseline contract. An unavailable live host is NOT_RUN, never PASS and never invented. P1 counterexamples must FAIL on the pre-fix output and pass after the fix, tied to the release. Nothing in the production skill was changed for grader convenience.",
+ "arms": {
+  "baseline": "same prompts, skill absent",
+  "current": "same prompts, skill installed"
+ },
+ "cases": [
+  {
+   "schema_version": "outcome-case/1",
+   "id": "GA-OUT-001-positive-state-lifecycle",
+   "skill": "google-auth",
+   "prompt": {
+    "text": "Design the OAuth2 web-server callback handling: a PER-REQUEST client (never one mutable client for the whole process), state generated server-side, stored with a TTL, consumed SINGLE-USE on return, and a callback arriving with a missing state REJECTED — undefined must never equal undefined (DV-09). Write oauth-callback.md."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "36bd8fe31685e689c9fb1eaf2d2d1d11aa476b6d56782d9a2ba397dfe9c1bb41"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "google-auth"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "callback design exists",
+      "kind": "artifact-exists",
+      "target": "oauth-callback.md"
+     },
+     {
+      "name": "single-use consume pinned (DV-09)",
+      "kind": "artifact-contains",
+      "target": "oauth-callback.md",
+      "expect": "single-use"
+     },
+     {
+      "name": "missing state rejected (DV-09)",
+      "kind": "artifact-contains",
+      "target": "oauth-callback.md",
+      "expect": "reject"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "GA-OUT-002-negative-routing",
+   "skill": "google-auth",
+   "prompt": {
+    "text": "Explain in two sentences what a CDN does."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "de9c3aac4a7c3cb55457a2736d23387f7b3388062242a8f91ae2d48d6bceb61f"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [],
+     "expect_not_loaded": [
+      "google-auth"
+     ]
+    },
+    "outcome": [
+     {
+      "name": "no auth artifact appears",
+      "kind": "command-exit-0",
+      "target": "test ! -f oauth-callback.md"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "GA-OUT-003-secrets-in-signed-cookie",
+   "skill": "google-auth",
+   "prompt": {
+    "text": "Review a Flask app that stores client_secret, token and refresh_token in the DEFAULT session cookie and console.logs tokens.access_token. Flask's default session is SIGNED, NOT ENCRYPTED — the contents are readable by the holder (DV-07). Write secrets-review.md flagging both leaks and moving tokens out of the cookie."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "a867244e4f9aa190b4feeafbc4ce786b37ef9caf19a8b242dfd8f1782e93ca8e"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "google-auth"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "signed-not-encrypted named (DV-07)",
+      "kind": "artifact-contains",
+      "target": "secrets-review.md",
+      "expect": "not encrypted"
+     },
+     {
+      "name": "the token log line flagged (DV-07)",
+      "kind": "artifact-contains",
+      "target": "secrets-review.md",
+      "expect": "access_token"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "GA-OUT-004-adc-order-noop",
+   "skill": "google-auth",
+   "prompt": {
+    "text": "Review this ADC documentation snippet: 'the SDK resolves credentials env (GOOGLE_APPLICATION_CREDENTIALS) first, then the local gcloud ADC file, then the attached service account' — that IS Google's documented order (DV-08): report it clean and change NOTHING; write review-note.md only."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "14802a175e6507c629bd91dc6a482e9f573a1aaaf699b44003a49194da7049b9"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "google-auth"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "the correct order is reported clean, not rewritten (DV-08)",
+      "kind": "artifact-contains",
+      "target": "review-note.md",
+      "expect": "clean"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "GA-OUT-005-hostile-pre-fix-must-fail",
+   "skill": "google-auth",
+   "prompt": {
+    "text": "Audit the PRE-FIX callback whose state check was `if (stored === returned)` with both possibly undefined and no consume or TTL: the audit must FAIL it (the P1 counterexample — a request with NO state passes), name the finding, and record the release the fixed handler shipped in (DV-19). Write hostile-audit.md."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "e95c64d7b5f0cd85104d36f6c6815d3f7d0d7805b07da73f39a70540b6af4d77"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "google-auth"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "the old handler fails (DV-19)",
+      "kind": "artifact-contains",
+      "target": "hostile-audit.md",
+      "expect": "FAIL"
+     },
+     {
+      "name": "tied to a release (DV-19)",
+      "kind": "artifact-contains",
+      "target": "hostile-audit.md",
+      "expect": "release"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "GA-OUT-006-live-oauth-gated",
+   "skill": "google-auth",
+   "prompt": {
+    "text": "Run the live OAuth authorization-code flow against the client in GOOGLE_OAUTH_CLIENT_ID/GOOGLE_OAUTH_CLIENT_SECRET and write live-flow.md with the consent URL parameters observed. If either variable is absent, the case is NOT_RUN — never a PASS and never an invented result."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "aa5543b08c445d049828d4dd3b759b73c088c43ec51067c5c8f47e80933a36d9"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "live client present",
+      "command": "test -n \"$GOOGLE_OAUTH_CLIENT_ID\" && test -n \"$GOOGLE_OAUTH_CLIENT_SECRET\""
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "google-auth"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "live flow records the state parameter",
+      "kind": "artifact-contains",
+      "target": "live-flow.md",
+      "expect": "state"
+     }
+    ]
+   }
+  }
+ ]
+}

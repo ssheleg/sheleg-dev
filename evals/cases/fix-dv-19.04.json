@@ -1,0 +1,46 @@
+{
+ "contract": "offline artifact / fault-injection corpus (fix-dv-19.04) for google-signin — sibling of 19.01–19.03. Each case injects a fault, runs a state/output ORACLE (not a provider stub judging itself), records exit/trace/environment. DV-19: the counterexample FAILS pre-fix, PASSES post-fix, verified by STATE/OUTPUTS, release-tied.",
+ "release_tie": "the fix ships in a tagged release; a counterexample that passes pre-fix is not a fix",
+ "environment": {
+  "runtime": "python3 stdlib",
+  "network": "none — offline oracles",
+  "note": "GIS/token stubs are inputs, never the oracle"
+ },
+ "cases": [
+  {
+   "id": "DV-10-nonce-server-challenge",
+   "finding": "DV-10",
+   "fault": "client generates the nonce and POSTs it; backend skips the check when nonce is absent",
+   "counterexample": {
+    "client_nonce": true,
+    "skip_when_absent": true
+   },
+   "oracle": "stolen_token_replay_rejected",
+   "prefix_expect": "FAIL (a stolen token with the nonce field deleted replays)",
+   "postfix_expect": "PASS (server-issued nonce, stored, single-use consumed; missing rejected)"
+  },
+  {
+   "id": "DV-11-auto-link-domain",
+   "finding": "DV-11",
+   "fault": "email_verified=true treated as current inbox ownership for any domain",
+   "counterexample": {
+    "trust_any_domain": true
+   },
+   "oracle": "third_party_email_reverified",
+   "prefix_expect": "FAIL (a non-hd third-party email auto-links without re-verification)",
+   "postfix_expect": "PASS (auto-link only where the claim is authoritative: Gmail/hd; else re-verify)"
+  },
+  {
+   "id": "DV-12-csrf-form-post",
+   "finding": "DV-12",
+   "fault": "missing Sec-Fetch-Site treated as same-origin; g_csrf_token not double-submitted",
+   "counterexample": {
+    "missing_secfetch_is_same_origin": true,
+    "check_double_submit": false
+   },
+   "oracle": "cross_site_post_rejected",
+   "prefix_expect": "FAIL (a cross-site POST with no Sec-Fetch-Site passes)",
+   "postfix_expect": "PASS (missing Sec-Fetch-Site is NOT same-origin; g_csrf_token double-submit verified)"
+  }
+ ]
+}
