@@ -125,6 +125,36 @@ return redirect(authorization_url)
 
 ## Step 3: Handle Callback
 
+### The session cookie is opaque — credentials live server-side, encrypted
+
+**A signed cookie is not an encrypted one.** Flask's default session and
+Starlette's `SessionMiddleware` SIGN the cookie (tamper-evident) but do NOT
+encrypt it — anyone holding the cookie can base64-decode and read every value
+in it, which the official docs confirm. So the cookie carries **only a random
+opaque session id**; the Google credentials (`token`, `refresh_token`,
+`client_secret`) go into a **server-side encrypted store**, fetched by
+`(session_id, principal)` — never into the cookie, the redirect URL, or the
+response body.
+
+```python
+# The cookie holds ONLY an opaque id. Credentials are server-side, encrypted.
+session['sid'] = session.get('sid') or secrets.token_urlsafe(32)
+credential_store.put(                      # encrypted at rest, keyed by (sid, principal)
+    sid=session['sid'], principal=userinfo['sub'],
+    credentials={'token': credentials.token,
+                 'refresh_token': credentials.refresh_token,
+                 'client_secret': credentials.client_secret, ...})
+# Never: session['credentials'] = {...}     ← readable in the cookie
+# Never: log or return the tokens            ← no console.log(tokens.access_token)
+```
+
+Three more, because a leaked secret does not announce itself: **never log a
+token or a credential** (no `console.log(tokens.access_token)`); the session
+signing secret is a **required production secret with NO dev fallback** (a
+hardcoded default signs every deployment's cookies with a key in the repo); and
+the auth cookie is **`Secure`, and the callback refuses plain HTTP** — an OAuth
+code or token over `http://` is a code or token on the wire.
+
 ### Node.js
 
 ```js
@@ -179,14 +209,17 @@ def oauth2callback():
     # credentials.expiry — expiration datetime
     # credentials.scopes — granted scopes
 
-    session['credentials'] = {
+    # Cookie: opaque id only. Credentials: server-side, encrypted, keyed by
+    # (session id, principal) — never serialized into the signed cookie.
+    session['sid'] = session.get('sid') or secrets.token_urlsafe(32)
+    credential_store.put(session['sid'], principal=userinfo['sub'], credentials={
         'token': credentials.token,
         'refresh_token': credentials.refresh_token,
         'token_uri': credentials.token_uri,
         'client_id': credentials.client_id,
         'client_secret': credentials.client_secret,
-        'scopes': list(credentials.scopes)
-    }
+        'scopes': list(credentials.scopes),
+    })
     return redirect('/profile')
 ```
 
@@ -262,7 +295,8 @@ oauth2Client.on('tokens', (tokens) => {
   if (tokens.refresh_token) {
     // Store in database — only sent once!
   }
-  console.log('New access_token:', tokens.access_token);
+  // Never log a token or a credential (FIX-DV-07) — a token in a log is a
+  // token anyone with log access holds.
 });
 ```
 
@@ -483,22 +517,24 @@ def oauth2callback():
     )
     flow.fetch_token(authorization_response=request.url)
     creds = flow.credentials
-    session['credentials'] = {
-        'token': creds.token,
-        'refresh_token': creds.refresh_token,
-        'token_uri': creds.token_uri,
-        'client_id': creds.client_id,
-        'client_secret': creds.client_secret,
-        'scopes': list(creds.scopes or [])
-    }
+    userinfo = build('oauth2', 'v2', credentials=creds).userinfo().get().execute()
+    # Opaque id in the cookie; credentials in the server-side encrypted store.
+    session['sid'] = session.get('sid') or secrets.token_urlsafe(32)
+    credential_store.put(session['sid'], principal=userinfo['id'], credentials={
+        'token': creds.token, 'refresh_token': creds.refresh_token,
+        'token_uri': creds.token_uri, 'client_id': creds.client_id,
+        'client_secret': creds.client_secret, 'scopes': list(creds.scopes or []),
+    })
+    session['principal'] = userinfo['id']
     return redirect('/profile')
 
 
 @app.route('/profile')
 def profile():
-    if 'credentials' not in session:
+    stored = credential_store.get(session.get('sid'), session.get('principal'))
+    if not stored:
         return redirect('/auth')
-    creds = Credentials(**session['credentials'])
+    creds = Credentials(**stored)
     service = build('oauth2', 'v2', credentials=creds)
     user_info = service.userinfo().get().execute()
     return jsonify(user_info)
@@ -566,22 +602,26 @@ async def oauth2callback(request: Request):
     )
     flow.fetch_token(code=request.query_params.get('code'))
     creds = flow.credentials
-    request.session['credentials'] = {
-        'token': creds.token,
-        'refresh_token': creds.refresh_token,
-        'token_uri': creds.token_uri,
-        'client_id': creds.client_id,
-        'client_secret': creds.client_secret,
-        'scopes': list(creds.scopes or [])
-    }
+    userinfo = build('oauth2', 'v2', credentials=creds).userinfo().get().execute()
+    # Opaque id in the cookie; credentials in the server-side encrypted store.
+    sid = request.session.get('sid') or secrets.token_urlsafe(32)
+    request.session['sid'] = sid
+    request.session['principal'] = userinfo['id']
+    credential_store.put(sid, principal=userinfo['id'], credentials={
+        'token': creds.token, 'refresh_token': creds.refresh_token,
+        'token_uri': creds.token_uri, 'client_id': creds.client_id,
+        'client_secret': creds.client_secret, 'scopes': list(creds.scopes or []),
+    })
     return RedirectResponse('/profile')
 
 
 @app.get('/profile')
 async def profile(request: Request):
-    if 'credentials' not in request.session:
+    stored = credential_store.get(request.session.get('sid'),
+                                  request.session.get('principal'))
+    if not stored:
         return RedirectResponse('/auth')
-    creds = Credentials(**request.session['credentials'])
+    creds = Credentials(**stored)
     service = build('oauth2', 'v2', credentials=creds)
     user_info = service.userinfo().get().execute()
     return user_info
