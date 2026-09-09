@@ -89,13 +89,36 @@ covered by default instead of leaking until someone updates a list.
 ```python
 import re
 
-_URL_CREDENTIALS = re.compile(r"(?P<scheme>[a-zA-Z][a-zA-Z0-9+.-]*://)(?P<user>[^:/@\s]+):(?P<pw>[^@/\s]+)@")
 _REDACTED = "<redacted>"
+
+# userinfo: scheme://[user][:password]@host — the username is OPTIONAL, so
+# `redis://:AUDIT_FAKE_PASSWORD@host` (empty user) is caught, not skipped; the
+# password may be percent-encoded. Keep the (possibly empty) user and the host,
+# redact only the password.
+_URL_USERINFO = re.compile(
+    r"(?P<scheme>[a-zA-Z][a-zA-Z0-9+.-]*://)(?P<user>[^:/?#@\s]*):(?P<pw>[^@/?#\s]+)@")
+
+# a secret in the PATH: a Telegram bot token is `/bot<id>:<secret>/…`, and the
+# secret is in the path, not the userinfo — the userinfo regex never sees it.
+_URL_PATH_BOT_TOKEN = re.compile(r"(?P<pre>/bot)(?P<tok>\d+:[A-Za-z0-9_-]+)")
+
+# a credential in the QUERY STRING: ?access_token=… &token=… &api_key=… — the
+# value, never the key, is redacted so the shape stays readable.
+_URL_QUERY_SECRET = re.compile(
+    r"(?P<pre>[?&](?:access_token|auth_token|api_key|apikey|auth|token|key|"
+    r"password|passwd|secret|session|sig|signature)=)(?P<val>[^&#\s]+)",
+    re.IGNORECASE)
 
 def scrub_text(value):
     if not isinstance(value, str):
         return value
-    return _URL_CREDENTIALS.sub(rf"\g<scheme>\g<user>:{_REDACTED}@", value)
+    # Every secret is replaced BEFORE the string can be logged: userinfo first,
+    # then the path token, then the query value. A safe URL (a lone user, a
+    # non-secret query key) matches none of them and keeps its useful shape.
+    value = _URL_USERINFO.sub(rf"\g<scheme>\g<user>:{_REDACTED}@", value)
+    value = _URL_PATH_BOT_TOKEN.sub(rf"\g<pre>{_REDACTED}", value)
+    value = _URL_QUERY_SECRET.sub(rf"\g<pre>{_REDACTED}", value)
+    return value
 
 def scrub_values(event, _hint=None):
     def walk(node):
@@ -116,6 +139,11 @@ Three properties that matter:
 
 - **Keep the user and host.** A fully redacted URL is useless for debugging.
   Redact the password only.
+- **Three places a credential hides — userinfo, path, query.** `user:pw@` is
+  the obvious one, but a Telegram token sits in the PATH (`/bot<id>:<secret>/`)
+  and an access token sits in the QUERY (`?access_token=…`); the scrubber
+  covers all three, and the username in userinfo may be EMPTY
+  (`redis://:pw@host`) or the redis leak walks straight through.
 - **Scheme-agnostic.** `amqps://`, `redis://`, `mongodb+srv://` leak the same way.
 - **Never return `None`.** In `before_send` that discards the event. A bug in
   the scrubber then reads as "Sentry is quiet", which is indistinguishable from
