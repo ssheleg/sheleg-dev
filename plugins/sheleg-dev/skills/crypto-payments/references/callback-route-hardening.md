@@ -9,6 +9,12 @@ mode that looks like "webhooks stopped working" rather than like a security even
 
 ---
 
+## Contents
+
+- [IP allowlisting behind a proxy](#ip-allowlisting-behind-a-proxy)
+- [CSRF exemption for callback routes](#csrf-exemption-for-callback-routes)
+- [Crediting: lifecycle, grant and refund are separate (DV-05)](#crediting-lifecycle-grant-and-refund-are-separate-dv-05)
+
 ## IP allowlisting behind a proxy
 
 Signature verification is the real gate; the allowlist is defence in depth and
