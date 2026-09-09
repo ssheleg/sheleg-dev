@@ -1,0 +1,248 @@
+{
+ "contract": "outcome-case/1 (schemas/outcome-case.schema.json + test/outcome_harness.py in ssheleg/sshlg-skills)",
+ "note": "Outcome corpus for stripe-billing (FIX-EV-01.22), anchored to the audit's own findings DV-01/DV-02/DV-03/DV-04/DV-19. Judged on ARTIFACTS via the family harness: the runner records the actual output oracle verdict AND the raw result per case; with/without-skill arms are the harness's baseline contract. An unavailable live account is NOT_RUN, never PASS and never invented. P1 counterexamples must FAIL on the pre-fix output and pass after the fix, tied to the release. Nothing in the production skill was changed for grader convenience.",
+ "arms": {
+  "baseline": "same prompts, skill absent",
+  "current": "same prompts, skill installed"
+ },
+ "cases": [
+  {
+   "schema_version": "outcome-case/1",
+   "id": "SB-OUT-001-positive-webhook-idempotency",
+   "skill": "stripe-billing",
+   "prompt": {
+    "text": "Design the webhook handler's idempotency: the processed_event marker and the business effect commit in ONE transaction (or an outbox) — a SIGKILL between the marker INSERT and the effect must not eat the event, and a caught exception is not the only failure mode (DV-01). Write webhook-idempotency.md naming the kill-between-steps scenario."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "879056c6339ce03d2491f5bae582f9c52527b0e1040f382791f963f39c5e64f9"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "stripe-billing"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "design exists",
+      "kind": "artifact-exists",
+      "target": "webhook-idempotency.md"
+     },
+     {
+      "name": "one transaction or outbox (DV-01)",
+      "kind": "artifact-contains",
+      "target": "webhook-idempotency.md",
+      "expect": "transaction"
+     },
+     {
+      "name": "SIGKILL scenario named (DV-01)",
+      "kind": "artifact-contains",
+      "target": "webhook-idempotency.md",
+      "expect": "SIGKILL"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "SB-OUT-002-negative-routing",
+   "skill": "stripe-billing",
+   "prompt": {
+    "text": "Explain in two sentences what a message queue is."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "2d16b9b17af93ec6550542fca343dba47d32cf84161fca847491bac4e2ac4241"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [],
+     "expect_not_loaded": [
+      "stripe-billing"
+     ]
+    },
+    "outcome": [
+     {
+      "name": "no billing artifact appears",
+      "kind": "command-exit-0",
+      "target": "test ! -f webhook-idempotency.md"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "SB-OUT-003-grant-both-periods",
+   "skill": "stripe-billing",
+   "prompt": {
+    "text": "Review a renewal-grant handler that drops events where periodStart <= lastGrantedPeriodStart. The February→January fixture (a shorter month arriving after a longer one) requires BOTH periods granted; note that SELECT→UPDATE inside a transaction does not by itself lock the row, and reconciliation must carry event.id (DV-02). Write grant-review.md."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "bb747e6e7e0883f85ecde985610f6121f1dcdb086ec1ae01d80bca9ad590d2f4"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "stripe-billing"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "both periods granted (DV-02)",
+      "kind": "artifact-contains",
+      "target": "grant-review.md",
+      "expect": "both"
+     },
+     {
+      "name": "row locking named (DV-02)",
+      "kind": "artifact-contains",
+      "target": "grant-review.md",
+      "expect": "lock"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "SB-OUT-004-refund-cas",
+   "skill": "stripe-billing",
+   "prompt": {
+    "text": "Harden two concurrent refund handlers that both read stored.refundedTotal and write cumulative totals (4000 and 9000): the write must be a compare-and-swap or a re-read under lock — the loser re-reads, and a rollback marker without CAS must not overwrite a newer total (DV-04). Write refund-cas.md."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "4e6dd43cb525e04d3e3b8f4f76c4d608fa591eaf5b95946bf7cfe2638deb056d"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "stripe-billing"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "CAS or re-read under lock (DV-04)",
+      "kind": "artifact-contains",
+      "target": "refund-cas.md",
+      "expect": "compare"
+     },
+     {
+      "name": "rollback cannot clobber newer total (DV-04)",
+      "kind": "artifact-contains",
+      "target": "refund-cas.md",
+      "expect": "newer"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "SB-OUT-005-hostile-pre-fix-must-fail",
+   "skill": "stripe-billing",
+   "prompt": {
+    "text": "Audit the PRE-FIX upgrade flow that used always_invoice and, on a DB failure, returned oldQuantity with proration_behavior:none — an operation that does not return the first invoice's charge: the audit must FAIL it (the P1 counterexample — the customer is charged and the entitlement rolls back without refunding), name the finding, and record the release the fixed flow shipped in (DV-19). Write hostile-audit.md."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "0cf34a3c92ebf1160b6f5590a0fa7b0d26db7f0b0972cea24372746f77736e3a"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "python3 present",
+      "command": "python3 -c 'pass'"
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "stripe-billing"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "the old flow fails (DV-19)",
+      "kind": "artifact-contains",
+      "target": "hostile-audit.md",
+      "expect": "FAIL"
+     },
+     {
+      "name": "tied to a release (DV-19)",
+      "kind": "artifact-contains",
+      "target": "hostile-audit.md",
+      "expect": "release"
+     }
+    ]
+   }
+  },
+  {
+   "schema_version": "outcome-case/1",
+   "id": "SB-OUT-006-live-stripe-gated",
+   "skill": "stripe-billing",
+   "prompt": {
+    "text": "Run a live test-mode check against the Stripe account in STRIPE_TEST_SECRET_KEY: create and immediately void a draft invoice, and write live-check.md with the invoice lifecycle states observed. If STRIPE_TEST_SECRET_KEY is absent, the case is NOT_RUN — never a PASS and never an invented result."
+   },
+   "environment": {
+    "model": "inherit",
+    "host": "any",
+    "case_digest": "be58cd14e158feb7ff652b2762153e86b6abe54d5136c797cf3d8db8ab45270a"
+   },
+   "checks": {
+    "tool": [
+     {
+      "name": "live key present",
+      "command": "test -n \"$STRIPE_TEST_SECRET_KEY\""
+     }
+    ],
+    "load_trace": {
+     "expect_loaded": [
+      "stripe-billing"
+     ],
+     "expect_not_loaded": []
+    },
+    "outcome": [
+     {
+      "name": "live check records the lifecycle",
+      "kind": "artifact-contains",
+      "target": "live-check.md",
+      "expect": "void"
+     }
+    ]
+   }
+  }
+ ]
+}
