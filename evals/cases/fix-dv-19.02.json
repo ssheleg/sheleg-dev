@@ -1,0 +1,44 @@
+{
+ "contract": "offline artifact / fault-injection corpus (fix-dv-19.02) for crypto-payments — sibling of fix-dv-19.01.json (stripe-billing). Each case injects a fault, runs a state/output ORACLE (not a protocol/provider stub judging itself), and records exit/trace/environment. DV-19: the counterexample FAILS pre-fix and PASSES after the fix, verified by STATE and OUTPUTS, tied to a release.",
+ "release_tie": "the fix ships in a tagged release; a counterexample that passes pre-fix is not a fix",
+ "environment": {
+  "runtime": "python3 stdlib",
+  "network": "none — offline oracles",
+  "note": "provider/protocol stubs (Heleket) are inputs, never the oracle"
+ },
+ "cases": [
+  {
+   "id": "DV-06-typed-amounts",
+   "finding": "DV-06",
+   "fault": "credit waterfall mixes Money (USD minor) and an Asset amount (crypto decimals) with ??",
+   "counterexample": {
+    "mix_dimensions": true
+   },
+   "oracle": "credited_usd_minor_is_dimensionally_correct",
+   "prefix_expect": "FAIL (a 10.5 TON tokenAmount credited as 10.5 USD-minor via ??)",
+   "postfix_expect": "PASS (Asset converts through a dated quote to USD minor before compare)"
+  },
+  {
+   "id": "DV-06-excess-policy-required",
+   "finding": "DV-06",
+   "fault": "a buffered payment with NO excess policy configured",
+   "counterexample": {
+    "policy": null
+   },
+   "oracle": "missing_policy_blocks_not_invents",
+   "prefix_expect": "FAIL (a default 'credit' invented, the business price baked in)",
+   "postfix_expect": "PASS (missing policy BLOCKS invoice creation, invents no fee)"
+  },
+  {
+   "id": "DV-06-unknown-fx-blocks",
+   "finding": "DV-06",
+   "fault": "an Asset→Money conversion with an unknown/undated FX source",
+   "counterexample": {
+    "guess_rate": true
+   },
+   "oracle": "unknown_fx_blocks_not_guesses",
+   "prefix_expect": "FAIL (a guessed rate produces a plausible-but-wrong USD credit)",
+   "postfix_expect": "PASS (unknown FX source BLOCKS the conversion)"
+  }
+ ]
+}
