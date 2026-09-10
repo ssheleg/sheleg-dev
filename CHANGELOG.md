@@ -1,3 +1,19 @@
+## v0.12.0 — the integration doctrine closes its audit, and a crypto reference gains its map
+
+Sherlock external-v3 (43 findings) — the largest share in the family — each with
+its own executable regression.
+
+- Offline fault-injection corpora for every integration surface: card money,
+  crypto, ad tracking, error tracking, sign-in and page speed. Each case injects a
+  fault and judges it with a STATE or OUTPUT oracle rather than a provider stub
+  judging itself, and each counterexample fails before the fix and passes after.
+- `test/negatives.py` stops reading an environment failure as a proven validation
+  gap: explicit stages, a resource preflight, a per-step timeout, and cleanup in a
+  `finally`. A full disk once printed forty "the guard does not actually fire"
+  findings; it now prints TEST_ERROR and zero guard-bypass findings.
+- `crypto-payments/references/callback-route-hardening.md` gained a `## Contents`.
+- CI now MEASURES the token budget with a real tokenizer instead of estimating it.
+
 ## v0.11.8 — a Contents entry pointing nowhere is depth the file does not have
 
 The family audit's second round (2026-09-07) read the eight reference files that
