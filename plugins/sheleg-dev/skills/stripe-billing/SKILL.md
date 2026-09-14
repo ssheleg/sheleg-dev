@@ -9,7 +9,7 @@ description: >-
   resolution, claim-first webhook idempotency, what invoice
   billing_reason decides, cumulative refunds, the cancellation field
   flexible billing_mode moved, retention eligibility Stripe cannot
-  express, and write ordering with compensating reverts. Triggers: "add
+  express, and write ordering with compensating reverts. Triggers - "add
   Stripe", "Stripe checkout", "subscription billing", "webhook signature",
   "invoice.paid", "proration", "refund", "cancel subscription", "retention
   coupon", "подключить Stripe", "оплата подпиской", "вебхук Stripe",
