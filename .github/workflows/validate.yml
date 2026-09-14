@@ -786,8 +786,9 @@ jobs:
           import re
           p = "/tmp/evalnum/docs/evals/stripe-billing.md"
           s = open(p, encoding="utf-8").read()
-          s2, n = re.subn(r"~\d+ tokens by the house heuristic",
-                          "~4994 tokens by the house heuristic", s, count=1)
+          # v0.13.0: the record restates a MEASURED figure, so the plant follows it.
+          # The old shape (`~N tokens by the house heuristic`) is gone with the estimator.
+          s2, n = re.subn(r"\d+ tokens \(tiktoken\)", "4994 tokens (tiktoken)", s, count=1)
           assert n == 1, "PLANT DID NOT LAND: the token sentence moved"
           open(p, "w", encoding="utf-8").write(s2)
           PY
