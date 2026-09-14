@@ -6,14 +6,14 @@ description: >-
   coupon offered at the cancel step, the portal, and the webhook that
   turns a payment into an entitlement in your database. Covers Stripe's
   agent toolchain, the pinned API version and SDK retries, price
-  resolution across modes, claim-first webhook idempotency, what invoice
+  resolution, claim-first webhook idempotency, what invoice
   billing_reason decides, cumulative refunds, the cancellation field
   flexible billing_mode moved, retention eligibility Stripe cannot
-  express, and write ordering with compensating reverts. Triggers - "add
+  express, and write ordering with compensating reverts. Triggers: "add
   Stripe", "Stripe checkout", "subscription billing", "webhook signature",
   "invoice.paid", "proration", "refund", "cancel subscription", "retention
   coupon", "подключить Stripe", "оплата подпиской", "вебхук Stripe",
-  "скидка при отмене", "биллинг". Not for choosing between Stripe products
+  "скидка при отмене", "биллинг подписок". Not for choosing between Stripe products
   (stripe-best-practices) or reading Stripe docs (stripe-docs).
 license: MIT
 ---
@@ -378,6 +378,21 @@ CLI trigger verbs, the test cards and decline codes, and the clock tricks for
 renewal and proration. The one thing to know before you get there: the signing
 secret `stripe listen` prints is **not** the dashboard's, and using the wrong one
 fails verification in a way that reads like a key problem.
+
+## Degradation
+
+- **Not Claude Code** (Cursor, Codex, the skills CLI, the API container): the
+  `PreToolUse` money gate this pack ships does not exist there — nothing refuses a
+  refund, a payout, a dispute close or a live `sk_live_…` key on your behalf. Every
+  rule below still holds; it is advice again rather than a precondition, so the
+  authorisation step becomes a human one. Say which you are on before acting on money.
+- **Installed by copy rather than as a plugin**: same loss, same remedy — a plain
+  `~/.claude/skills/` copy carries the doctrine and not `hooks/money-gate.js`. The
+  README names the categories and how one is signed off; without the hook, that
+  sign-off is a sentence somebody has to actually say.
+- **No Stripe CLI, no network, or test keys only**: webhook signature verification and
+  the local replay loop are the parts that need the binary. State which is missing
+  once, do the rest, and record what could not be verified rather than implying it was.
 
 ## Before you ship
 

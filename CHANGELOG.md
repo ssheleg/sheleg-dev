@@ -1,3 +1,34 @@
+## v0.13.0 — the gate exists on one surface, and every skill now says so
+
+This pack ships a `PreToolUse` money gate (`hooks/money-gate.js`) that refuses a refund,
+a payout, a dispute close, a live `sk_live_…` key and `SKIP_BILLING=true` in production
+until the authorised person has signed that category off. It runs on Claude Code and
+nowhere else. Measured 2026-09-14: of the seven skills, **one** (`error-tracking`) wrote
+a degradation contract; `stripe-billing` never mentioned the gate at all and
+`crypto-payments` named it and sent the consequences to the README — so the two skills
+the gate exists FOR were the two that did not say what happens without it.
+
+- **`## Degradation` in all seven skill bodies**, one line per axis, in the shape
+  `references/host-capabilities.md` requires: not-Claude-Code, installed-by-copy, and the
+  capability each skill's own work needs (Stripe CLI, node fixtures, a browser channel, a
+  console login).
+- **`check_degradation_is_written_where_a_host_capability_ships`** — a pack that ships
+  `hooks/hooks.json` requires the section in every skill body. Watched failing on four
+  skills before they were written.
+- **The body budget is MEASURED, not estimated.** This gate divided by 3.9 chars/token
+  while the family's CI auditor measures with tiktoken, and the two disagree by up to 8%
+  in the same direction: `crypto-payments` estimated **4986** and measured **4618** — a
+  verdict of *past the working limit* over 132 tokens of real headroom, which is what
+  blocked this change from landing. With no tokenizer installed the check now DISCLOSES
+  that it could not measure instead of failing a file it never counted. make-skill
+  v0.28.0 closed exactly this for the family auditor; this repo kept the estimate and so
+  kept the defect.
+- **The `биллинг` trigger is now `биллинг подписок`.** Bare `биллинг` collided with
+  `agent-orchestrator`'s `биллинг LLM` across packs, where no per-repo validator can see
+  it: this one meters what an agent burned, that one charges a card.
+- `docs/evals/stripe-billing.md` restates a measured figure (4521 tokens, tiktoken)
+  rather than a heuristic one, and the validator compares it to a measurement.
+
 ## v0.12.0 — the integration doctrine closes its audit, and a crypto reference gains its map
 
 Sherlock external-v3 (43 findings) — the largest share in the family — each with

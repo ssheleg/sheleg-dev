@@ -399,3 +399,18 @@ a green suite, each with the defect it catches:
 | Cannot answer "how much did we net" | commission and `merchantAmount` never stored |
 | A dev machine, a CI job or an agent run is holding the production key | no separate credential, and no assertion binding the key to a declared environment |
 | Real invoices in a merchant dashboard nobody watches | a staging credential declared live — the mismatch nothing refused |
+
+## Degradation
+
+- **Not Claude Code** (Cursor, Codex, the skills CLI, the API container): the
+  `PreToolUse` gate named above — `plugins/sheleg-dev/hooks/money-gate.js` — does not
+  run there. Nothing refuses a payout, a refund, an exported `HELEKET_API_KEY` in a
+  `test` run, or `SKIP_BILLING=true` in production. The three lines are advice again,
+  which is exactly the state that made them ineffective for four releases: name the
+  surface you are on, and make the authorisation a human step out loud.
+- **Installed by copy rather than as a plugin**: the doctrine arrives, the hook does
+  not. The README carries the categories and how one is authorised for a session.
+- **No node, or the fixtures cannot run**: the invariant fixtures are the executable
+  half of this skill. Say the check did not run rather than reporting the invariant as
+  held — an unrun check and a passing one are indistinguishable from the exit code
+  nobody looked at.

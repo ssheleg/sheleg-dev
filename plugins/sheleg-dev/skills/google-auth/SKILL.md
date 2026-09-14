@@ -279,3 +279,12 @@ if credentials.expired and credentials.refresh_token:
 - **[ADC & Service Accounts](references/adc-and-service-accounts.md)** — Application Default Credentials setup, service account keys, JWT, Compute credentials, environment configuration (Node.js + Python)
 - **[Sign In with Google](references/sign-in-with-google.md)** — Google Identity Services (GIS), ID token verification, CSRF protection, One Tap, FedCM (Node.js + Python)
 - **[Workload Identity Federation](references/workload-identity.md)** — AWS, Azure, OIDC/SAML federation, workforce identity, executable-sourced credentials (Node.js + Python)
+
+## Degradation
+
+- **Not Claude Code** (Cursor, Codex, the skills CLI, the API container): the pack's
+  `PreToolUse` gate does not run; a live credential is refused by nothing but you.
+- **Installed by copy rather than as a plugin**: doctrine yes, `hooks/` no.
+- **No browser, or no console access**: the consent screen and the client-id half are a
+  human step. Name the exact screen and what is blocked, do the code half, and do not
+  loop on a login only a person can complete.

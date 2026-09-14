@@ -23,7 +23,18 @@ actually prints. Both were watched refusing a plant; see the SD-05 block.
 
 ---
 
-## Shipped state — v0.12.0
+## Shipped state — v0.13.0
+
+**The gate exists on one surface, and every skill now says so.**
+
+| REQ | What ships | How it was confirmed | Confirmed |
+|---|---|---|---|
+| SD-deg | Every skill body states what is lost where the pack's host capability does not exist | `check_degradation_is_written_where_a_host_capability_ships` — a pack shipping `hooks/hooks.json` requires `## Degradation` in every skill body | **planted** — watched failing on ad-tracking, frontend-performance, google-auth and google-signin before they were written |
+| SD-measure | The body budget is measured, never estimated | `_measure_tokens` uses tiktoken where installed and DISCLOSES rather than judging where it is not. `crypto-payments`: estimate 4986, measurement 4618 — the estimate's verdict was wrong by 132 tokens of headroom | **observed** — the estimate blocked a change that the measurement passes |
+| SD-trigger | `биллинг` no longer matches two packs | narrowed to `биллинг подписок`; `agent-orchestrator` keeps `биллинг LLM`. A cross-pack collision no per-repo validator can see | **observed** |
+| Gate | The whole suite on this tree | `npm test` EXIT=0; `OK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.13.0)` | **observed** |
+
+## Shipped in v0.12.0
 
 **The integration doctrine closes its sherlock audit, and a full disk stops proving a bypass.**
 
@@ -59,7 +70,7 @@ Seven skills ship: `ad-tracking`, `crypto-payments`, `error-tracking`,
 
 | REQ | Requirement | Verified by | Result | Status |
 |---|---|---|---|---|
-| 001 | The structural validator passes on the shipped tree | `python3 test/validate.py` | `OK: sheleg-dev structurally valid (27 checks, 7 skill(s), v0.12.0)` — and the check count is now the length of the registry, so adding a check moves it. It used to be `10 + len(skill_dirs)`: adding a **skill** moved the number and adding a check did not, and four rows of this file read it as evidence that a guard had been added. `check_ledger_quotes_the_validator_verdict` compares this quoted string against the line the run prints, so it cannot drift again | **verified** |
+| 001 | The structural validator passes on the shipped tree | `python3 test/validate.py` | `OK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.13.0)` — and the check count is now the length of the registry, so adding a check moves it. It used to be `10 + len(skill_dirs)`: adding a **skill** moved the number and adding a check did not, and four rows of this file read it as evidence that a guard had been added. `check_ledger_quotes_the_validator_verdict` compares this quoted string against the line the run prints, so it cannot drift again | **verified** |
 | 002 | Every guard has been watched failing against a planted defect | CI run `32293489020` at `6f66255`, step-level conclusions of every `Negative self-test` step | **28 of 28 `success`**, 39 of 39 steps `success`, 0 failed steps in the run. This retires the *"CI has not seen any of this"* limitation that SD-01 through SD-04 each recorded separately: the four blocks below all ran in that one run, against the tagged tree | **verified** |
 | 003 | Version is synchronised across every surface | read back from `package.json`, `.claude-plugin/marketplace.json`, `plugins/sheleg-dev/.claude-plugin/plugin.json`, the top `## vX.Y.Z` in `CHANGELOG.md` | all four → `0.7.0` | **verified** |
 | 056 | `error-tracking` meets the Agent Skills standard and the house canon | `python3 audit_skill.py plugins/sheleg-dev/skills/error-tracking --house` (make-skill 0.23.0) | `0 GAP, 14 PASS` — description 943/970 chars, body 242 lines / ~2777 tokens against a 500/4750 working limit, every relative link resolves | **verified** |
