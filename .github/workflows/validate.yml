@@ -31,6 +31,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The body budget is MEASURED, never estimated: `test/validate.py` refuses to issue
+      # a verdict from chars/3.9 and DISCLOSES instead, so without this step the budget
+      # checks silently stop gating — which the negative self-test below catches by
+      # failing, exactly as it should. The skill-audit job installs the same package for
+      # the same reason (make-skill v0.28.0).
+      - name: Install a real tokenizer (the budget is MEASURED, never estimated)
+        run: python3 -m pip install --quiet tiktoken
+
       - name: Structural validator
         run: python3 test/validate.py
 
@@ -778,8 +786,9 @@ jobs:
           import re
           p = "/tmp/evalnum/docs/evals/stripe-billing.md"
           s = open(p, encoding="utf-8").read()
-          s2, n = re.subn(r"~\d+ tokens by the house heuristic",
-                          "~4994 tokens by the house heuristic", s, count=1)
+          # v0.13.0: the record restates a MEASURED figure, so the plant follows it.
+          # The old shape (`~N tokens by the house heuristic`) is gone with the estimator.
+          s2, n = re.subn(r"\d+ tokens \(tiktoken\)", "4994 tokens (tiktoken)", s, count=1)
           assert n == 1, "PLANT DID NOT LAND: the token sentence moved"
           open(p, "w", encoding="utf-8").write(s2)
           PY

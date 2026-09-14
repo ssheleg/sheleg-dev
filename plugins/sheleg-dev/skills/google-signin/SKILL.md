@@ -151,3 +151,12 @@ attacker's account.
 | `access_denied` on consent | Consent screen still in Testing → publish the app |
 | Works locally, breaks in prod | Prod origin missing in GCP, or `Secure` cookie served over plain HTTP |
 | One Tap missing / FedCM console warnings | FedCM is mandatory since Aug 2025 and the opt-out is gone (checked 2026-08-06). Load `gsi/client` from Google and keep it current — a vendored or pinned copy is the real break. The rendered button flow is unaffected; code branching on the old `isNotDisplayed()` moment callbacks is not |
+
+## Degradation
+
+- **Not Claude Code** (Cursor, Codex, the skills CLI, the API container): the pack's
+  `PreToolUse` gate does not run — the rules here hold, the refusal does not.
+- **No browser channel**: the sign-in button and its redirect are verified by reading
+  the code, not by watching it work. Record that as the weaker claim it is.
+- **No console access**: creating the OAuth client is a human step; state it once, do
+  the rest, and say what is waiting on it.

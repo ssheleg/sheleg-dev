@@ -192,3 +192,14 @@ Four names that used to sit here — `frontend-design`, `landing-page-design`,
 `next-best-practices`, `responsive-design` — resolved to nothing installable, and
 `seo-audit` was one character-class away from the real `seo-aeo-audit`, which is
 how a typo survives review.
+
+## Degradation
+
+- **Not Claude Code** (Cursor, Codex, the skills CLI, the API container): the pack's
+  `PreToolUse` gate does not run — every rule here still applies, enforced by a person
+  instead of a hook.
+- **No browser channel** (no Chrome DevTools MCP, no Playwright): a page is judged from
+  the diff and the numbers are not measured on this machine. Record the weaker claim;
+  a Lighthouse score nobody ran is not a score.
+- **No network**: PageSpeed Insights and field data are unavailable. Lab reasoning is
+  still worth doing — say which half you did.

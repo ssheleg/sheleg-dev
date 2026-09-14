@@ -476,6 +476,37 @@ def check_release_gates_on_validate():
              "than after it")
 
 
+@check
+def check_degradation_is_written_where_a_host_capability_ships():
+    """A skill whose pack ships a host capability states what is lost without it.
+
+    `plugins/sheleg-dev/hooks/money-gate.js` is a `PreToolUse` gate: on Claude Code it
+    REFUSES a refund, a payout, a dispute close and a live key until the category is
+    signed off; installed by copy, or on any other agent, it does not exist and nothing
+    refuses anything. `references/host-capabilities.md` (make-skill) puts that in the
+    skill BODY, one line per axis, "what a reader checks before installing, and what the
+    agent reads at the exact moment something is missing".
+
+    Measured 2026-09-14: `error-tracking` had it, `stripe-billing` never mentioned the
+    gate at all, and `crypto-payments` named it and deferred the consequences to the
+    README — so the two skills the gate exists FOR were the two that did not say what
+    happens without it. Nothing checked, because the auditor's rule lives in prose.
+    """
+    hooks = os.path.join(ROOT, "plugins", "sheleg-dev", "hooks", "hooks.json")
+    if not os.path.isfile(hooks):
+        _disclose_routing("degradation: this pack ships no hooks.json — nothing to lose")
+        return
+    for name in skill_dirs:
+        path = os.path.join(SKILL_ROOT, name, "SKILL.md")
+        if not os.path.isfile(path):
+            continue
+        body = _body_of(path)
+        if "\n## Degradation" not in body:
+            fail(f"{name}/SKILL.md: no `## Degradation` section. This pack ships a "
+                 "PreToolUse money gate that exists on Claude Code and nowhere else; a "
+                 "skill that does not say so reads as protected on every surface")
+
+
 def _disclose_routing(msg):
     """A check that could not run, said out loud rather than counted as a pass."""
     print(f"  unlooked: {msg}")
@@ -1569,6 +1600,29 @@ BODY_TARGET_TOKENS = 4750
 CHARS_PER_TOKEN = 3.9
 
 
+def _measure_tokens(body):
+    """(count, how). A real tokenizer where one is installed; the estimate otherwise.
+
+    The estimate and the measurement disagree by up to ~8% on prose carrying Russian and
+    code, and always in the same direction — `len(body)/3.9` OVERSHOOTS. make-skill v0.28.0
+    closed exactly this for the family's CI auditor, which had gapped seven skills that are
+    all inside the limit when measured; this gate kept the estimate and so kept the defect.
+    Measured here 2026-09-14: `crypto-payments` estimated 4986 and measured 4618 — a
+    verdict of "past the working limit" over 132 tokens of real headroom.
+
+    A verdict from an estimate is refused in both directions: with no tokenizer the check
+    reports what it could not measure rather than failing a file it never counted.
+    """
+    try:
+        import tiktoken
+    except Exception:                                    # noqa: BLE001 - optional dependency
+        return int(len(body) / CHARS_PER_TOKEN), "estimate"
+    try:
+        return len(tiktoken.get_encoding("cl100k_base").encode(body)), "tiktoken:cl100k_base"
+    except Exception:                                    # noqa: BLE001 - a broken install is not a verdict
+        return int(len(body) / CHARS_PER_TOKEN), "estimate"
+
+
 def _body_of(path):
     """A SKILL.md with its front matter removed -- what the host loads at level 2."""
     with open(path, encoding="utf-8") as fh:
@@ -1605,19 +1659,25 @@ def check_body_budget():
             continue  # check_skill_front_matter owns the missing case
         body = _body_of(path)
         lines = body.count("\n") + 1
-        est = int(len(body) / CHARS_PER_TOKEN)
+        est, how = _measure_tokens(body)
         if lines >= BODY_MAX_LINES:
             fail(f"{name}/SKILL.md: body is {lines} lines, the budget is < {BODY_MAX_LINES} "
                  "-- move detail into references/")
+        if how == "estimate":
+            # A number from the wrong instrument gets quoted as if it were a measurement.
+            # Say what did not happen instead of issuing a verdict from chars/3.9.
+            _disclose_routing(f"body budget for {name}/SKILL.md NOT MEASURED (~{est} tokens by "
+                     f"{CHARS_PER_TOKEN} chars/token) -- `pip install tiktoken` to gate it")
+            continue
         if est >= BODY_MAX_TOKENS:
-            fail(f"{name}/SKILL.md: body is ~{est} tokens ({len(body)} chars / "
-                 f"{CHARS_PER_TOKEN}), the budget is < {BODY_MAX_TOKENS}. Over this the host "
-                 "truncates silently, which is worse than an error")
+            fail(f"{name}/SKILL.md: body is {est} tokens ({how}), the budget is < "
+                 f"{BODY_MAX_TOKENS}. Over this the host truncates silently, which is worse "
+                 "than an error")
         elif est >= BODY_TARGET_TOKENS:
-            fail(f"{name}/SKILL.md: body is ~{est} tokens, inside the {BODY_MAX_TOKENS} "
-                 f"budget and past the {BODY_TARGET_TOKENS} house working limit "
-                 f"({BODY_TARGET_TOKENS - est} of headroom). The next section breaches it, "
-                 "and the answer then is a split into references/, not a trim")
+            fail(f"{name}/SKILL.md: body is {est} tokens ({how}), inside the "
+                 f"{BODY_MAX_TOKENS} budget and past the {BODY_TARGET_TOKENS} house working "
+                 f"limit ({BODY_TARGET_TOKENS - est} of headroom). The next section breaches "
+                 "it, and the answer then is a split into references/, not a trim")
 
 
 # ------------------------------------------- the numbers documents restate (B-84, B-93)
@@ -1717,11 +1777,15 @@ def check_evals_numbers_are_computed():
     body = _body_of(skill)
     with open(path, encoding="utf-8") as fh:
         text = fh.read()
-    rows = (
-        (r"~(\d+) tokens by the house heuristic", int(len(body) / CHARS_PER_TOKEN),
-         "estimated body tokens"),
-        (r"(\d+) lines of body", body.count("\n") + 1, "body lines"),
-    )
+    measured, how = _measure_tokens(body)
+    rows = [(r"(\d+) lines of body", body.count("\n") + 1, "body lines")]
+    if how == "estimate":
+        # The document states a MEASURED number; with no tokenizer there is nothing to
+        # compare it to, and comparing it to an estimate is the defect this row exists
+        # to prevent, inverted.
+        _disclose_routing("evals body-token figure NOT MEASURED — `pip install tiktoken`")
+    else:
+        rows.insert(0, (r"(\d+) tokens \(tiktoken\)", measured, "measured body tokens"))
     for pattern, computed, what in rows:
         found = re.findall(pattern, text)
         if len(found) != 1:

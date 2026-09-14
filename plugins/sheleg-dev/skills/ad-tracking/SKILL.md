@@ -414,3 +414,14 @@ when** line, so the trigger has one home and this table stays an index.
 
 For the page-speed side of the same problem — what the tag does to LCP and TBT,
 and what to do about it — see the `frontend-performance` skill in this pack.
+
+## Degradation
+
+- **Not Claude Code** (Cursor, Codex, the skills CLI, the API container): the pack's
+  `PreToolUse` gate does not run. It is the thing that refuses a live key or an
+  irreversible action in this pack; elsewhere those rules are advice you follow by hand.
+- **Installed by copy rather than as a plugin**: the doctrine arrives, `hooks/` does not
+  — same loss, same remedy.
+- **No network, or the ad platform's API unreachable**: server-side events cannot be
+  verified end to end. Say the dedup check did not run rather than reporting it held;
+  a browser pixel firing proves the browser, never the conversion.
