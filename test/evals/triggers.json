@@ -10,7 +10,8 @@
       "q08",
       "q09",
       "q10",
-      "q11"
+      "q11",
+      "q15"
     ],
     "validation": [
       "q05",
@@ -18,7 +19,8 @@
       "q07",
       "q12",
       "q13",
-      "q14"
+      "q14",
+      "q16"
     ]
   },
   "queries": [
@@ -119,6 +121,20 @@
       "query": "Reconcile an internal invoice CSV with no product integration",
       "should_trigger": false,
       "why": "data work rather than wiring a paid-product seam"
+    },
+    {
+      "id": "q15",
+      "lang": "ru",
+      "query": "баг в оплате: после оплаты подписка не активируется",
+      "should_trigger": true,
+      "why": "stripe-billing; the 2026-10-08 routing audit found a payment-bug request reached no skill"
+    },
+    {
+      "id": "q16",
+      "lang": "en",
+      "query": "Payment bug: customers are charged twice for one Stripe checkout",
+      "should_trigger": true,
+      "why": "stripe-billing; payment bug as the entry wording"
     }
   ]
 }

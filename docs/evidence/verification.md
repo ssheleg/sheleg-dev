@@ -23,7 +23,17 @@ actually prints. Both were watched refusing a plant; see the SD-05 block.
 
 ---
 
-## Shipped state — v0.13.0
+## Shipped state — v0.13.1
+
+**A payment bug reaches the billing skill.**
+
+| REQ | What ships | How it was confirmed | Confirmed |
+|---|---|---|---|
+| SD-route | `stripe-billing` names "payment bug", «баг в оплате» and «оплата» in its first sentence | the description read back through `scalar()`: 965 chars; `audit_skill.py --house plugins/sheleg-dev/skills/stripe-billing` → `0 GAP`; the umbrella's `test/advertised_check.js --member sheleg-dev` → every routed trigger still advertised | **observed** — routing itself is not measured; that needs a model run |
+| SD-route-evals | Two positive trigger cases for the symptom-first wording | `q15` (train), `q16` (validation) in `test/evals/triggers.json`; `python3 test/evals_validate.py` → `OK: 16 trigger cases and 6 scenarios validate` | **observed** — data, not a result |
+| Gate | The whole suite on this tree | `npm test` EXIT=0; `OK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.13.1)` | **observed** |
+
+## Shipped in v0.13.0
 
 **The gate exists on one surface, and every skill now says so.**
 
