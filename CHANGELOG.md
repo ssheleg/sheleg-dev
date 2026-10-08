@@ -1,3 +1,24 @@
+## v0.13.1 — a payment bug reaches the billing skill
+
+The 2026-10-08 family routing audit found that a request opening with the symptom rather
+than the vendor — «баг в оплате», "payment bug", or plain «оплата» — loaded no skill.
+`stripe-billing` was written for someone who already knew the word Stripe: its
+description led with "connecting a product to Stripe" and its only payment phrase was
+«оплата подпиской».
+
+- **`stripe-billing` now names "payment bug", «баг в оплате» and «оплата» in its first
+  sentence**, ahead of the point where harness listings truncate a description. Room
+  was made by tightening wording, not by dropping a trigger: every routed trigger the
+  umbrella's table holds for this skill is still advertised. 959 → 965 characters,
+  inside the 970 working limit.
+- **The trigger corpus gains `q15` and `q16`** («баг в оплате: после оплаты подписка не
+  активируется», "Payment bug: customers are charged twice for one Stripe checkout"),
+  one per split. They are data for the next measured run, not a result.
+
+Bare «оплата» is broad, and the near-miss negatives already in the corpus (`q09` «нарисуй
+экран оплаты», `q11` Telegram Stars) are the cases a measured run should watch: the
+first is the visual layer's, the second telegram-dev's.
+
 ## v0.13.0 — the gate exists on one surface, and every skill now says so
 
 This pack ships a `PreToolUse` money gate (`hooks/money-gate.js`) that refuses a refund,

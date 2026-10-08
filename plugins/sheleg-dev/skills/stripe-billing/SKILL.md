@@ -1,20 +1,21 @@
 ---
 name: stripe-billing
 description: >-
-  Use when connecting a product to Stripe, or auditing a live integration:
-  checkout, renewals, seats, proration, refunds, cancellation and the
-  coupon offered at the cancel step, the portal, and the webhook that
-  turns a payment into an entitlement in your database. Covers Stripe's
-  agent toolchain, the pinned API version and SDK retries, price
-  resolution, claim-first webhook idempotency, what invoice
+  Use when connecting a product to Stripe, fixing a payment bug
+  ("баг в оплате", "оплата"), or auditing a live integration: checkout,
+  renewals, seats, proration, refunds, cancellation and the cancel-step
+  coupon, the portal, and the webhook that turns a payment into an
+  entitlement. Covers Stripe's agent toolchain, the pinned API version, SDK
+  retries, price resolution, claim-first webhook idempotency, what
   billing_reason decides, cumulative refunds, the cancellation field
-  flexible billing_mode moved, retention eligibility Stripe cannot
-  express, and write ordering with compensating reverts. Triggers - "add
-  Stripe", "Stripe checkout", "subscription billing", "webhook signature",
-  "invoice.paid", "proration", "refund", "cancel subscription", "retention
-  coupon", "подключить Stripe", "оплата подпиской", "вебхук Stripe",
-  "скидка при отмене", "биллинг подписок". Not for choosing between Stripe products
-  (stripe-best-practices) or reading Stripe docs (stripe-docs).
+  flexible billing_mode moved, retention eligibility Stripe cannot express,
+  and write ordering with compensating reverts. Triggers - "add Stripe",
+  "Stripe checkout", "subscription billing", "webhook signature",
+  "invoice.paid", "proration", "refund", "cancel subscription",
+  "retention coupon", "подключить Stripe", "оплата подпиской",
+  "вебхук Stripe", "скидка при отмене", "биллинг подписок". Not for choosing
+  between Stripe products (stripe-best-practices) or reading Stripe docs
+  (stripe-docs).
 license: MIT
 ---
 
