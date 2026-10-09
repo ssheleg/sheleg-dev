@@ -137,6 +137,10 @@ gateway must reject the mismatch and the flow cannot complete.
 claude mcp add --transport http sentry https://mcp.sentry.dev/mcp/<org>/<project>
 ```
 
+That command is for Claude Code. Other clients use their own supported MCP
+configuration and OAuth flow; inspect the current host's instructions instead
+of executing a Claude command there. If MCP is unavailable, use the CLI route.
+
 Scoping is optional and narrows what the server sees:
 `…/mcp`, `…/mcp/<org>`, `…/mcp/<org>/<project>`. Narrow it.
 
