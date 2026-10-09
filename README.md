@@ -12,6 +12,10 @@
 npx skills add ssheleg/sheleg-dev
 ```
 
+For error-tracking setup, check the host's shell, network, install permissions
+and available integrations. The skill's CLI/SDK route is not restricted to
+Claude Code or Cursor; a skills-only install does not register MCP or hooks.
+
 Ask: `Wire Stripe subscriptions so access follows verified webhook state exactly once.`
 
 **[Detailed docs →](https://skills.sshlg.me/skills/sheleg-dev/)**

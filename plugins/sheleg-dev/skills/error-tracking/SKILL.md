@@ -257,10 +257,12 @@ cover the shape where a job stops running.
 
 ## Degradation
 
-- **Not Claude Code** (Cursor, Codex, skills CLI, the API container): no MCP, no
-  `/command`. Everything here is CLI and SDK, both of which work anywhere with a
-  shell — except the API container, which has no network and no package install,
-  so treat this skill as Claude Code and Cursor only for the setup half.
+- **Host capabilities vary:** check the current client's shell, network,
+  package-install permissions, MCP and skill invocation support. Do not infer
+  their absence from a non-Claude host name. Use the CLI/SDK route when its
+  prerequisites exist; in a restricted container, name the unavailable step
+  and prepare the configuration without claiming setup ran. A skills-only
+  install does not register plugin commands, MCP servers or hooks.
 - **`sentry` CLI absent**: say so once, then use the REST API directly with a
   token (`curl https://sentry.io/api/0/…`), or the web UI for the one-off. Do
   not loop on the missing binary.

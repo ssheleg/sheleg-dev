@@ -1,3 +1,10 @@
+## v0.13.2 — setup follows host capabilities
+
+Error tracking no longer assumes every non-Claude host lacks MCP or that setup
+works only in Claude Code and Cursor. It checks the active host prerequisites,
+keeps CLI/SDK fallback, and labels the Claude MCP command as host-specific.
+A skills-only installation does not claim to register MCP or hooks.
+
 ## v0.13.1 — a payment bug reaches the billing skill
 
 The 2026-10-08 family routing audit found that a request opening with the symptom rather

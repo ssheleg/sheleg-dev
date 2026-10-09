@@ -23,7 +23,17 @@ actually prints. Both were watched refusing a plant; see the SD-05 block.
 
 ---
 
-## Shipped state — v0.13.1
+## Shipped state — v0.13.2
+
+Candidate only: **NOT_RELEASED**. This heading follows the validator's version
+contract; no tag, package publication or installed-host acceptance is claimed.
+
+| REQ | What changes | Evidence | Status |
+|---|---|---|---|
+| HC-4 | Error-tracking setup follows actual host capabilities | `plugins/sheleg-dev/skills/error-tracking/SKILL.md` Degradation and `references/setup.md` MCP instructions | reviewed text; runtime NOT_RUN |
+| Gate | Observed validator line | `OK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.13.2)` | PASS, `npm test` exit 0: structural 28 checks; moneygate 65 fixtures; money fixtures 16 checks; installer 11 cases; audit regressions pass |
+
+## Shipped in v0.13.1
 
 **A payment bug reaches the billing skill.**
 
@@ -431,3 +441,40 @@ reads as coverage it does not have.
   since has been run locally as processes (`python3 test/negatives.py`, 43/43 refused)
   and by CI on pull requests, but no post-v0.7.0 tagged run's step conclusions have been
   read back into a REQ row — the same gap, honestly aged rather than hidden.
+
+---
+
+## HC-4 host compatibility handoff — 2026-10-09
+
+Status: **NOT_RELEASED**. Candidate version `0.13.2` on
+`codex/host-compat-20261009`, based on `3c16c9c`. This is a bounded documentation
+and skill-instruction change; no host configuration was modified.
+
+### Objective and completed work
+
+Error-tracking now selects CLI, SDK and MCP setup by actual client capabilities; non-Claude host names no longer imply absent MCP, slash commands or a shell. The Claude MCP command is explicitly host-specific. A skills-only installation does not register plugin commands, MCP servers or hooks.
+Version manifests, changelog, README, skill card and the
+verification ledger above describe the same candidate.
+
+Shared task and contract context:
+[HC plan](https://github.com/ssheleg/sshlg-skills/blob/6415e3e/docs/evidence/host-compat/README.md),
+[primary-source research](https://github.com/ssheleg/sshlg-skills/blob/46f983f/docs/evidence/host-compat/research/README.md).
+The research distinguishes installer destinations from native host acceptance.
+
+### Checks actually run
+
+`npm test` exited 0: structural validation (28 checks, 7 skills), moneygate (65 fixtures), money fixtures (16 checks), installer (11 cases) and audit regressions.
+`git diff --check` passed. The first structural run correctly rejected stale
+version receipts; the receipts were updated before the passing complete run.
+No new behavioral test was added for these reversible prose changes.
+Client/model/provider execution is **NOT_RUN**: local checks do not establish
+native loading or runtime acceptance. Umbrella routing checks belong to the
+integrating hub change and were not run from this owner repository.
+
+### Open work and exact next task
+
+The integrating reviewer should inspect the bounded skill diff and this
+candidate's check receipt, then follow `CONTRIBUTING.md` for review, merge and
+release. No tag, npm publication, installed-skill update or umbrella pin change
+is part of this branch. Parent hub integration must reference the reviewed owner
+commit and keep release/installation acceptance separate from these local checks.
