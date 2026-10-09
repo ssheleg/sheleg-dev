@@ -478,3 +478,46 @@ candidate's check receipt, then follow `CONTRIBUTING.md` for review, merge and
 release. No tag, npm publication, installed-skill update or umbrella pin change
 is part of this branch. Parent hub integration must reference the reviewed owner
 commit and keep release/installation acceptance separate from these local checks.
+
+---
+
+## HC-4 release receipt — 2026-10-10
+
+This receipt supersedes the candidate-only status above. PR #21 merged after
+required checks passed; the merge tree equals the independently reviewed tree.
+Tag `v0.13.2` and `origin/main` resolved to the source commit below at release.
+The release workflow passed validation, strict Claude plugin conformance,
+installer smoke and npm publication; no manual full-CI dispatch was used.
+
+Readback fetched the exact registry version and tarball without executing it,
+checked registry SHA512/SHA1, and compared every published file byte-for-byte
+with `git show <gitHead>:<path>`. The canonical manifest is SHA256 over UTF-8
+compact JSON (sorted keys) of path-sorted `{path, sha256, bytes}` file rows.
+Native skill loading remains separate from this artifact check.
+
+```json
+{
+  "as_of": "2026-10-09T22:05:15.608281+00:00",
+  "package": "@ssheleg/sheleg-dev",
+  "version": "0.13.2",
+  "gitHead": "d15b0603105753a3d26737d77fc955c9b29bf7d0",
+  "registry": "https://registry.npmjs.org/%40ssheleg%2Fsheleg-dev/0.13.2",
+  "tarball": "https://registry.npmjs.org/@ssheleg/sheleg-dev/-/sheleg-dev-0.13.2.tgz",
+  "integrity": "sha512-+87E74SUGdqglc8G+wleDIlg//1zPBdj67xXM2zNxv1rSZgTRC//O/8NrOLBZ5sflFAYrpDxhmVqlwk7pYZUnw==",
+  "tarball_sha256": "4af434b687095c649c25a9b7e3bda0274d4514d1db0dc3c435b3b7dfd10efd5f",
+  "all_published_files_equal_release_source": true,
+  "published_files": 67,
+  "canonical_manifest_sha256": "a597abb1fa6f14c44c1aa2dee8bf29acf1877b6085492dafcb4e2fbf833fd12b",
+  "release_run": "37996862249",
+  "runtime_acceptance": "NOT_RUN",
+  "release_workflow_conclusion": "success"
+}
+```
+
+Public release: https://github.com/ssheleg/sheleg-dev/releases/tag/v0.13.2
+Workflow: https://github.com/ssheleg/sheleg-dev/actions/runs/37996862249
+
+Next task belongs to the hub integrator: update the family version/submodule
+pin, refresh authorized installations, and retain separate native acceptance
+status. No owner payload work remains for HC-4. This follow-up changes only
+the evidence ledger and requires no additional package release.
