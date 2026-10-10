@@ -23,10 +23,21 @@ actually prints. Both were watched refusing a plant; see the SD-05 block.
 
 ---
 
-## Shipped state — v0.13.2
+## Shipped state — v0.13.3
 
-Candidate only: **NOT_RELEASED**. This heading follows the validator's version
-contract; no tag, package publication or installed-host acceptance is claimed.
+**A lightweight tag cannot publish a release** (umbrella plan 2026-10-10, T5 / REQ-6).
+Rows are measured on the candidate tree; the pass on the real annotated `v0.13.3` is
+read on its release run, not here.
+
+| REQ | What changes | Evidence | Status |
+|---|---|---|---|
+| REQ-6 | `release.yml` refuses a tag whose `git cat-file -t` is not `tag`, right after checkout and before any gate or publish | the step's `run:` body extracted by YAML parse from `release.yml` (identical bytes in the seven members released 2026-10-10) and replayed in a scratch repository: lightweight `v9.9.9` → `::error::v9.9.9 is a commit, not an annotated tag object…`, exit 1; annotated `v9.9.10` → `v9.9.10 is annotated`, exit 0 | **planted** — the lightweight case watched failing |
+| Gate | Observed validator line | `OK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.13.3)` | PASS, `npm test` exit 0 on this tree: structural 28 checks; moneygate 65 fixtures; money fixtures 16 checks; installer 11 cases; audit regressions pass |
+
+## Shipped in v0.13.2
+
+Released 2026-10-10 from a lightweight tag (`git cat-file -t v0.13.2` → `commit`; not
+re-cut). Receipt: *HC-4 release receipt — 2026-10-10* below.
 
 | REQ | What changes | Evidence | Status |
 |---|---|---|---|

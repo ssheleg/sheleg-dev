@@ -1,3 +1,14 @@
+## v0.13.3 — a lightweight tag cannot publish a release
+
+- **The release refuses a lightweight tag.** `release.yml` gains one step, right after
+  checkout and before any gate: `git cat-file -t` on the tag must print `tag`; a `commit`
+  fails the job with the remedy (`git tag -a <tag> -m '<release>'` at the same commit)
+  before anything is published. `git describe` and `git submodule status` see annotated
+  tags only, and the 2026-10-09 family wave cut four lightweight member tags that the
+  umbrella then read as each member's previous release. The step is identical across the
+  family (umbrella plan 2026-10-10, T5 / REQ-6). Published tags are not re-cut.
+- No skill, reference or installer change.
+
 ## v0.13.2 — setup follows host capabilities
 
 Error tracking no longer assumes every non-Claude host lacks MCP or that setup
