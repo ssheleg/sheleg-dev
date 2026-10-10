@@ -532,3 +532,42 @@ Next task belongs to the hub integrator: update the family version/submodule
 pin, refresh authorized installations, and retain separate native acceptance
 status. No owner payload work remains for HC-4. This follow-up changes only
 the evidence ledger and requires no additional package release.
+
+---
+
+## REQ-6 release receipt — 2026-10-10
+
+This receipt closes the `v0.13.3` shipped-state block above. PR #23 merged after its
+required checks passed (squash `59e64dc79ecf9d0c0bb9d501312ad5aaaa64cb79`, tip subject carries `(#23)`). Tag
+`v0.13.3` is annotated (`git cat-file -t v0.13.3` → `tag`) and dereferences to that
+commit. Release run 38075408303 concluded `success` — validate, house audit, release and
+publish all ran — and its new step printed `v0.13.3 is annotated`: the pass case of the
+REQ-6 gate observed on a real tag, beside the planted lightweight refusal above.
+
+Readback fetched the exact registry version and tarball without executing it, checked
+registry SHA512/SHA1, and compared every published file byte-for-byte with
+`git show <gitHead>:<path>` (same canonical manifest as the HC-4 receipt).
+
+```json
+{
+  "as_of": "2026-10-10T18:34:56.149883+00:00",
+  "package": "@ssheleg/sheleg-dev",
+  "version": "0.13.3",
+  "gitHead": "59e64dc79ecf9d0c0bb9d501312ad5aaaa64cb79",
+  "registry": "https://registry.npmjs.org/@ssheleg%2Fsheleg-dev/0.13.3",
+  "tarball": "https://registry.npmjs.org/@ssheleg/sheleg-dev/-/sheleg-dev-0.13.3.tgz",
+  "integrity": "sha512-AnNDTKQGmEE4Gn55jPlqidz1Df/BH3M1iJVW4nZHsnHioZ/F69kMCqE+mBIthhiNgt8ITAO/+sqEYAjvwNuf8w==",
+  "shasum": "20c0a687f5adbe10c6e66b852c49b49c1b9e3351",
+  "tarball_sha256": "92fd3bc93a5c217269a844030e31f5868081811a81138102f5b6226988e5fb4d",
+  "all_published_files_equal_release_source": true,
+  "published_files": 67,
+  "canonical_manifest_sha256": "fabd96938e3f99b10d66b4434c42be2077dd3c64b7fa6b0ee037c73787006e84",
+  "provenance": true,
+  "release_run": "38075408303",
+  "release_workflow_conclusion": "success",
+  "runtime_acceptance": "NOT_RUN"
+}
+```
+
+Public release: https://github.com/ssheleg/sheleg-dev/releases/tag/v0.13.3
+Workflow: https://github.com/ssheleg/sheleg-dev/actions/runs/38075408303
