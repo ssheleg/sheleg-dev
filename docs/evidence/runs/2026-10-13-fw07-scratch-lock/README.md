@@ -50,3 +50,12 @@ passing runs. No public scratch or lock was touched by this owner.
 Next: independent owner-adapter review, required serialized aggregate, frozen
 candidate promotion with genuine checks and normal merge. No full local suite
 or hosted/release acceptance has run in this slice.
+
+## Independent owner acceptance
+
+[Independent frozen-source review](owner-independent-review.json) accepts SEO
+d6c87c3 and dev366a2d3 adapters, exact helper identity and the dev dated-receipt
+classification. It independently replayed30 controls per owner (SEO2.22seconds,
+dev1.34seconds), exit0, using owned namespaces only. This is bounded source
+acceptance; mandatory owner aggregate before PR remains queued behind the
+coordinator's active release/full-suite slot. No public negative suite was run.
