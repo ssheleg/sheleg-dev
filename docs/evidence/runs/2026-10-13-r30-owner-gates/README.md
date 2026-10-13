@@ -21,3 +21,7 @@ For the three sibling process suites, healthy and legitimate escaped-pipe rows p
 ## Handoff and remaining work
 
 Branch `fix/r30-owner-board-1013`. Next: independent diff review, one serial full owner gate using an owned temporary root, then normal frozen draft-to-ready PR admission. No package version, published payload, installed state, source release or hub pin is changed here. Original historical board states remain historical; this bounded candidate does not close every R30 requirement or every owner task. Local task/resource leases are advisory to this machine, not a cross-machine lock.
+
+## Final-tree reconciliation
+
+Independent review of `ea179df` found this new dated README missing from the existing document classification. Earlier process receipt preceded the README and therefore does not certify that final tree. The follow-up explicitly classifies this one dated record, without widening or bypassing the classification gate. Final-tree process results are retained separately in `final-process.json`; prior measured evidence remains unchanged.

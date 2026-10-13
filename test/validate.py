@@ -608,6 +608,8 @@ SELF_DESCRIBING_DOCS = (
 # must be in exactly one of the two lists, so a new live document cannot arrive unchecked
 # and cannot be parked here without saying so.
 DATED_RECORDS = {
+    "docs/evidence/runs/2026-10-13-r30-owner-gates/README.md":
+        "dated R30 source candidate, pre-change plants and bounded local validation receipts",
     "docs/evidence/runs/2026-10-13-fw03-credentials.md":
         "dated FW03 recovery, negative controls and unverified provider/native bounds",
     "docs/evidence/verification.md":
