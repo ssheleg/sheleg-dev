@@ -708,11 +708,11 @@ NOT_IN_THE_TARBALL = {
 
 _PATH_TOKEN = re.compile(
     r"^(?:[A-Za-z0-9_.*-]+/)*[A-Za-z0-9_.*-]+"
-    r"\.(?:md|mdc|py|js|json|sh|yml|yaml|ts|tsx|txt)$"
+    r"\.(?:md|mdc|py|js|mjs|cjs|json|sh|yml|yaml|ts|tsx|txt)$"
 )
 
 
-def _named_paths(text):
+def _named_paths(text, line_ranges=False):
     """Every path-shaped token a reader could try, with its line number.
 
     Two sources, because the defect hides in the second one. Inline code spans are the
@@ -739,11 +739,15 @@ def _named_paths(text):
                 # split off and checked rather than making the whole token unreadable --
                 # which is also how an `…/abbreviated/path.md:12` would evade the guard
                 # entirely, so do not write one.
-                ref = re.search(r":(\d+)(?:-\d+)?$", tok)
+                ref = re.search(r":(\d+)(?:-(\d+))?$", tok)
                 if ref:
                     tok = tok[: ref.start()]
                 if _PATH_TOKEN.match(tok):
-                    yield lineno, tok, int(ref.group(1)) if ref else None
+                    address = None
+                    if ref:
+                        start = int(ref.group(1))
+                        address = (start, int(ref.group(2) or start)) if line_ranges else start
+                    yield lineno, tok, address
 
 
 def _tarball_paths():
@@ -902,20 +906,24 @@ def skill_repo_path_gaps(text):
     Reader-project paths such as src/web/auth.py remain outside this check. Unlike
     bare-name citations, an explicit prefix must resolve exactly, not by basename.
     """
-    for line, token, ref in _named_paths(text):
+    for line, token, ref in _named_paths(text, line_ranges=True):
         rel = token[2:] if token.startswith("./") else token
         if not rel.startswith(("plugins/", "test/", "bin/", "scripts/")):
             continue
         matches = glob.glob(os.path.join(ROOT, rel))
         if not matches:
             yield line, token, "repository path is absent"
-        elif ref:
+        elif ref is not None:
+            start, end = ref
+            if start < 1 or end < start:
+                yield line, token, "line citation must be a positive ordered range"
+                continue
             target = os.path.join(ROOT, rel)
             if not os.path.isfile(target):
                 yield line, token, "line citation does not name one file"
             else:
                 with open(target, encoding="utf-8", errors="replace") as fh:
-                    if ref > sum(1 for _ in fh):
+                    if end > sum(1 for _ in fh):
                         yield line, token, "line citation is past end of file"
 
 

@@ -22,10 +22,15 @@ def check(name, fn):
         print("OK:", name)
 
 def paths():
-    for token in ["plugins/missing/SKILL.md", "test/missing/validate.py", "bin/absent.js"]:
+    for token in ["plugins/missing/SKILL.md", "test/missing/validate.py", "bin/absent.js",
+                  "plugins/missing/file.mjs", "plugins/missing/file.cjs"]:
         assert list(v.skill_repo_path_gaps("`" + token + "`")), token
-    assert list(v.skill_repo_path_gaps("`test/validate.py:999999`"))
+    for ref in ["999999", "0", "1-999999", "2-1", "0-1"]:
+        assert list(v.skill_repo_path_gaps("`test/validate.py:" + ref + "`")), ref
     assert not list(v.skill_repo_path_gaps("`test/validate.py:1`"))
+    assert not list(v.skill_repo_path_gaps("`test/validate.py:1-2`"))
+    assert not list(v.skill_repo_path_gaps(
+        "`plugins/sheleg-dev/skills/stripe-billing/scripts/assert-stripe-env.mjs:1-2`"))
     assert not list(v.skill_repo_path_gaps("`src/web/auth.py` and `next.config.ts`"))
 
 def stripe():

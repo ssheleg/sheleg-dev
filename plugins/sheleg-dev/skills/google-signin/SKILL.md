@@ -110,8 +110,11 @@ attacker's account.
 
 ## Setup (GCP)
 
-1. Cloud Console → APIs & Services → OAuth consent screen (External;
-   publish it — in "Testing" only allowlisted users can sign in).
+1. Cloud Console → APIs & Services → OAuth consent screen: choose the audience.
+   External Testing normally limits access to test users, but basic identity
+   scopes (`openid`, `email`, `profile`) are exempt. Workspace policy can still
+   block access; publishing alone is not the remedy. See the dated setup note
+   in [the full guide](references/full-guide.md).
 2. Credentials → Create OAuth client ID → **Web application** →
    **Authorized JavaScript origins** = every origin the button renders on,
    incl. `http://localhost:<port>` for dev (scheme+host+port, no path, no
@@ -148,7 +151,7 @@ attacker's account.
 | Button never renders | GSI async race (add retry loop), empty client ID, or CSP blocks `accounts.google.com` |
 | "Token used too early/expired" | Server clock skew → sync NTP |
 | Audience mismatch | Frontend/backend client IDs differ → single env source of truth |
-| `access_denied` on consent | Consent screen still in Testing → publish the app |
+| `access_denied` on consent | Check requested scopes, audience and Workspace policy. Testing allowlisting applies beyond basic identity scopes; investigate before changing publishing status |
 | Works locally, breaks in prod | Prod origin missing in GCP, or `Secure` cookie served over plain HTTP |
 | One Tap missing / FedCM console warnings | FedCM is mandatory since Aug 2025 and the opt-out is gone (checked 2026-08-06). Load `gsi/client` from Google and keep it current — a vendored or pinned copy is the real break. The rendered button flow is unaffected; code branching on the old `isNotDisplayed()` moment callbacks is not |
 

@@ -39,7 +39,7 @@ category authorization is the existing gate policy, not a grant of provider righ
   11 cases; all 44 audit regression scripts. Counts describe their own layers and
   are not summed into one homogeneous test total.
 - `git diff --check`: exit 0. Security payload counts and Stripe body measurements
-  updated from the validator: 62 plugin files, 68 package files, 4551 body tokens,
+  updated from the validator: 62 plugin files, 68 package files, 4552 body tokens,
   399 body lines. Version and release surfaces remain v0.13.3.
 
 ## Provider evidence, checked 2026-10-13
@@ -70,3 +70,32 @@ Skills used: task-pipeline for delivery; agent-sync for advisory ownership;
 evidence-docs for measured claims; stripe-billing, google-auth, google-signin and
 ad-tracking for source contract review. make-skill supplied construction guidance in
 the preceding wave; no new skill or package release was created here.
+
+## Current Google Testing correction and candidate CI
+
+The reviewed Google app-state source also contradicted four current owner claims:
+Google-signin entry setup/troubleshooting and the corresponding full-guide rows
+said Testing always needs allowlisting or instructed publishing as the remedy.
+Both now explain the basic identity scope exception and Workspace restrictions.
+No provider configuration is changed. Structural validation remains the gate for
+these prose changes; no invented model or login test is claimed.
+
+The owner validate workflow now follows the standing policy: nightly 23:00
+Europe/Warsaw, reusable release call, manual diagnostics, and only a deliberate
+ready_for_review PR promotion. Job bodies are unchanged; opened/synchronize/push
+are absent. A successful manual dispatch is not eligible PR admission, per
+[GitHub required checks](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#checks-from-some-workflow-jobs-are-not-evaluated).
+The operator policy explicitly permits manual hosted CI for an urgent or explicit
+candidate; promotion is that bounded exception, not continuous per-push CI.
+
+Independent review identified three holes in the initial B-82 tokenizer: `.mjs`
+was ignored, line zero was treated as no citation, and only the first endpoint of
+a range was checked. Added `.mjs`/`.cjs` recognition and opt-in full range parsing
+for payload checks, preserving the older callers' interface. The added missing
+module control failed before the fix; zero, reversed and out-of-bounds ranges
+now fail, while valid single/range module citations pass.
+
+After the review fixes, a positive structural baseline exited 0 before
+`python3 -B test/negatives.py` ran: all 48 existing workflow guards rejected
+their plants. This sequencing prevents an unrelated baseline failure from
+being mistaken for a successful negative control.

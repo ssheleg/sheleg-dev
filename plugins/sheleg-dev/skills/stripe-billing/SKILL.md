@@ -85,7 +85,7 @@ customers. See [`references/price-integrity.md`](references/price-integrity.md).
 ## The client
 
 ```ts
-// Copy scripts/assert-stripe-env.mjs beside this client (see price-integrity.md).
+// Copy the linked assert-stripe-env.mjs beside this client (see price-integrity.md).
 import { assertStripeEnv } from "./assert-stripe-env.mjs";
 let client: Stripe | null = null;
 
