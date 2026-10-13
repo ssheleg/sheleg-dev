@@ -8,7 +8,7 @@ This is implementation evidence, not provider, native-host or release acceptance
 
 | Row | Recovered defect and delivered scope | Acceptance / residual |
 |---|---|---|
-| B-82 | Payload Markdown was outside the repository citation check. `skill_repo_path_gaps` and `check_skill_repo_paths` in `test/validate.py` now check explicit `plugins/`, `test/`, `bin/`, `scripts/` prefixes exactly, including end-of-file citations; no basename fallback. Consumer project paths stay outside this rule. | Focused positive/negative controls and actual public-validator plant pass. Bare or consumer-project paths are not claimed validated. |
+| B-82 | Payload Markdown was outside the repository citation check. `skill_repo_path_gaps` and `check_skill_repo_paths` in `test/validate.py` now check inline-code and fenced-block path tokens with explicit `plugins/`, `test/`, `bin/`, `scripts/` prefixes exactly, including end-of-file citations; no basename fallback. Consumer project paths stay outside this rule. | Focused positive/negative controls and actual public-validator plant pass. Bare or consumer-project paths are not claimed validated. |
 | B-86 | Stripe prescribed a mode assertion without supplying one. `plugins/sheleg-dev/skills/stripe-billing/scripts/assert-stripe-env.mjs` now exports it; the skill calls it before client construction and `references/price-integrity.md` supplies the copy block. The validator's credential table includes this reference. | 18 local assertions cover secret/restricted keys, both mode mismatches, absent/unknown mode and unsupported key formats. Prefix agreement is not authentication or permission. |
 | B-87 | The old row treats three skills alike. Current Google GIS uses a public client ID and explicitly no client secret; CAPI teaches payloads and no authenticated adapter. Google-auth does teach service-account JSON and OAuth client secrets. | Current source audited, boundaries documented in existing Google-auth and Meta references. Removed access-token logging from Google-auth SKILL.md. Meta current Test Events contract remains unverified after official page HTTP 429. No blanket closure. |
 | B-91 | The shell gate knew only Heleket's named opaque credential. Add only established Google names: GOOGLE_CREDENTIALS and GOOGLE_CLIENT_SECRET. Preserve public client/project/pixel IDs and ADC configuration paths. | 12 new fixtures: 8 named-secret refusal/authorization/reader cases and 4 metadata counterexamples. Only explicit shell assignments are covered; inherited values, credential files and ambient ADC remain outside this gate. CAPI row remains open pending provider contract evidence. |
@@ -99,3 +99,30 @@ After the review fixes, a positive structural baseline exited 0 before
 `python3 -B test/negatives.py` ran: all 48 existing workflow guards rejected
 their plants. This sequencing prevents an unrelated baseline failure from
 being mistaken for a successful negative control.
+
+## Independent bounded review — 2026-10-13
+
+Reviewed implementation `764cffb844fd745324dbca9a920a9e77e2a5df3e`, following
+initial review of `3b730d21752f5a95332ac07d5b349fc3450d82bd`. Verdict: **PASS
+within the stated source and lexical bounds**. No provider calls or machine changes.
+
+The first review reproduced missing `.mjs` path acceptance, line zero acceptance
+and unchecked line-range endpoints. The follow-up fixes these in the new payload
+helper and retains the old callers' first-line interface. Independent replay on
+the final implementation passed eight path controls: five missing/zero/reversed/
+overlong refusals and three real-file or consumer-path positives.
+
+Checks actually run: `python3 -B test/audit_regressions/fw03_credentials.py`
+(3 groups, including 18 Stripe assertions), `python3 -B test/validate.py`
+(28 checks), and the unchanged money-gate implementation's 77 fixtures. Seven
+additional independent command controls covered inline/env/nested-shell Google
+assignments, grep/printf data, public client IDs and command sequencing. All
+passed. Three additional Stripe newline/CR controls refused unsupported keys.
+The final workflow diff limits PR validation to explicit `ready_for_review`
+promotion and retains nightly/call/manual entry points; no per-push trigger was
+restored. No hosted run or complete suite was duplicated by this reviewer.
+
+This acceptance does not classify ambient ADC, inherited credentials, arbitrary
+shell execution, Meta test-token authority or deployed runtime behavior. Prefix
+agreement remains a mode assertion, not authentication or IAM validation. The
+open provider/native rows in this receipt remain open. Parent owns integration.
