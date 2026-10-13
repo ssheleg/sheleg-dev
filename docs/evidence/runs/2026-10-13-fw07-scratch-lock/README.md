@@ -19,3 +19,34 @@ under healthy owned lock; different TMPDIR/owner-labelled processes contend on
 one inode, release/retry works; unsafe file kinds/modes/identity refuse unchanged.
 Helper hash and excluded payload identity will be recorded after implementation.
 Source-only plan at this commit; focused port and independent review next.
+
+## Port implementation and focused results
+
+[Helper identity](helper-identity.json) equals the canonical file byte-for-byte.
+[Canonical independent review](canonical-independent-review.json) is source27b7e9
+evidence, not independent acceptance of this owner adapter. Runtime package
+version stays unchanged. [Dry-run payload readback](payload-parity.json) confirms
+every included file's bytes match this owner's accepted base (46 SEO/68 dev files);
+no package archive was published and temporary npm cache was removed.
+
+`python3 -B test/audit_regressions/fw07_scratch_lock.py` passes
+[30 controls](focused30.txt), exit0. `python3 -B test/validate.py` passes
+[structural validation](structural.txt), exit0; the isolated checkout explicitly
+discloses routed-trigger umbrella observation as unlooked. New regressions join
+the existing `test:audit` glob, already part of the owner aggregate/CI.
+
+The [first fixture run](first-fixture-failure.txt) failed because its positive
+listing assertion was copied with TP's property-check suffix. These owners list
+negative self-tests without that suffix. The common assertion now checks actual
+negative-self-test listing and exit0; unsafe-lock refusal still requires exit1
+and the admission diagnostic. No production guard was weakened.
+
+The first structural run rejected the new dated receipt as unclassified;
+[output](structural-first-failure.txt) is retained. Adding this exact dated source
+receipt to DATED_RECORDS corrects its classification, without widening the
+classification rule. Context-managed fixtures were removed on both failed and
+passing runs. No public scratch or lock was touched by this owner.
+
+Next: independent owner-adapter review, required serialized aggregate, frozen
+candidate promotion with genuine checks and normal merge. No full local suite
+or hosted/release acceptance has run in this slice.
