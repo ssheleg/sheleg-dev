@@ -59,3 +59,31 @@ classification. It independently replayed30 controls per owner (SEO2.22seconds,
 dev1.34seconds), exit0, using owned namespaces only. This is bounded source
 acceptance; mandatory owner aggregate before PR remains queued behind the
 coordinator's active release/full-suite slot. No public negative suite was run.
+
+
+## Integration and version decision
+
+[Author policy/readback](integration-plan.json) rechecks all 68 recorded npm
+payload files against the accepted base and current source. No packaged byte
+changed: retain 0.13.4, without a new tag or registry publication. This is an
+author readback, not another independent review. The canonical helper has no
+production environment override; path replacement is confined to owned fixtures.
+
+`CONTRIBUTING.md:69` requires `npm test` before opening a PR and
+provides no draft exception. The prepared PR text is saved in the integration plan;
+no PR has been opened prematurely. Once the serial slot is available, run
+`npm run test:all` so the changed negative runner and audit regressions are included.
+Preserve exact source, output and any failure; then open the draft, freeze, promote
+once for genuine required checks, and merge normally. Read back the accepted tree
+and unchanged package payload before the parent's Git pin update. Old runner
+versions and direct plant calls still lack the shared-lock protocol.
+
+### New independent lifetime finding: acceptance held
+
+The observer subsequently reproduced a gap with owned process barriers: killing
+the runner parent releases its flock while a writing child survives; a contender
+can enter before that child exits. The prior 30 controls do not establish
+descendant-lifetime exclusion. Canonical helper/runner correction and independent
+review are required before these ports' full gates and promotion. No public lock
+or scratch path was used by the reproduction. The original review remains a
+historical bounded result, not acceptance of this newly tested case.

@@ -1,0 +1,43 @@
+{
+  "owner": "sheleg-dev",
+  "source": "2aa47aa6d0f38d98753b4d7f47f62bb4afc3c7ab",
+  "role": "author policy/source readback; independent acceptance is owner-independent-review.json, not this receipt",
+  "policy": {
+    "path": "CONTRIBUTING.md:69",
+    "required_before_opening_pr": "npm test",
+    "draft_exception": null,
+    "additional_coherent_gate": "npm run test:all",
+    "reason": "Changed negative runner must run its actual complete corpus; test:all also includes minimum gate and audit regression glob."
+  },
+  "version": {
+    "retained": "0.13.4",
+    "reason": "Only test and owner evidence files changed; none belong to measured npm payload. No package release/tag needed.",
+    "payload_files_checked": 68,
+    "base": "21e0c531a0fdd306aa8a8e408f5b8d34d9f9b369",
+    "all_current_bytes_match_manifest_and_base": true
+  },
+  "override_review": {
+    "helper_sha256": "8d847c6744490818da51b1e60d0b5c7bc9cacd093587de626282d2a13009d67f",
+    "runtime_override_inputs": [],
+    "fixture_override": "Module-local scratch_lock_path override in owned subprocess fixtures only; no TMPDIR/env/public-lock override introduced in shipped runner."
+  },
+  "next_steps": [
+    "Resolve child-lifetime exclusion finding on separately frozen canonical source; peer review and port before treating this candidate as accepted.",
+    "After coordinator releases serial slot, run exact frozen npm run test:all with owned TMPDIR and disk watcher; preserve source/tree, output/hash, counts and failures.",
+    "Only after required local gate passes, open draft PR from this branch; update pending validation text to actual evidence.",
+    "Freeze complete candidate and promote draft once via ready_for_review for genuine eligible hosted checks.",
+    "Verify exact head and all required jobs; normal merge without bypass.",
+    "Read accepted tree and whole npm-payload parity; parent may update Git source pin while retaining published package version. No tag or registry publication."
+  ],
+  "draft_pr": {
+    "title": "fix: serialize fixed scratch paths across family test runners",
+    "body": "The negative runner previously used a per-owner lock under TMPDIR while its plants wrote shared fixed /tmp paths. It now uses the byte-identical family helper to serialize that namespace across owners and TMPDIR values, and refuses unsafe lock files before any plant runs.\n\nThe helper never truncates, unlinks, steals or changes the permissions of an existing lock. Regression processes use owned temporary namespaces; production behavior and all 68 npm payload files remain byte-equal to the accepted base, so package 0.13.4 is unchanged and no release is requested. Older runners and direct plant calls do not participate.\n\nValidation: independent owner review replayed 30 focused controls; structural validation passed. Complete local test:all and genuine frozen-candidate hosted checks are still pending. Evidence: docs/evidence/runs/2026-10-13-fw07-scratch-lock/README.md.\n",
+    "created": false,
+    "reason": "Owner CONTRIBUTING requires its local gate before opening a PR; no draft exemption."
+  },
+  "acceptance_hold": {
+    "finding": "Independent observer reproduced parent SIGKILL releasing flock while original plant child remains alive and writes; contender acquires before child exits.",
+    "scope": "Prior30 controls cover live parent exclusion and release/retry, not all descendant lifetime.",
+    "next": "Separate canonical helper/runner correction and peer review, then exact-byte owner ports before complete gates or promotion. No public scratch was used by the reproduction."
+  }
+}
