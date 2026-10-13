@@ -1,3 +1,14 @@
+## Unreleased — FW03 credential boundaries
+
+- Supply a copyable, locally tested Stripe mode assertion before client construction.
+- Refuse explicit Google service-account JSON and OAuth client-secret assignments in
+  non-production or undeclared runs, while preserving public metadata assignments.
+- Correct Google Testing advice for basic identity scopes and Workspace controls.
+- Replace a Google access-token log with a value-free event. Document ambient ADC,
+  skills-only hooks and CAPI coverage limits. No provider operation was performed.
+- Validate explicit repository paths inside skill Markdown without treating consumer
+  project paths as repository claims.
+
 ## v0.13.3 — a lightweight tag cannot publish a release
 
 - **The release refuses a lightweight tag.** `release.yml` gains one step, right after

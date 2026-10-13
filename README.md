@@ -159,13 +159,25 @@ person has signed the category off **for this session**:
 | Category | What it stops |
 |---|---|
 | `live-key` | a live-shaped `sk_live_…` / `rk_live_…` reaching a command |
-| `credential` | exporting a credential whose provider issues no test value — `HELEKET_API_KEY` — in a run that declares `test`, or declares nothing |
+| `credential` | explicitly assigning `HELEKET_API_KEY`, `GOOGLE_CREDENTIALS` or `GOOGLE_CLIENT_SECRET` in a run that declares `test`, or declares nothing |
 | `refund` | `stripe refunds create`, a POST to a `…/v1/refunds` URL, or a `create_refund` tool |
 | `payout` | `stripe payouts\|transfers create`, a POST to `…/v1/payouts`, `…/v1/transfers` or Heleket's `…/v1/payout` |
 | `dispute` | `stripe disputes close`, or `…/v1/disputes/…/close` — closing one accepts the loss |
 | `live-flag` | an explicit `--live` / `--live-mode` flag |
 | `self-authorisation` | a command that sets this gate's own switch. Never authorisable |
 | `skip-billing` | `SKIP_BILLING=true` in a run declaring production — the free-money path. Never authorisable |
+
+The Google names identify service-account JSON and an OAuth client secret. A Google
+OAuth app in Testing still uses real credentials and can access permitted real data.
+Public client IDs, project IDs, pixel IDs and ADC configuration paths are not treated
+as secrets by name. This command-text guard does not inspect inherited credentials,
+files or ambient ADC; skills-only installations do not activate it.
+
+Stripe clients can copy the pure boot assertion from
+[`assert-stripe-env.mjs`](plugins/sheleg-dev/skills/stripe-billing/scripts/assert-stripe-env.mjs).
+It compares `STRIPE_PRODUCT_MODE` with a secret/restricted key prefix before client
+construction and fails on unknown formats. It does not prove credential validity
+or grant permission for a provider operation.
 
 **Authorising one.** The authorised person exports the category — or `all` — in the
 shell that starts the session, and starts a new one:

@@ -459,3 +459,21 @@ decoded = id_token.verify_token(
 | `GOOGLE_CLOUD_PROJECT` | Default project ID |
 | `GCLOUD_PROJECT` | Alias for project ID |
 | `HTTPS_PROXY` / `https_proxy` | Proxy for HTTPS requests |
+
+## Credential boundary: real authority versus offline mocks
+
+Checked 2026-10-13 against [Google's ADC documentation](https://docs.cloud.google.com/docs/authentication/application-default-credentials).
+`GOOGLE_CREDENTIALS` in the JSON-loading examples carries a service-account private key.
+It has no sandbox marker comparable to Stripe's mode prefix. A local or staging process
+can still access real resources through its IAM grants: isolate the project, principal
+and permissions before a real-provider test. Offline fixtures should inject an in-memory
+auth adapter and no credentials.
+
+The pack's Claude plugin gate refuses explicit shell assignments to `GOOGLE_CREDENTIALS`
+in a test/undeclared run; a real-provider run uses the existing operator-authorised
+credential category. A name in a grep pattern and `GOOGLE_CLOUD_PROJECT` are metadata,
+not secret assignments. `GOOGLE_APPLICATION_CREDENTIALS` is deliberately not classified
+as a secret by its name: it can point to either a key or keyless federation configuration.
+Allowing that path does not prove its target safe. Verify the resolved principal and
+source without reading a secret into logs; ambient ADC, metadata identities, files and
+inherited environment are outside this lexical assignment check.

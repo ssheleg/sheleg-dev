@@ -235,7 +235,8 @@ client.on('tokens', (tokens) => {
   if (tokens.refresh_token) {
     // Store refresh_token — only sent on first auth
   }
-  console.log(tokens.access_token);
+  // Record an event name only; token values never enter logs.
+  console.info("google_auth_tokens_refreshed");
 });
 ```
 

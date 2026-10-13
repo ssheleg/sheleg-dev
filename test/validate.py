@@ -591,6 +591,7 @@ SELF_DESCRIBING_DOCS = (
     # `references/*.md` and `agent_sync.py`, all of them the agent-sync skill's -- in a
     # document whose whole subject is how to coordinate work HERE.
     "docs/AGENT_SYNC.md",
+    "docs/HANDOFF.md",
     "docs/evals/stripe-billing.md",
 )
 
@@ -605,6 +606,8 @@ SELF_DESCRIBING_DOCS = (
 # must be in exactly one of the two lists, so a new live document cannot arrive unchecked
 # and cannot be parked here without saying so.
 DATED_RECORDS = {
+    "docs/evidence/runs/2026-10-13-fw03-credentials.md":
+        "dated FW03 recovery, negative controls and unverified provider/native bounds",
     "docs/evidence/verification.md":
         "one row per shipped requirement, dated. Its rows quote the dead paths and the "
         "stale counts that WERE the defect, at the commit they were read",
@@ -705,11 +708,11 @@ NOT_IN_THE_TARBALL = {
 
 _PATH_TOKEN = re.compile(
     r"^(?:[A-Za-z0-9_.*-]+/)*[A-Za-z0-9_.*-]+"
-    r"\.(?:md|mdc|py|js|json|sh|yml|yaml|ts|tsx|txt)$"
+    r"\.(?:md|mdc|py|js|mjs|cjs|json|sh|yml|yaml|ts|tsx|txt)$"
 )
 
 
-def _named_paths(text):
+def _named_paths(text, line_ranges=False):
     """Every path-shaped token a reader could try, with its line number.
 
     Two sources, because the defect hides in the second one. Inline code spans are the
@@ -736,11 +739,15 @@ def _named_paths(text):
                 # split off and checked rather than making the whole token unreadable --
                 # which is also how an `…/abbreviated/path.md:12` would evade the guard
                 # entirely, so do not write one.
-                ref = re.search(r":(\d+)(?:-\d+)?$", tok)
+                ref = re.search(r":(\d+)(?:-(\d+))?$", tok)
                 if ref:
                     tok = tok[: ref.start()]
                 if _PATH_TOKEN.match(tok):
-                    yield lineno, tok, int(ref.group(1)) if ref else None
+                    address = None
+                    if ref:
+                        start = int(ref.group(1))
+                        address = (start, int(ref.group(2) or start)) if line_ranges else start
+                    yield lineno, tok, address
 
 
 def _tarball_paths():
@@ -879,6 +886,8 @@ def check_self_describing_docs_resolve():
                     fail(f"{doc}:{lineno} cites {tok}:{ref}, but that file has {total} "
                          "lines -- the address resolves to nothing (B-79)")
 
+    check_skill_repo_paths()
+
     for key, reason in FOREIGN_BY_DESIGN.items():
         if key not in used:
             fail(f"FOREIGN_BY_DESIGN carries {key[1]!r} for {key[0]} ({reason}) but the "
@@ -889,6 +898,46 @@ def check_self_describing_docs_resolve():
             fail(f"NOT_IN_THE_TARBALL carries {key[1]!r} for {key[0]} ({reason}) but that "
                  "document no longer names it, or the path now ships -- either way the "
                  "exemption is a hole")
+
+
+def skill_repo_path_gaps(text):
+    """Only explicitly repository-rooted payload paths are claims about this repo.
+
+    Reader-project paths such as src/web/auth.py remain outside this check. Unlike
+    bare-name citations, an explicit prefix must resolve exactly, not by basename.
+    """
+    for line, token, ref in _named_paths(text, line_ranges=True):
+        rel = token[2:] if token.startswith("./") else token
+        if not rel.startswith(("plugins/", "test/", "bin/", "scripts/")):
+            continue
+        matches = glob.glob(os.path.join(ROOT, rel))
+        if not matches:
+            yield line, token, "repository path is absent"
+        elif ref is not None:
+            start, end = ref
+            if start < 1 or end < start:
+                yield line, token, "line citation must be a positive ordered range"
+                continue
+            target = os.path.join(ROOT, rel)
+            if not os.path.isfile(target):
+                yield line, token, "line citation does not name one file"
+            else:
+                with open(target, encoding="utf-8", errors="replace") as fh:
+                    if end > sum(1 for _ in fh):
+                        yield line, token, "line citation is past end of file"
+
+
+def check_skill_repo_paths():
+    """B-82: payload Markdown has the same internal-path contract as repo docs."""
+    for base, _, files in os.walk(SKILL_ROOT):
+        for name in sorted(files):
+            if not name.endswith(".md"):
+                continue
+            path = os.path.join(base, name)
+            with open(path, encoding="utf-8") as fh:
+                text = fh.read()
+            for line, token, why in skill_repo_path_gaps(text):
+                fail(f"{os.path.relpath(path, ROOT)}:{line} names {token!r}: {why} (B-82)")
 
 
 
@@ -903,14 +952,18 @@ def check_self_describing_docs_resolve():
 # must ship the boot assertion that refuses the two mismatches -- plus, where the provider
 # offers no test credential at all, the exposure that remains, named.
 #
-# Table-driven so a second provider is a row, not a second shape (M-44). It carries ONE
-# row today, and that is a measurement rather than an oversight: `stripe-billing`
-# prescribes the same control at `references/price-integrity.md:62-64` and asks for it at
-# `references/testing-and-local-dev.md:246` ("something asserts they agree") while
-# shipping no assertion to copy. Filed as board **B-85**, not enforced here, because a
-# guard added in the same breath as the defect it would flag turns the gate red for work
-# this row did not do.
+# Each row binds a credential-assignment block to a shipped assertion. FW03 adds
+# Stripe after supplying its executable assertion; Google opaque credentials use
+# the separate shell-assignment boundary and cannot infer authority from a prefix.
 CREDENTIAL_BOUNDARIES = {
+    "stripe-billing/references/price-integrity.md": {
+        "secret": "STRIPE_SECRET_KEY",
+        "declared_env": "STRIPE_PRODUCT_MODE",
+        "assertion": "assertStripeEnv",
+        "codes": ("STRIPE_ENV_TEST_HOLDS_LIVE_CREDENTIAL",
+                  "STRIPE_ENV_LIVE_HOLDS_TEST_CREDENTIAL"),
+        "exposure": None,  # Stripe provides distinct sandbox/live key modes.
+    },
     "crypto-payments/references/heleket-provider.md": {
         # the env var that IS the secret
         "secret": "HELEKET_API_KEY",
@@ -1063,7 +1116,7 @@ def check_credential_boundary():
             if code not in text:
                 fail(f"{rel}: the boot assertion cannot refuse {code} — a boundary that "
                      "refuses one direction only lets the other one through")
-        if spec["exposure"] not in text:
+        if spec["exposure"] and spec["exposure"] not in text:
             fail(f"{rel}: no {spec['exposure']!r} section. This provider issues one "
                  "credential per merchant and no test key, so a residual risk remains "
                  "after the assertion; unwritten, it reads as absent")

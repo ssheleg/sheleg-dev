@@ -389,6 +389,25 @@ check('the hook is syntactically valid on its own', () => {
   execFileSync(process.execPath, ['--check', path.join(HOOKS, 'lib', 'moneygate.js')], { stdio: 'pipe' });
 });
 
+// FW03: opaque provider secrets have no trustworthy test/live prefix. Public
+// identifiers and credential-configuration paths are separate, non-secret metadata.
+for (const name of ['GOOGLE_CREDENTIALS', 'GOOGLE_CLIENT_SECRET']) {
+  refuses(name + ' in a test run', bash('export ' + name + '=FIXTURE_ONLY'),
+    {SHELEG_DEV_ENV: 'test'}, 'credential');
+  refuses(name + ' cannot be authorised inside a test run',
+    bash('export ' + name + '=FIXTURE_ONLY'),
+    {SHELEG_DEV_ENV: 'test', SHELEG_DEV_LIVE_AUTHORISED: 'credential'}, 'credential');
+  allows(name + ' with an existing live authorisation', bash('export ' + name + '=FIXTURE_ONLY'),
+    {SHELEG_DEV_ENV: 'production', SHELEG_DEV_LIVE_AUTHORISED: 'credential'});
+  allows(name + ' named as a grep pattern', bash("rg '" + name + "=' docs/"),
+    {SHELEG_DEV_ENV: 'test'});
+}
+for (const name of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLOUD_PROJECT', 'GOOGLE_APPLICATION_CREDENTIALS',
+                    'NEXT_PUBLIC_META_PIXEL_ID']) {
+  allows(name + ' metadata alone is not a secret classification',
+    bash('export ' + name + '=FIXTURE_ONLY'), {SHELEG_DEV_ENV: 'test'});
+}
+
 // ------------------------------------------------------------------------- verdict
 
 if (failures.length) {

@@ -17,12 +17,11 @@ documents name that does not exist here.
 
 ## What ships, and what of it executes
 
-`git ls-files plugins` returns **61 files: 35 markdown, one plugin manifest, three
-files of the manual gate, and 22 files of money fixtures.** Two of the seven skills now
-ship code you can run — the assertion packs under `fixtures/` — and that is a change
-from every release before v0.7.0, so it is stated here rather than left to be noticed.
-They run only when you invoke them, read only the JSON fixtures beside them, and open
-no socket; the greps below prove all three.
+`git ls-files plugins` returns **62 files: 35 markdown, one plugin manifest, three
+files of the manual gate, 22 files of money fixtures, and one Stripe mode assertion.**
+The fixture runners read their adjacent JSON only when invoked. The new Stripe
+assertion is a pure function: caller-supplied mode and key in, mode or error code out;
+no I/O, network or logging. Neither runs during installation.
 
 | Component | Count | Runtime behavior |
 |---|---|---|
@@ -32,6 +31,7 @@ no socket; the greps below prove all three.
 | `plugins/sheleg-dev/hooks/hooks.json` | 1 | Hook manifest read by Claude Code. Declares one `PreToolUse` hook and no `if` filter. |
 | `plugins/sheleg-dev/hooks/money-gate.js` | 1 | Runs on a tool call, when the plugin is enabled. Requires `path` and its own decision module — nothing else. Reads stdin, writes one JSON line, exits 0 on every path. |
 | `plugins/sheleg-dev/hooks/lib/moneygate.js` | 1 | Pure. Payload and environment in, verdict out. No `require` at all, no filesystem, no clock. |
+| `plugins/sheleg-dev/skills/stripe-billing/scripts/assert-stripe-env.mjs` | 1 | Copyable boot assertion. Compares the declared mode with a secret/restricted key prefix. No I/O or logging; does not authenticate a credential. |
 | `bin/sheleg-dev.js` — the npm installer | 1 | Runs only when you invoke it. Node built-ins only: `fs`, `path`, `os`. |
 | `install.sh` — the shell installer | 1 | **Not in the tarball** — `files` ships `bin/` and `plugins/`, so this one reaches you only through a clone. Runs when you invoke it. Shell tools only: `cd`, `pwd`, `dirname`, `basename`, `mkdir`, `rm`, `cp`, `echo`, plus `sed` and `head` to read the plugin registry it refuses to shadow. It is the destructive channel: `rm -rf` per skill, then `cp -R`. |
 | `plugins/sheleg-dev/skills/*/fixtures/*.json` — webhook payloads | 16 | Data. Placeholder ids only; no key, token, signing secret or real customer id. |
@@ -39,7 +39,7 @@ no socket; the greps below prove all three.
 | `plugins/sheleg-dev/skills/*/fixtures/manifest.json` and its `README.md` | 4 | Text. The invariant-to-fixture-to-document map, which `test/validate.py` reads. |
 
 The published tarball is `bin/` and `plugins/` plus `README.md`, `CHANGELOG.md`,
-`SECURITY.md`, `LICENSE` and `package.json` — 67 files, listed by
+`SECURITY.md`, `LICENSE` and `package.json` — 68 files, listed by
 `npm pack --dry-run`. `install.sh`, `test/`, `docs/` and `CONTRIBUTING.md` are **not**
 in it; `test/validate.py` now refuses a path these shipped documents name that the
 tarball does not carry, because resolving in a clone is the wrong question for a
@@ -54,8 +54,7 @@ in it can do is print nothing. It reads `process.env` for one variable pair
 declaration a run already carries, and it never writes to any file. `README.md` →
 *The manual gate* is its single home.
 
-**There are no npm lifecycle scripts.** `package.json` declares exactly one
-script, `test`. Installing this package, or reaching it through `npx`, runs
+**There are no npm lifecycle scripts.** `package.json` declares development and test scripts only; none are install lifecycle hooks. Installing this package, or reaching it through `npx`, runs
 nothing but the CLI you typed.
 
 ## What the installers read and write
@@ -92,8 +91,10 @@ installer deletes your edits and the node installer does not.
 ## Credentials
 
 **This pack handles payment credentials as a subject and never as a value.** It
-reads no credential, stores none, transmits none, logs none. It is markdown; it
-could not.
+stores and transmits no credential and logs no credential value. Its hook examines
+command text, including explicit credential assignments; the copyable Stripe
+assertion accepts a caller-supplied key to check its mode prefix. Neither reads a
+secret store. Knowledge examples describe credentials without shipping real ones.
 
 What it contains is credential *names*, inside example code you adapt —
 `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `HELEKET_API_KEY`,
@@ -177,11 +178,11 @@ git clone https://github.com/ssheleg/sheleg-dev && cd sheleg-dev
 # self-describing documents name -- this file included.
 python3 test/validate.py
 
-# The shipped payload: 61 files.
+# The shipped payload: 62 files.
 git ls-files plugins
 
-# 26 lines: the plugin manifest, the three files of the manual gate, and the 22
-# files of money fixtures. Everything else in the payload is markdown.
+# 27 lines: the plugin manifest, the three files of the manual gate, and the 22
+# files of money fixtures, plus the Stripe mode assertion. Everything else is markdown.
 git ls-files plugins | grep -v '\.md$'
 
 # Every require the gate makes: two lines, both in the hook -- `path`, and its own
@@ -212,7 +213,7 @@ node test/installer_test.js
 grep -rnE "child_process|\bfetch\(|require\('(http|https|net|dns|tls)'\)|spawn\(|execFile|writeFileSync|appendFileSync|unlinkSync|process\.env\." \
   plugins/sheleg-dev/skills/*/fixtures/*.mjs
 
-# The entire I/O surface of the only two executable files: twelve lines. Three
+# The I/O surface of the two installers: twelve lines. Three
 # built-in requires, the copy/mkdir/remove calls, homedir, install.sh's
 # rm -rf + cp -R, and one comment naming rm -rf. No process, no socket, no
 # network — the plugin-registry read that decides the shadow refusal is
@@ -222,6 +223,6 @@ grep -nE "require|child_process|exec|spawn|fetch|socket|rm -rf|cp -R|copyFileSyn
 # Live-key shapes across the skill payload: one line, and it is a placeholder.
 grep -rnE "sk_live_[A-Za-z0-9]|rk_live_[A-Za-z0-9]|whsec_[A-Za-z0-9]{8}|BEGIN [A-Z ]*PRIVATE KEY" plugins
 
-# What npm publishes, and nothing else: 67 files.
+# What npm publishes, and nothing else: 68 files.
 npm pack --dry-run
 ```

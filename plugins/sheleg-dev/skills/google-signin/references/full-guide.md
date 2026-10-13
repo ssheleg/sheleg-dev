@@ -219,8 +219,12 @@ cookie** — out of reach of JS/XSS, never sent cross-site.
 1. <https://console.cloud.google.com/> → create/pick a project.
 2. **APIs & Services → OAuth consent screen**: user type **External**, fill
    app name / support email / developer email. Scopes: none needed beyond the
-   defaults (GIS only uses `openid email profile`). Publish the app (while
-   "Testing", only allowlisted test users can sign in).
+   defaults (GIS only uses `openid email profile`). External apps in Testing
+   normally require allowlisted users, but apps requesting only these basic
+   identity scopes are exempt. Workspace administrators can still block the app.
+   Choose publishing and verification status for the intended audience and actual
+   scopes, not as a blanket fix for a sign-in error. Checked 2026-10-13 against
+   [Google OAuth app states](https://developers.google.com/identity/protocols/oauth2/production-readiness/overview).
 3. **APIs & Services → Credentials → Create credentials → OAuth client ID**:
    - Application type: **Web application**.
    - **Authorized JavaScript origins**: every origin the button renders on —
@@ -373,7 +377,7 @@ shape that flow never sends.
 | `[GSI_LOGGER] The given origin is not allowed for the given client ID` | Current origin missing from **Authorized JavaScript origins** (check port and `www.` exactly). Changes take minutes to propagate |
 | `Invalid Google token: Token used too early/expired` | Server clock skew → sync NTP |
 | `Wrong recipient / audience mismatch` | Frontend and backend use different client IDs — single env source of truth |
-| 403 `access_denied` at consent | OAuth consent screen still in **Testing** and the user isn't a test user → publish the app |
+| 403 `access_denied` at consent | Check requested scopes, user type and Workspace controls. For an External Testing app requesting more than basic identity scopes, confirm the user is allowlisted. Publishing does not override administrator policy |
 | Works locally, fails in prod | Prod origin not in Authorized origins; or cookie has `Secure` on plain HTTP (Prowl dev: `PROWL_INSECURE_COOKIES=1`) |
 | One Tap doesn't show / FedCM warnings | Third-party-cookie phase-out: GIS auto-migrates to FedCM; keep `gsi/client` unmodified and current — the rendered button flow is unaffected |
 | User "lost password" but signed up via Google | Expected: Google-only accounts have empty password hash. Recovery = sign in with Google using the same email |
