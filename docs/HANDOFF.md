@@ -9,7 +9,9 @@ Registry `@ssheleg/sheleg-dev` and remote tags read 0.13.3 before this preparati
 This branch changes manifests, card and release documentation only.
 
 Packaging validator passed: `python3 test/validate.py`, 28 checks, exit 0.
-Next: independent diff review, frozen PR promotion,
+Independent packaging review passed at `47e8391e7c2e619c0802d56cca4e406f3d23fef9`: metadata
+and release documentation only; no implementation or workflow changes.
+Next: frozen PR promotion,
 normal merge and exact-source checks before an annotated release tag. No tag,
 publication, parent pin or installed/native update has occurred. Meta CAPI's
 credential contract, B-90 copy-channel hooks and B-92 native-host observations
