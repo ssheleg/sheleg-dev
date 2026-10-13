@@ -1,0 +1,16 @@
+[
+  {
+    "owner": "sheleg-dev-r30",
+    "baseline_head": "8862fae9a826263f8109626ca257f81c7c43ac86",
+    "case": "ancestry removed",
+    "returncode": 0,
+    "output": "  unlooked: body budget for ad-tracking/SKILL.md NOT MEASURED (~4898 tokens by 3.9 chars/token) -- `pip install tiktoken` to gate it\n  unlooked: body budget for crypto-payments/SKILL.md NOT MEASURED (~4986 tokens by 3.9 chars/token) -- `pip install tiktoken` to gate it\n  unlooked: body budget for error-tracking/SKILL.md NOT MEASURED (~3232 tokens by 3.9 chars/token) -- `pip install tiktoken` to gate it\n  unlooked: body budget for frontend-performance/SKILL.md NOT MEASURED (~3152 tokens by 3.9 chars/token) -- `pip install tiktoken` to gate it\n  unlooked: body budget for google-auth/SKILL.md NOT MEASURED (~2603 tokens by 3.9 chars/token) -- `pip install tiktoken` to gate it\n  unlooked: body budget for google-signin/SKILL.md NOT MEASURED (~2289 tokens by 3.9 chars/token) -- `pip install tiktoken` to gate it\n  unlooked: body budget for stripe-billing/SKILL.md NOT MEASURED (~5017 tokens by 3.9 chars/token) -- `pip install tiktoken` to gate it\n  unlooked: evals body-token figure NOT MEASURED \u2014 `pip install tiktoken`\n  unlooked: shipped version \u2014 git cannot look here, so the heading was compared against package.json only\n  unlooked: routed triggers \u2014 no sshlg-skills umbrella above this checkout\nOK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.13.4)\n"
+  },
+  {
+    "owner": "sheleg-dev-r30",
+    "baseline_head": "8862fae9a826263f8109626ca257f81c7c43ac86",
+    "case": "shallow",
+    "returncode": 0,
+    "output": "  unlooked: body budget for ad-tracking/SKILL.md NOT MEASURED (~4898 tokens by 3.9 chars/token) -- `pip install tiktoken` to gate it\n  unlooked: body budget for crypto-payments/SKILL.md NOT MEASURED (~4986 tokens by 3.9 chars/token) -- `pip install tiktoken` to gate it\n  unlooked: body budget for error-tracking/SKILL.md NOT MEASURED (~3232 tokens by 3.9 chars/token) -- `pip install tiktoken` to gate it\n  unlooked: body budget for frontend-performance/SKILL.md NOT MEASURED (~3152 tokens by 3.9 chars/token) -- `pip install tiktoken` to gate it\n  unlooked: body budget for google-auth/SKILL.md NOT MEASURED (~2603 tokens by 3.9 chars/token) -- `pip install tiktoken` to gate it\n  unlooked: body budget for google-signin/SKILL.md NOT MEASURED (~2289 tokens by 3.9 chars/token) -- `pip install tiktoken` to gate it\n  unlooked: body budget for stripe-billing/SKILL.md NOT MEASURED (~5017 tokens by 3.9 chars/token) -- `pip install tiktoken` to gate it\n  unlooked: evals body-token figure NOT MEASURED \u2014 `pip install tiktoken`\n  unlooked: shipped version \u2014 git cannot look here, so the heading was compared against package.json only\n  unlooked: routed triggers \u2014 no sshlg-skills umbrella above this checkout\nOK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.13.4)\n"
+  }
+]

@@ -456,6 +456,8 @@ def check_release_gates_on_validate():
     it — and this guard is what keeps the call there. A dependency nobody checks is a
     dependency somebody removes.
     """
+    from owner_release import check as inspect_release
+    inspect_release(ROOT, fail)
     wf = os.path.join(ROOT, ".github/workflows")
     rel, val = os.path.join(wf, "release.yml"), os.path.join(wf, "validate.yml")
     if not (os.path.isfile(rel) and os.path.isfile(val)):
@@ -834,6 +836,8 @@ def check_self_describing_docs_resolve():
     An exemption that stops matching anything is itself a failure -- otherwise the list
     silently widens into a blanket as the documents move underneath it.
     """
+    from owner_board import check as inspect_owner_board
+    inspect_owner_board(ROOT, fail)
     basenames = set()
     for dirpath, dirnames, filenames in os.walk(ROOT):
         dirnames[:] = [d for d in dirnames if d not in (".git", "node_modules", "graphify-out")]

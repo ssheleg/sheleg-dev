@@ -1,0 +1,34 @@
+{
+  "owner": "sheleg-dev",
+  "sha": "8862fae9a826263f8109626ca257f81c7c43ac86",
+  "remote": "git@github.com:ssheleg/sheleg-dev.git",
+  "cases": [
+    {
+      "kind": "baseline",
+      "exit_code": 0,
+      "elapsed_seconds": 0.305,
+      "board_sha256": "d7520390891bc6206009b4fb022251eb455b69a26f5a5c6d14b82856fab832c8",
+      "other_tracked_changes": false,
+      "output": "  unlooked: routed triggers \u2014 no sshlg-skills umbrella above this checkout\nOK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.13.4)\n"
+    },
+    {
+      "kind": "duplicate",
+      "exit_code": 0,
+      "elapsed_seconds": 0.234,
+      "board_sha256": "50ca785f731d99b01e6e0769850b224e4910b5d05ab70ed8ae5a1d482a2256d1",
+      "other_tracked_changes": false,
+      "output": "  unlooked: routed triggers \u2014 no sshlg-skills umbrella above this checkout\nOK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.13.4)\n"
+    },
+    {
+      "kind": "width",
+      "exit_code": 0,
+      "elapsed_seconds": 0.243,
+      "board_sha256": "3c5bc30bff7dddc5b9f6f3b81bb062997d0b4dfe6d54f7a79e8164c244ebfb9e",
+      "other_tracked_changes": false,
+      "output": "  unlooked: routed triggers \u2014 no sshlg-skills umbrella above this checkout\nOK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.13.4)\n"
+    }
+  ],
+  "plant_line": 18,
+  "plant_id": "B-79",
+  "board_sha256": "d7520390891bc6206009b4fb022251eb455b69a26f5a5c6d14b82856fab832c8"
+}
