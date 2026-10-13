@@ -244,7 +244,7 @@ Before the first real charge, on staging, with a real key in test mode:
 - [ ] webhook endpoint registered for live mode, subscribed to exactly the events you handle
 - [ ] `STRIPE_WEBHOOK_SECRET` is the **live endpoint's** secret, not `stripe listen`'s
 - [ ] the live key is a restricted key with only the permissions the app uses
-- [ ] `STRIPE_PRODUCT_MODE` and the key are both live, and something asserts they agree
+- [ ] `STRIPE_PRODUCT_MODE` and the key are both live; call `assertStripeEnv` from [price-integrity.md](price-integrity.md#assert-the-credential-mode-before-constructing-the-client) before constructing the client
 - [ ] the price conformance job is scheduled and its findings reach a human
 - [ ] the reconciliation job is scheduled
 - [ ] alerts exist for: signature failures, handler 5xx, endpoint disabled by Stripe

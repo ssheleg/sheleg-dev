@@ -78,6 +78,31 @@ throw new Error(
 Left raw, that error reads as "somebody deleted the product" and sends people to
 the Dashboard for an hour.
 
+### Assert the credential mode before constructing the client
+
+Copy [assert-stripe-env.mjs](../scripts/assert-stripe-env.mjs) beside your client,
+and call `assertStripeEnv(process.env.STRIPE_PRODUCT_MODE, process.env.STRIPE_SECRET_KEY)`
+before `new Stripe`. The function is shipped executable code, not a second prose
+implementation. Supply the secret through your project's secret runner; the following
+values describe the configuration contract, not credentials to paste:
+
+```dotenv
+STRIPE_PRODUCT_MODE=test
+STRIPE_SECRET_KEY="<injected-at-runtime>"
+```
+
+`STRIPE_ENV_TEST_HOLDS_LIVE_CREDENTIAL` and
+`STRIPE_ENV_LIVE_HOLDS_TEST_CREDENTIAL` refuse opposite mode mismatches. Missing or
+unknown modes/keys fail closed. This bounded assertion recognises account secret and
+restricted keys (`sk_`/`rk_` with test/live mode); organization and other unrecognised
+keys need an explicit mode contract, not inferred safety. It never logs or returns the
+key. Agreement proves neither authenticity, account ownership nor permissions.
+Webhook signing secrets have a separate endpoint binding and are not classified here.
+
+Source checked 2026-10-13: [Stripe API keys](https://docs.stripe.com/keys), key types
+and sandbox versus live mode. The executable regression covers both supported key
+classes, both mismatches, absent mode/key and unsupported shapes without provider calls.
+
 ## One source for every displayed number
 
 Every surface that shows money reads from **one** module: the pricing page, the

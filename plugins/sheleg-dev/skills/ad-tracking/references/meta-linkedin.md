@@ -264,3 +264,20 @@ or use `lintrk` from the code path that actually completed the action.
 
 ---
 
+
+## Credential boundary for the server adapter
+
+The shipped `sendCapi` example and dedup fixtures specify event payloads; they do not
+provision an access token or implement network authentication. Public pixel IDs belong
+in browser configuration; provider access tokens belong only in the server's named
+secret store. Before supplying a real token, bind the adapter to a separately identified
+account/dataset and approved operation. Offline fixtures use the supplied emitter and
+no provider token. A payload fixture passing is not credential isolation or successful
+Meta delivery. This pack currently has no CAPI token-name rule in its shell gate.
+
+Meta's [official Node SDK](https://github.com/facebook/facebook-nodejs-business-sdk/blob/main/README.md)
+describes access tokens as opaque and requires one for the server client (checked
+2026-10-13). Do not infer test/live authority from a guessed prefix. The current Meta
+Test Events documentation could not be retrieved in this pass (HTTP 429); the exact
+provider test-token/permission contract remains unverified, so no claim that a test-event
+marker restricts the token is made here.

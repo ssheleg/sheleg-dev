@@ -2,17 +2,17 @@
 
 Thanks for taking the time. This repository ships **seven skills** — `stripe-billing`,
 `crypto-payments`, `ad-tracking`, `google-signin`, `google-auth`,
-`frontend-performance` and `error-tracking` — and they are almost entirely **knowledge**: twenty reference
+`frontend-performance` and `error-tracking` — and they are almost entirely **knowledge**: reference
 files an agent reads on demand. That shapes what a good contribution looks like.
 
 **Almost, not entirely.** Since 2026-08-19 the pack also ships a **manual gate** — a
 `PreToolUse` hook under `plugins/sheleg-dev/hooks/` that refuses a refund, a payout,
-closing a dispute, a live `sk_live_…` key, an export of `HELEKET_API_KEY` in a run
+closing a dispute, a live `sk_live_…` key, an explicit assignment of a named provider credential in a run
 declaring `test`, an explicit `--live` flag, a command granting itself the gate's own
 switch, and `SKIP_BILLING=true` in production. It exists because four of this pack's own
 rules were sentences that stopped nothing. `README.md` → *The manual gate* is its single
 home; the rules below about executable code apply to it and to `install.sh` /
-`bin/sheleg-dev.js`, which are the only other things here that run.
+`bin/sheleg-dev.js`, the shipped fixture runners and the copyable Stripe mode assertion.
 
 ## The one rule that matters
 

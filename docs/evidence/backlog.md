@@ -50,3 +50,13 @@ Status: `open` · `in progress` · `done` · `dropped (why)`.
 A run reads it before starting and quotes the open count. Anything a run finds and does not
 close gets an id here with a computed priority, or it did not happen. A row that leaves
 without either a `done` or a stated reason is what this file exists to prevent.
+
+## FW03 current-source reconciliation — 2026-10-13
+
+The historical rows above preserve the original observations. The branch
+`fix/fw03-credential-boundaries` supplies source fixes for B-82 and B-86; B-87 is
+audited with corrected current premises, and B-91 is partially implemented for the
+two named Google secrets only. See [the bounded receipt](runs/2026-10-13-fw03-credentials.md)
+for exact tests, sources and residuals. These are source-candidate states, not a
+release or installed-host claim. Meta's current credential/test-events contract,
+B-90 copy-channel hooks and B-92 native evidence remain open.

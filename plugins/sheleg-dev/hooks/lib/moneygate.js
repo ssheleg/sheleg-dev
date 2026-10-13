@@ -267,7 +267,18 @@ const READERS = new Set([
  * environment into the key, so `STRIPE_SECRET_KEY=sk_test_…` is correct and common. The
  * live half is caught by its shape (`LIVE_KEY`), not by the variable's name.
  */
+// These named Google values are secrets, not client IDs or ADC configuration paths.
+// Their authority comes from scopes/IAM and grants, never a test/live key prefix.
+// Source and bounds: google-auth/references/adc-and-service-accounts.md and
+// oauth2-web-server.md, Credential boundary sections (FW03).
 const NO_TEST_VARIANT = new Map([
+  ['GOOGLE_CREDENTIALS',
+    'Google service-account credential JSON carries authority from IAM, not a test-key ' +
+    'prefix. Use a credential-free mock for offline tests; an isolated test project is ' +
+    'still a real provider operation, with separately restricted principal and resources.'],
+  ['GOOGLE_CLIENT_SECRET',
+    'Google OAuth client secrets have no declared test/live key prefix. OAuth Testing ' +
+    'status limits app access; it is not a fake credential or proof that user data is synthetic.'],
   ['HELEKET_API_KEY',
     'Heleket issues one key per merchant, it is also the webhook signing secret, and it ' +
     'carries no test/live marker — so there is no test value this can hold ' +
@@ -487,13 +498,12 @@ function decide(payload, env) {
       if (allowedFor('credential', e, runEnv)) break;
       if (runEnv === 'production') {
         return deny('credential',
-          `this command exports ${name} — a live merchant credential`, why, runEnv);
+          `this command exports ${name} — a provider credential`, why, runEnv);
       }
       return deny('credential',
         `this command exports ${name} in a run declaring ${runEnv || 'nothing at all'}`,
-        `${why} SD-02's boot assertion refuses the same pair as ` +
-        'HELEKET_ENV_TEST_HOLDS_LIVE_CREDENTIAL, but it runs inside the application — a shell ' +
-        'that merely holds the key never reaches it.', runEnv);
+        `${why} This shell assignment is checked before the application starts; ` +
+        'the gate does not inspect credential values or infer a safe provider environment.', runEnv);
     }
   }
 

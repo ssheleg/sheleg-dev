@@ -684,3 +684,19 @@ Common scopes:
 - `https://www.googleapis.com/auth/drive.readonly` — Read-only Drive
 - `https://www.googleapis.com/auth/calendar.readonly` — Read-only Calendar
 - `https://www.googleapis.com/auth/cloud-platform` — Full GCP access
+
+## Credential boundary: OAuth Testing is not a fake credential
+
+Checked 2026-10-13 against [Google's OAuth app-state documentation](https://developers.google.com/identity/protocols/oauth2/production-readiness/overview).
+The consent screen's Testing state governs access and token lifetime; it does not turn
+a user's data or a client secret into synthetic fixtures. Use separate clients, test
+accounts and least scopes for provider tests; an offline mock needs no Google secret.
+The plugin gate refuses explicit `GOOGLE_CLIENT_SECRET` shell assignments in a test or
+undeclared run. Existing operator authorisation is required for its real-provider path.
+This does not classify inherited credentials, files or refresh/access tokens; those
+still require the application's credential boundary. Errors and logs carry event names
+or stable codes only, never a token value.
+
+`GOOGLE_CLIENT_ID` is public metadata. The `google-signin` GIS ID-token flow does not use
+a client secret at all; do not add one to make a test pass. See the `google-signin` skill
+for its nonce, audience, origin and session checks.

@@ -85,12 +85,14 @@ customers. See [`references/price-integrity.md`](references/price-integrity.md).
 ## The client
 
 ```ts
+// Copy scripts/assert-stripe-env.mjs beside this client (see price-integrity.md).
+import { assertStripeEnv } from "./assert-stripe-env.mjs";
 let client: Stripe | null = null;
 
 export function getStripe(): Stripe {
   if (!client) {
     const key = process.env.STRIPE_SECRET_KEY;
-    if (!key) throw new Error("STRIPE_SECRET_KEY is not set");
+    assertStripeEnv(process.env.STRIPE_PRODUCT_MODE, key);
     // Pin checked 2026-08-30 — 2026-08-26.dahlia was already newer. Confirm
     // against Stripe's changelog before pinning; this line goes stale monthly.
     client = new Stripe(key, { apiVersion: "2026-07-29.dahlia", maxNetworkRetries: 2 });
