@@ -25,3 +25,7 @@ Branch `fix/r30-owner-board-1013`. Next: independent diff review, one serial ful
 ## Final-tree reconciliation
 
 Independent review of `ea179df` found this new dated README missing from the existing document classification. Earlier process receipt preceded the README and therefore does not certify that final tree. The follow-up explicitly classifies this one dated record, without widening or bypassing the classification gate. Final-tree process results are retained separately in `final-process.json`; prior measured evidence remains unchanged.
+
+## Local acceptance and next integration step
+
+The independently reviewed implementation completed the owner's `npm test` with exit 0; [full.json](full.json) records exact source, timing, cleanup and hashes of [compressed output](full.log.gz). This does not assign local execution to CI-only checks. [Payload parity](payload-parity.json) compares every dry-run npm payload file byte-for-byte with the prior source: no package bump is needed for this guard-only change. This following receipt-only commit does not pretend the suite ran at its new commit; implementation bytes remain those in the source-bound result. Exact-head hosted admission and normal merge are next; no release or installed-state claim.
