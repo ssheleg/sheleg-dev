@@ -456,6 +456,8 @@ def check_release_gates_on_validate():
     it — and this guard is what keeps the call there. A dependency nobody checks is a
     dependency somebody removes.
     """
+    from owner_release import check as inspect_release
+    inspect_release(ROOT, fail)
     wf = os.path.join(ROOT, ".github/workflows")
     rel, val = os.path.join(wf, "release.yml"), os.path.join(wf, "validate.yml")
     if not (os.path.isfile(rel) and os.path.isfile(val)):
@@ -606,6 +608,8 @@ SELF_DESCRIBING_DOCS = (
 # must be in exactly one of the two lists, so a new live document cannot arrive unchecked
 # and cannot be parked here without saying so.
 DATED_RECORDS = {
+    "docs/evidence/runs/2026-10-13-r30-owner-gates/README.md":
+        "dated R30 source candidate, pre-change plants and bounded local validation receipts",
     "docs/evidence/runs/2026-10-13-fw03-credentials.md":
         "dated FW03 recovery, negative controls and unverified provider/native bounds",
     "docs/evidence/verification.md":
@@ -834,6 +838,8 @@ def check_self_describing_docs_resolve():
     An exemption that stops matching anything is itself a failure -- otherwise the list
     silently widens into a blanket as the documents move underneath it.
     """
+    from owner_board import check as inspect_owner_board
+    inspect_owner_board(ROOT, fail)
     basenames = set()
     for dirpath, dirnames, filenames in os.walk(ROOT):
         dirnames[:] = [d for d in dirnames if d not in (".git", "node_modules", "graphify-out")]

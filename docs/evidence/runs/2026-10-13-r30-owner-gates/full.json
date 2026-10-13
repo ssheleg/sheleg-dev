@@ -1,0 +1,16 @@
+{
+  "owner": "sheleg-dev-r30",
+  "source": "6786774567bb8c3a295730cd1225b99e96471225",
+  "command": "npm test",
+  "returncode": 0,
+  "disk_stop": false,
+  "elapsed_seconds": 14.06,
+  "free_before": 3485306880,
+  "free_after": 3431211008,
+  "owned_temporary_removed": true,
+  "log_original_sha256": "bf36112f5834b98abadefac5cedbc282ef68847baa3f98cbd3f194b66d774b7d",
+  "log_sanitized_sha256": "bf36112f5834b98abadefac5cedbc282ef68847baa3f98cbd3f194b66d774b7d",
+  "log": "full.log.gz",
+  "log_sanitization": "literal /Users/sshlg replaced by $HOME; test output otherwise preserved",
+  "scope": "npm test as declared by owner; CI-only checks and live/provider acceptance are separate"
+}
