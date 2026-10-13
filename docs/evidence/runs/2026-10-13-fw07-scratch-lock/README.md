@@ -115,3 +115,11 @@ pre-port source at its first control — the writer did not inherit the lock),
 `npm run test:audit` exit0 (13s), `test/validate.py` OK (28 checks). No full
 `negatives.py` or `test:all` yet: the owner full gate remains pending for the
 serial slot. No packaged byte changed; the 0.13.4 decision above still applies.
+
+### Owner full gate on the child-lifetime port
+
+`npm run test:all` on exact 913bd09 from a clean clone with an owned TMPDIR: exit0
+in 40s, minimum free space 812MB — [result](owner-full-913bd09.json),
+[log](owner-full-913bd09.log.gz). All 48 guards rejected their plant; the lifetime
+(71) and scratch-lock (30) controls, owner board (25) and owner release (27) passed.
+This is the owner gate, not hosted CI or a package release.
