@@ -1,4 +1,4 @@
-## Unreleased — FW03 credential boundaries
+## v0.13.4 — FW03 credential boundaries
 
 - Supply a copyable, locally tested Stripe mode assertion before client construction.
 - Refuse explicit Google service-account JSON and OAuth client-secret assignments in

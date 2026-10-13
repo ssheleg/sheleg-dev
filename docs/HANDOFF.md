@@ -1,3 +1,24 @@
+# FW03 release packaging — 2026-10-13
+
+Branch `release/fw03-0.13.4` prepares patch 0.13.4 from accepted source
+`9703d5ece1b1f135f0c7cc50c50c78563b894bbf` (PR25). Genuine validation
+[38336515558](https://github.com/ssheleg/sheleg-dev/actions/runs/38336515558)
+passed at candidate `40bf0f1f23a19651806f1efd0a20a418938ee2c3` before normal merge.
+Independent review and local gates: [FW03 receipt](evidence/runs/2026-10-13-fw03-credentials.md).
+Registry `@ssheleg/sheleg-dev` and remote tags read 0.13.3 before this preparation.
+This branch changes manifests, card and release documentation only.
+
+Packaging validator passed: `python3 test/validate.py`, 28 checks, exit 0.
+Independent packaging review passed at `47e8391e7c2e619c0802d56cca4e406f3d23fef9`: metadata
+and release documentation only; no implementation or workflow changes.
+Next: frozen PR promotion,
+normal merge and exact-source checks before an annotated release tag. No tag,
+publication, parent pin or installed/native update has occurred. Meta CAPI's
+credential contract, B-90 copy-channel hooks and B-92 native-host observations
+remain open; local fixtures do not establish provider acceptance.
+
+---
+
 # sheleg-dev handoff
 
 ## FW03 — credential boundaries, 2026-10-13
