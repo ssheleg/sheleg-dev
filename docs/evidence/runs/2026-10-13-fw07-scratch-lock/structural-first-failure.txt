@@ -1,0 +1,3 @@
+FAIL: 1 problem(s)
+  - docs/evidence/runs/2026-10-13-fw07-scratch-lock/README.md is in neither SELF_DESCRIBING_DOCS nor DATED_RECORDS. Every document under docs/ is one or the other: a live document whose paths must resolve, or a dated record that has to be able to quote a dead one. Unclassified is how docs/ sat outside the corpus until 2026-08-20
+  unlooked: routed triggers — no sshlg-skills umbrella above this checkout

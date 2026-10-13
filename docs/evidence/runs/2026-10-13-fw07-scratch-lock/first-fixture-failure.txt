@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/Users/sshlg/DATA/_wt/sheleg-dev-fw07-scratch-lock/test/audit_regressions/fw07_scratch_lock.py", line 96, in <module>
+    check(r.returncode == 0 and 'property checks' in r.stdout, 'actual runner listing remains usable with owned lock')
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/sshlg/DATA/_wt/sheleg-dev-fw07-scratch-lock/test/audit_regressions/fw07_scratch_lock.py", line 24, in check
+    assert ok, label
+           ^^
+AssertionError: actual runner listing remains usable with owned lock

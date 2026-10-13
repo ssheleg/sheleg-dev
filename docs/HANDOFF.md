@@ -1,3 +1,11 @@
+## FW07 shared scratch lock — active bounded port
+
+[Owner entry](evidence/runs/2026-10-13-fw07-scratch-lock/README.md) binds the
+accepted canonical mechanism, own source and pending tests. Exact next task:
+port byte-identical helper and runner adapter, run owned-namespace focused checks,
+independent review, then serial owner gate. No public scratch execution while the
+coordinator owns the full-suite slot; no package version/release in this change.
+
 # FW03 release packaging — 2026-10-13
 
 Branch `release/fw03-0.13.4` prepares patch 0.13.4 from accepted source
