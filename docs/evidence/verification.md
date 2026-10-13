@@ -23,7 +23,18 @@ actually prints. Both were watched refusing a plant; see the SD-05 block.
 
 ---
 
-## Shipped state — v0.13.3
+## Shipped state — v0.13.4
+
+Candidate source only, 2026-10-13: publication pending. This is the validator's
+required ledger heading; it does not claim that the candidate is on npm.
+
+| REQ | What changes | Evidence | Status |
+|---|---|---|---|
+| FW03 source | Credential/source-path fixes in accepted main 9703d5e (PR25) | [FW03 receipt](runs/2026-10-13-fw03-credentials.md), independent review at 764cffb; genuine run 38336515558 passed at 40bf0f1 | observed source and synthetic fixtures; provider/native unobserved |
+| Gate | Required candidate validator line | `OK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.13.4)` | observed: `python3 test/validate.py` exit 0 on candidate source |
+| Publication | Annotated tag, release run, registry readback and parent pin | not performed during preparation | pending |
+
+## Shipped in v0.13.3
 
 **A lightweight tag cannot publish a release** (umbrella plan 2026-10-10, T5 / REQ-6).
 Rows are measured on the candidate tree; the pass on the real annotated `v0.13.3` is
