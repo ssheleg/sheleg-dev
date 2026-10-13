@@ -43,6 +43,8 @@ def case(name, fn):
 
 
 def load_neg():
+    # negatives.py imports its sibling negative_lock; load it the way the runner does.
+    sys.path.insert(0, os.path.dirname(NEG))
     spec = importlib.util.spec_from_file_location("negatives_dv2001", NEG)
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)

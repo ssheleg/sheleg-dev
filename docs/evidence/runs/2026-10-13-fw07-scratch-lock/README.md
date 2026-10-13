@@ -87,3 +87,31 @@ descendant-lifetime exclusion. Canonical helper/runner correction and independen
 review are required before these ports' full gates and promotion. No public lock
 or scratch path was used by the reproduction. The original review remains a
 historical bounded result, not acceptance of this newly tested case.
+
+## Child-lifetime correction port (TP 6b6d625)
+
+Ported from task-pipeline [`6b6d625`](https://github.com/ssheleg/task-pipeline/commit/6b6d625ff6e96f2006a5ea0bbbe1cd64bcdfd1b7),
+whose child-lifetime correction `9c29ec3` passed an independent review (IO09).
+`test/negative_lock.py` is byte-identical to TP's copy (`cmp` exit0). `test/negatives.py`
+wraps the run in `ScratchProcesses`: negative and property plants run through
+`plants.run`, so the plant Bash and its synchronous writers inherit the held lock in
+their own process group; INT/TERM or any fixture error stops admission and drains
+every owned group; nothing calls `LOCK_UN`.
+
+**Behaviour change, recorded:** a plant exceeding `SD_NEG_TIMEOUT` used to land in the
+TEST_ERROR bucket while the remaining plants ran. The shared helper cancels the whole
+run on any plant exception, so a timeout now stops the run as `TEST_ERROR` (exit3,
+unchanged class and code) naming the hung plant(s) and stating that nothing is known
+about the remaining guards. It is never reported as a guard verdict.
+
+Pre-existing defect fixed here: `test/audit_regressions/fix-dv-20.01.py` loaded
+`negatives.py` without its directory on `sys.path`, so `from negative_lock import …`
+raised `ModuleNotFoundError` at branch head 4678ef4 already; `npm run test:audit`
+would have failed. It now inserts the test directory first.
+
+Focused results on this source: `fw07_child_lifetime.py` 71 controls (exit1 on the
+pre-port source at its first control — the writer did not inherit the lock),
+`fw07_scratch_lock.py` 30, `fix-dv-20.01.py` all green, `fw03_credentials.py` 3/3,
+`npm run test:audit` exit0 (13s), `test/validate.py` OK (28 checks). No full
+`negatives.py` or `test:all` yet: the owner full gate remains pending for the
+serial slot. No packaged byte changed; the 0.13.4 decision above still applies.

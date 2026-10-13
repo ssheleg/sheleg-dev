@@ -44,7 +44,7 @@ import re
 import shutil
 import subprocess
 import sys
-from negative_lock import acquire_scratch_lock
+from negative_lock import acquire_scratch_lock, ScratchProcesses
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORKFLOW = os.path.join(ROOT, ".github/workflows/validate.yml")
@@ -199,7 +199,12 @@ def sweep(paths):
             shutil.rmtree(p, ignore_errors=True)
 
 
-def main(argv):
+class PlantTimeout(Exception):
+    """A plant outlived SD_NEG_TIMEOUT. The shared lifecycle cancels and drains every
+    owned plant group on any fixture error, so the run stops here as a TEST_ERROR."""
+
+
+def _main(argv, plants):
     args = argv[1:]
     only = None
     if "-k" in args:
@@ -230,7 +235,7 @@ def main(argv):
     # The shared helper binds physical /tmp across owners and TMPDIR settings.
     # Old runner versions and direct plant invocation do not participate.
     try:
-        _lock = acquire_scratch_lock()
+        _lock = plants.hold(acquire_scratch_lock())
     except (OSError, RuntimeError) as exc:
         print(f"FAIL: cannot acquire family scratch lock ({type(exc).__name__}): {exc}")
         return 1
@@ -372,22 +377,43 @@ def main(argv):
         print(f"running {len(tests)} negative self-tests"
               + (f" + {len(props)} property checks\n" if props else "\n"))
         _TIMEOUT = int(os.environ.get("SD_NEG_TIMEOUT", "600"))
+        # FW07: each plant Bash runs in its own process group and inherits the held
+        # scratch lock (ScratchProcesses), so a writing child keeps the namespace
+        # excluded even if this runner or its Bash dies first. Any fixture error,
+        # INT or TERM stops admission and drains every owned group.
+        _timed_out = []
+
         def _run_one(name_script):
             name, script = name_script
+            plants.check_running()
             cdir = copy_dir_of(script)
             sweep([cdir])
             try:
-                r = subprocess.run(["bash", "-c", script], cwd=_base,
-                                   capture_output=True, text=True, timeout=_TIMEOUT)
+                r = plants.run(["bash", "-c", script], cwd=_base, timeout=_TIMEOUT)
                 return name, script, cdir, r.stdout, r.stderr, r.returncode, False
-            except subprocess.TimeoutExpired as e:
-                _dec = lambda b: b if isinstance(b, str) else (b or b"").decode(errors="replace")
+            except subprocess.TimeoutExpired:
                 # A timeout is fixture_setup/validator_ran never completing -- an
-                # environment fact, classified as TEST_ERROR, not a guard verdict.
-                return name, script, cdir, _dec(e.stdout), _dec(e.stderr), None, True
+                # environment fact, never a guard verdict. The lifecycle has already
+                # cancelled and drained the run; record which plant hung.
+                _timed_out.append(label(name))
+                raise
+            except BaseException:
+                plants.cancel()
+                raise
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=_WORKERS) as _ex:
-            _results = list(_ex.map(_run_one, tests))
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=_WORKERS) as _ex:
+                _results = list(_ex.map(_run_one, tests))
+        except (subprocess.TimeoutExpired, InterruptedError):
+            # The executor has joined every worker, so a hung plant is recorded even
+            # when another worker's cancellation surfaced first.
+            if _timed_out:
+                raise PlantTimeout(
+                    f"{len(_timed_out)} plant(s) exceeded SD_NEG_TIMEOUT={_TIMEOUT}s "
+                    f"({', '.join(sorted(_timed_out))}); every owned plant group was "
+                    f"cancelled and drained -- an environment fact, NOT a guard verdict; "
+                    f"nothing is known about the remaining guards") from None
+            raise
         for name, script, cdir, _stdout, _stderr, _rc, _timed_out in _results:
             # The success vocabulary is declared, not assumed (see SUCCESS_MARKERS): a
             # runner reads what the repository prints, it does not impose a convention.
@@ -419,7 +445,7 @@ def main(argv):
         for name, script in props:
             cdir = copy_dir_of(script)
             sweep([cdir])
-            r = subprocess.run(["bash", "-c", script], cwd=_base, capture_output=True, text=True)
+            r = plants.run(["bash", "-c", script], cwd=_base)
             ok = r.returncode == 0 and any(_k in r.stdout.upper() for _k in SUCCESS_MARKERS)
             print(f"  {'PASS' if ok else 'FAIL':<7}[property] " + _plabel(name))
             if not ok:
@@ -470,6 +496,21 @@ def main(argv):
         # exit path, including an early return or an exception mid-run.
         shutil.rmtree(_snap, ignore_errors=True)
         sweep([copy_dir_of(s) for _, s in tests])
+
+
+def main(argv):
+    try:
+        with ScratchProcesses() as plants:
+            result = _main(argv, plants)
+            plants.check_running()
+        plants.check_running()
+        return result
+    except PlantTimeout as exc:
+        print(f"TEST_ERROR: {exc}")
+        return 3
+    except (InterruptedError, OSError, RuntimeError) as exc:
+        print(f"FAIL: plant lifecycle refused ({type(exc).__name__}): {exc}")
+        return 1
 
 
 if __name__ == "__main__":
