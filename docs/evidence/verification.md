@@ -23,10 +23,22 @@ actually prints. Both were watched refusing a plant; see the SD-05 block.
 
 ---
 
-## Shipped state — v0.13.4
+## Shipped state — v0.14.0
 
-Candidate source only, 2026-10-13: publication pending. This is the validator's
-required ledger heading; it does not claim that the candidate is on npm.
+Candidate source only, 2026-10-16 (family iteration ITER-1016, R14): publication
+pending. This is the validator's required ledger heading; it does not claim that the
+candidate is on npm.
+
+| REQ | What changes | Evidence | Status |
+|---|---|---|---|
+| R14 | `frontend-performance` tests in WebKit (Safari) first; Lighthouse, PSI, CrUX, CDP traces and the chrome-devtools MCP labelled the stated Chromium exception | `test/audit_regressions/safari-first.py` — 5 checks, watched failing 5 of 5 before the text existed; drop mutations refused | **planted** — text integrity only; no agent run observed |
+| Gate | Required candidate validator line | `OK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.14.0)` | observed: `npm test` exit 0 on candidate source |
+| Publication | Annotated tag, release run, registry readback and parent pin | not performed during preparation | pending |
+
+## Shipped in v0.13.4
+
+Published: `npm view @ssheleg/sheleg-dev version` read `0.13.4` on 2026-10-16 and the
+annotated tag `v0.13.4` is on the remote. The rows below were written as the candidate.
 
 | REQ | What changes | Evidence | Status |
 |---|---|---|---|
