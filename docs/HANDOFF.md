@@ -1,3 +1,17 @@
+## WebKit (Safari) first in frontend-performance — 0.14.0 candidate (2026-10-16)
+
+Branch `docs/safari-first` (family iteration ITER-1016, REQ R14): `frontend-performance`
+gains *Test browser — WebKit (Safari) first*; Lighthouse, PSI, CrUX, CDP traces and the
+chrome-devtools MCP stay as the stated Chromium exception. Measure/Validate steps,
+Degradation and the contrast check in `references/accessibility-perf.md` carry it.
+Other skills (ad-tracking, google-auth, crypto-payments) mention Chrome only
+incidentally and prescribe no test browser — left unchanged. Version 0.13.4 → 0.14.0;
+ledger block moved. Regression `test/audit_regressions/safari-first.py` (watched failing
+5 of 5 first). Gate: `npm test` exit 0.
+
+Next task: review the draft PR; the coordinator owns the annotated tag, publication and
+the umbrella pin.
+
 ## FW07 shared scratch lock — active bounded port
 
 [Owner entry](evidence/runs/2026-10-13-fw07-scratch-lock/README.md) binds the

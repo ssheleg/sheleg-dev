@@ -1,3 +1,19 @@
+## v0.14.0 — frontend performance is tested in WebKit (Safari) first
+
+- `frontend-performance/SKILL.md` gains *Test browser — WebKit (Safari) first*:
+  Safari through `safaridriver`, Playwright `webkit` (`--browser webkit`,
+  `npx playwright install webkit`), Safari Web Inspector's Timelines, and
+  `open -a Safari <url>` on macOS rather than the system default browser.
+- Lighthouse, PageSpeed Insights, CrUX, CDP traces and the chrome-devtools MCP stay
+  as the stated Chromium exception (Chromium by definition): Chrome Dev, a
+  temporary profile, every started process closed. A page checked only in Chromium
+  is reported as exactly that; a Lighthouse score is not a cross-browser verdict.
+- The Measure and Validate steps run the WebKit pass too; *Degradation* names the
+  WebKit channels; the contrast check in `references/accessibility-perf.md` starts
+  in Safari Web Inspector.
+- New regression `test/audit_regressions/safari-first.py` with drop mutations. Text
+  integrity only; no hook or script behaviour changed.
+
 ## v0.13.4 — FW03 credential boundaries
 
 - Supply a copyable, locally tested Stripe mode assertion before client construction.

@@ -56,7 +56,7 @@ If you need visual hierarchy without reducing contrast below WCAG thresholds:
 
 ### Checking Contrast
 
-Use Chrome DevTools: inspect element -> color picker shows contrast ratio against computed background.
+Inspect in Safari Web Inspector first: the Computed styles give the text colour and, on the element or the ancestor that paints it, the background colour; and the formula below gives the ratio. Chrome DevTools' color picker shows the contrast ratio directly — a Chromium tool, so name it as the engine you checked in.
 
 Or calculate manually: `(L1 + 0.05) / (L2 + 0.05)` where L1 is the lighter relative luminance.
 

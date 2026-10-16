@@ -20,11 +20,33 @@ Optimize frontend applications for maximum Lighthouse scores and real-user perfo
 
 ## Audit Workflow
 
-1. **Measure** -- Run PageSpeed Insights or Lighthouse. Record scores and failing audits.
+1. **Measure** -- Run PageSpeed Insights or Lighthouse (Chromium) and load the same scenario in WebKit first (see *Test browser* below). Record scores, failing audits and the engine of each number.
 2. **Diagnose** -- Map each failing audit to a specific code-level cause (see checklist below).
 3. **Prioritize** -- Fix by impact: P0 blocks rendering, P1 hurts metrics, P2 is informational.
 4. **Implement** -- Apply fixes per the reference guides.
-5. **Validate** -- `next build` (or framework equivalent) + re-run Lighthouse. Verify no regressions.
+5. **Validate** -- `next build` (or framework equivalent) + re-run Lighthouse and the WebKit run. Verify no regressions in either engine.
+
+## Test browser — WebKit (Safari) first
+
+Load and profile the page in **WebKit first**: Safari through `safaridriver`
+(WebDriver; `sudo safaridriver --enable` once) for a real browser, Playwright's
+`webkit` (the `webkit` project, `--browser webkit`, installed with
+`npx playwright install webkit`) for scripted runs and traces, Safari Web
+Inspector's Timelines for debugging. On macOS open a page with
+`open -a Safari <url>`, not the system default browser, which may be another
+engine. An automation library (browser-use and the like) runs on its
+WebKit/Safari backend where it has one. WebKit has the narrowest support
+envelope of the big three — a regression that only iOS Safari users feel is
+invisible to every Chrome tool below.
+
+**Lighthouse, PageSpeed Insights, CrUX, a CDP trace and the chrome-devtools MCP
+are Chromium by definition** — they stay in this workflow as the **stated
+Chromium exception**: use them when the task needs Chrome itself, and say which
+and why. Prefer the Chrome Dev build for a Chrome run you start; give it a
+temporary profile (never the user's), record what you started, and close every
+process you started before you finish. A page checked only in Chromium is
+reported as "checked only in Chromium", never as "tested in a browser"; a
+Lighthouse score is a Chrome lab number, not a cross-browser verdict.
 
 ## Core Web Vitals, and the diagnostics beside them
 
@@ -198,7 +220,7 @@ how a typo survives review.
 - **Not Claude Code** (Cursor, Codex, the skills CLI, the API container): the pack's
   `PreToolUse` gate does not run — every rule here still applies, enforced by a person
   instead of a hook.
-- **No browser channel** (no Chrome DevTools MCP, no Playwright): a page is judged from
+- **No browser channel** (no `safaridriver`, no Playwright `webkit`, no Chrome DevTools MCP): a page is judged from
   the diff and the numbers are not measured on this machine. Record the weaker claim;
   a Lighthouse score nobody ran is not a score.
 - **No network**: PageSpeed Insights and field data are unavailable. Lab reasoning is
