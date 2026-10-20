@@ -1,3 +1,17 @@
+## Short router descriptions, v0.15.0 (2026-10-20)
+
+Objective: free Claude Code's shared skill-listing budget (about 30,000 chars; 81 of
+134 skills showed no description on 2026-10-20). All seven descriptions are now
+386-459 chars (6,174 to 2,875 in total); the removed trigger phrases moved verbatim
+into each body's `## Triggers`. `test/validate.py` caps a description at 500 chars.
+Checks: `npm run test:all` exit 0; every routed trigger in the umbrella's
+routing table (42) found in its SKILL.md text by a scratch check.
+
+Open: the umbrella's advertised-trigger check still reads the description only, so
+it reports the 7 triggers that now live only in a body until the umbrella's
+context-diet change makes it read the whole SKILL.md. The umbrella re-pin is the
+umbrella's task. Next task: none in this repository for this change.
+
 ## WebKit (Safari) first in frontend-performance — 0.14.0 candidate (2026-10-16)
 
 Branch `docs/safari-first` (family iteration ITER-1016, REQ R14): `frontend-performance`

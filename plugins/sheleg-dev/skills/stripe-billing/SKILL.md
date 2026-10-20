@@ -1,21 +1,12 @@
 ---
 name: stripe-billing
 description: >-
-  Use when connecting a product to Stripe, fixing a payment bug
-  ("баг в оплате", "оплата"), or auditing a live integration: checkout,
-  renewals, seats, proration, refunds, cancellation and the cancel-step
-  coupon, the portal, and the webhook that turns a payment into an
-  entitlement. Covers Stripe's agent toolchain, the pinned API version, SDK
-  retries, price resolution, claim-first webhook idempotency, what
-  billing_reason decides, cumulative refunds, the cancellation field
-  flexible billing_mode moved, retention eligibility Stripe cannot express,
-  and write ordering with compensating reverts. Triggers - "add Stripe",
-  "Stripe checkout", "subscription billing", "webhook signature",
-  "invoice.paid", "proration", "refund", "cancel subscription",
-  "retention coupon", "подключить Stripe", "оплата подпиской",
-  "вебхук Stripe", "скидка при отмене", "биллинг подписок". Not for choosing
-  between Stripe products (stripe-best-practices) or reading Stripe docs
-  (stripe-docs).
+  Use when connecting a product to Stripe, fixing a payment bug ("баг в оплате") or auditing
+  a live integration: checkout, renewals, refunds, cancellation and the retention coupon,
+  and the webhook that grants an entitlement. Not for crypto (crypto-payments). Opt out: no
+  wiring, без обвязки. Triggers - "add Stripe", "Stripe checkout", "subscription billing",
+  "webhook signature", "cancel subscription", "подключить Stripe", "оплата подпиской",
+  "вебхук Stripe".
 license: MIT
 ---
 
@@ -416,3 +407,7 @@ The full security checklist lives in `references/stripe-agent-toolchain.md`; eve
 pitfall it used to list is stated where the rule is, which is the only place it can
 be kept true.
 
+## Triggers
+
+More phrases that route here: "invoice.paid", "proration", "refund", "retention coupon",
+"скидка при отмене", "биллинг подписок", "оплата".

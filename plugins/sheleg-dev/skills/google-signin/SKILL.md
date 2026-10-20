@@ -1,15 +1,11 @@
 ---
 name: google-signin
 description: >-
-  Use when implementing, reviewing or debugging Google login / sign-in / sign-up on a website —
-  wiring the GIS button or One Tap, verifying Google ID tokens on the server, linking Google to
-  existing password accounts, or fixing "origin is not allowed for the given client ID". Covers
-  GCP OAuth client setup, backend ID-token verification, three-way account linking with the pre-
-  hijacking guard, login-CSRF defense, nonce/replay protection and a mandatory security
-  checklist. Triggers - "sign in with google", "google login", "google sign-in button", "GIS",
-  "google.accounts.id", "gsi/client", "verify google token", "one tap", "account linking",
-  "login csrf", "g_csrf_token", "вход через Google", "кнопка входа Google", "связать аккаунты",
-  "проверить токен Google". For the broader library surface use google-auth instead.
+  Use when implementing or debugging Google sign-in on a website: the GIS button or One Tap,
+  server-side ID token checks, linking Google to password accounts, login CSRF. Not for a
+  server authenticating to Google (google-auth). Opt out: no wiring, без обвязки. Triggers -
+  "sign in with google", "google login", "GIS", "one tap", "account linking", "вход через
+  Google", "связать аккаунты".
 license: MIT
 ---
 
@@ -163,3 +159,9 @@ attacker's account.
   the code, not by watching it work. Record that as the weaker claim it is.
 - **No console access**: creating the OAuth client is a human step; state it once, do
   the rest, and say what is waiting on it.
+
+## Triggers
+
+More phrases that route here: "google sign-in button", "google.accounts.id", "gsi/client",
+"verify google token", "login csrf", "g_csrf_token", "кнопка входа Google", "проверить токен
+Google", "origin is not allowed for the given client ID".

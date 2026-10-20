@@ -315,6 +315,14 @@ def check_skill_front_matter():
                 f"{name}/SKILL.md: description is {len(fm_desc)} chars, limit 1024 "
                 "-- hosts truncate silently, so this never surfaces at runtime"
             )
+        elif len(fm_desc) > DESCRIPTION_SOFT_CAP:
+            fail(
+                f"{name}/SKILL.md: description is {len(fm_desc)} chars, family cap "
+                f"{DESCRIPTION_SOFT_CAP} -- Claude Code shares ~30,000 chars of skill listing "
+                "across every installed skill, and on 2026-10-20 a full budget left 81 skills "
+                "with no description at all. Keep the router sentence, the boundary and a "
+                "short trigger list; move the rest under the body's `## Triggers`"
+            )
         if fm_desc and re.search(r"<[a-zA-Z/]", fm_desc):
             fail(f"{name}/SKILL.md: description must not contain angle-bracket tags")
 
@@ -352,6 +360,14 @@ TRIGGERS_SHARED_BY_DESIGN = {
         "correctly for its rail; the umbrella routes it to stripe-billing "
         "(lib/triggers.js), and crypto-payments labels its scheme as one provider's",
 }
+
+
+# The family soft cap on a front-matter description (make-skill doctrine, 2026-10-20):
+# target 400, ceiling 500, the standard's 1024 is the hard limit. Measured 2026-10-20:
+# the operator's skill listing held 29,995 of ~30,000 chars for 134 skills and 81 of
+# them showed no description, so every character a description spends is taken from
+# another skill's routing. Plugin skills cannot be hidden; length is the only lever.
+DESCRIPTION_SOFT_CAP = 500
 
 
 @check

@@ -1,16 +1,11 @@
 ---
 name: google-auth
 description: >-
-  Use when a server authenticates to Google in a Node.js or Python application — OAuth 2.0
-  flows, verifying Google ID tokens server-side, service account authentication and keys,
-  Application Default Credentials, Workload Identity Federation, API keys, or working with
-  google-auth-library (Node.js) or google-auth (Python). Covers server-side ID token
-  verification and security best practices. Triggers - "google auth", "OAuth 2.0 Google",
-  "google-auth-library", "ADC", "Application Default Credentials", "service account",
-  "Workload Identity Federation", "Google ID token", "verifyIdToken",
-  "GOOGLE_APPLICATION_CREDENTIALS", "Google SSO", "авторизация Google", "сервисный аккаунт",
-  "ключи сервисного аккаунта", "проверить ID-токен". For end-user web sign-in only, use the
-  google-signin skill instead.
+  Use when a Node.js or Python server authenticates to Google: OAuth 2.0 flows, server-side
+  ID token verification, service accounts, Application Default Credentials, Workload
+  Identity Federation, API keys. Not for end-user web sign-in (google-signin). Opt out: no
+  wiring, без обвязки. Triggers - "google auth", "google-auth-library", "service account",
+  "ADC", "verifyIdToken", "авторизация Google", "сервисный аккаунт".
 license: MIT
 ---
 
@@ -289,3 +284,9 @@ if credentials.expired and credentials.refresh_token:
 - **No browser, or no console access**: the consent screen and the client-id half are a
   human step. Name the exact screen and what is blocked, do the code half, and do not
   loop on a login only a person can complete.
+
+## Triggers
+
+More phrases that route here: "OAuth 2.0 Google", "Application Default Credentials",
+"Workload Identity Federation", "Google ID token", "GOOGLE_APPLICATION_CREDENTIALS", "Google
+SSO", "ключи сервисного аккаунта", "проверить ID-токен".

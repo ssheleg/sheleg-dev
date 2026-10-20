@@ -1,17 +1,11 @@
 ---
 name: error-tracking
 description: >-
-  Use when wiring error tracking into a product — adding Sentry to a service, deciding what a
-  DSN is and where it may live, keeping secrets out of events before they reach a third party,
-  tying releases to commits so a stack trace names the change that caused it, or judging whether
-  a green health check means anything. Covers the Sentry SDK options that matter for a backend,
-  the two different tools both called sentry, the auth-token taxonomy and which kind can create
-  a project, and the MCP server with the config channel it belongs in. Triggers - "add Sentry",
-  "set up error tracking", "SENTRY_DSN", "sentry-cli", "sentry mcp", "scrub secrets from
-  errors", "release tracking", "suspect commits", "why is Sentry empty", "подключить Sentry",
-  "трекинг ошибок", "секреты в Sentry", "релизы в Sentry", "наблюдаемость". NOT for judging an
-  agent's trajectory (agent-evals), triaging tickets in a tracker (your tracker's own triage
-  skill), or choosing an uptime vendor.
+  Use when wiring error tracking into a service: the Sentry SDK, where a DSN may live,
+  scrubbing secrets out of events, and tying releases to commits. Not for judging an agent's
+  trajectory (agent-evals) or choosing an uptime vendor. Opt out: no wiring, без обвязки.
+  Triggers - "add Sentry", "SENTRY_DSN", "sentry-cli", "release tracking", "подключить
+  Sentry", "трекинг ошибок", "секреты в Sentry".
 license: MIT
 ---
 
@@ -285,3 +279,8 @@ Two claims worth re-measuring rather than trusting from this page, because both
 are version-dependent: the default denylist contents, and whether the SDK has
 started scrubbing values. `references/scrubbing.md` carries the command for
 each.
+
+## Triggers
+
+More phrases that route here: "set up error tracking", "sentry mcp", "scrub secrets from
+errors", "suspect commits", "why is Sentry empty", "релизы в Sentry", "наблюдаемость".
