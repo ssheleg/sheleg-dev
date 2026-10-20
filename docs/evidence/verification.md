@@ -23,11 +23,20 @@ actually prints. Both were watched refusing a plant; see the SD-05 block.
 
 ---
 
-## Shipped state — v0.14.0
+## Shipped state — v0.15.0
 
-Candidate source only, 2026-10-16 (family iteration ITER-1016, R14): publication
-pending. This is the validator's required ledger heading; it does not claim that the
-candidate is on npm.
+Candidate source, 2026-10-20 (context diet: short router descriptions). Publication is
+read on the release run and the registry, not here.
+
+| REQ | What changes | Evidence | Status |
+|---|---|---|---|
+| DESC-1020 | Seven descriptions cut to 386-459 chars; removed trigger phrases moved verbatim into each body's `## Triggers` | `test/validate.py` description cap (500); the umbrella's routed triggers checked against each SKILL.md text by a scratch script over the umbrella's routing table: 42 triggers, 0 missing | observed: `npm run test:all` exit 0 on candidate source |
+| Gate | Required candidate validator line | `OK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.15.0)` | observed: `npm test` exit 0 on candidate source |
+
+## Shipped in v0.14.0
+
+Published: `npm view @ssheleg/sheleg-dev version` read `0.14.0` on 2026-10-20 and the
+annotated tag `v0.14.0` is on the remote. The rows below were written as the candidate.
 
 | REQ | What changes | Evidence | Status |
 |---|---|---|---|

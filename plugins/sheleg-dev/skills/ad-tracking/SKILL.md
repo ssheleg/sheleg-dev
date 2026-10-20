@@ -1,16 +1,11 @@
 ---
 name: ad-tracking
 description: >-
-  Use when setting up or modifying ad pixel integration, conversion tracking, consent
-  management, purchase event tracking, retargeting audiences, or auditing an existing
-  advertising analytics stack. Covers Google Analytics 4, Google Ads, Meta (Facebook) Pixel and
-  LinkedIn Insight Tag in web applications: Consent Mode v2, standard events, e-commerce
-  tracking, advanced matching, Enhanced Conversions, CSP configuration, user identification,
-  cross-device tracking, and GDPR/DMA compliance. Triggers - "ad tracking", "conversion
-  tracking", "meta pixel", "fbq", "google ads", "GA4", "gtag", "consent mode", "cookie consent",
-  "enhanced conversions", "retargeting", "purchase event", "CAPI", "gclid", "UTM",
-  "attribution", "отслеживание конверсий", "пиксель Meta", "согласие на куки", "ретаргетинг",
-  "аналитика рекламы". Not for running the ad campaigns themselves.
+  Use when wiring or auditing ad pixels and conversion tracking on the web: GA4, Google Ads,
+  Meta Pixel and CAPI, LinkedIn Insight Tag, under Consent Mode v2 and GDPR/DMA. Not for
+  running the campaigns, or the charge itself (stripe-billing). Opt out: no wiring, без
+  обвязки. Triggers - "conversion tracking", "meta pixel", "consent mode", "GA4", "CAPI",
+  "отслеживание конверсий", "пиксель Meta", "ретаргетинг".
 license: MIT
 ---
 
@@ -425,3 +420,9 @@ and what to do about it — see the `frontend-performance` skill in this pack.
 - **No network, or the ad platform's API unreachable**: server-side events cannot be
   verified end to end. Say the dedup check did not run rather than reporting it held;
   a browser pixel firing proves the browser, never the conversion.
+
+## Triggers
+
+More phrases that route here: "ad tracking", "fbq", "google ads", "gtag", "cookie consent",
+"enhanced conversions", "retargeting", "purchase event", "gclid", "UTM", "attribution",
+"согласие на куки", "аналитика рекламы".

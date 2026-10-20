@@ -1,16 +1,11 @@
 ---
 name: crypto-payments
 description: >-
-  Use when adding or auditing crypto checkout, crypto top-up, or payment webhooks — where a
-  payer sends the wrong amount, a webhook arrives more than once, and the rate moves between
-  quote and transfer. Covers invoice lifecycle and status mapping, webhook signature
-  verification and the JSON-escaping trap, idempotent processing, IP allowlisting behind a
-  proxy, CSRF exemption for callback routes, the conversion buffer, reconciliation fields,
-  credit waterfalls, refund and AML-hold states, local development with a tunnel and signed mock
-  callbacks, a test matrix and a security checklist. Triggers - "crypto payment", "crypto
-  checkout", "pay with crypto", "USDT payment", "TRC20", "payment webhook", "IPN", "webhook
-  signature", "underpayment", "Heleket", "NOWPayments", "приём криптоплатежей", "оплата
-  криптой", "вебхук платежа", "недоплата". Not for card billing — use stripe-billing.
+  Use when adding or auditing crypto checkout, crypto top-up or payment webhooks: invoice
+  states, signed callbacks, idempotent processing, underpayment and rate drift. Not for card
+  billing (stripe-billing). Opt out: no wiring, без обвязки. Triggers - "crypto payment",
+  "USDT payment", "payment webhook", "webhook signature", "underpayment", "приём
+  криптоплатежей", "оплата криптой", "вебхук платежа".
 license: MIT
 ---
 
@@ -414,3 +409,8 @@ a green suite, each with the defect it catches:
   half of this skill. Say the check did not run rather than reporting the invariant as
   held — an unrun check and a passing one are indistinguishable from the exit code
   nobody looked at.
+
+## Triggers
+
+More phrases that route here: "crypto checkout", "pay with crypto", "TRC20", "IPN",
+"Heleket", "NOWPayments", "недоплата".

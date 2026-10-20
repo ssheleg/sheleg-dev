@@ -1,3 +1,24 @@
+## v0.15.0: short router descriptions
+
+- Every skill's front-matter `description` is now a router, not a manual: one
+  "Use when" sentence, a "Not for" boundary naming the sibling skill, the opt-out
+  phrase (no wiring, без обвязки) and a short English and Russian trigger list.
+  Lengths before and after: stripe-billing 965 to 459, error-tracking 962 to 395,
+  frontend-performance 885 to 412, crypto-payments 884 to 398, ad-tracking 859 to 408,
+  google-signin 821 to 386, google-auth 798 to 417 (6,174 to 2,875 chars in total).
+- Why: Claude Code shares about 30,000 chars of skill listing across every installed
+  skill. Measured on 2026-10-20, the operator's listing held 29,995 chars for 134 skills
+  and 81 of them showed no description. Plugin skills cannot be hidden, so description
+  length is the only lever.
+- Every trigger phrase removed from a description moved verbatim into a new
+  `## Triggers` section at the end of that skill's body, so the family's routing hook
+  still finds each of its words in the skill's text.
+- `test/validate.py` refuses a description over 500 chars (the family cap; the
+  standard's 1024 stays the hard limit). The CI plant that pads crypto-payments by
+  320 chars now trips this cap.
+- `docs/evals/stripe-billing.md` restates the recomputed body budget (4603 tokens,
+  403 lines).
+
 ## v0.14.0 — frontend performance is tested in WebKit (Safari) first
 
 - `frontend-performance/SKILL.md` gains *Test browser — WebKit (Safari) first*:
