@@ -108,16 +108,16 @@ Is the image decorative (purely visual, no information)?
 
 If an image appears next to text that says the same thing, the image is decorative:
 
-**Bad (screen reader announces "PrivateClawd" twice):**
+**Bad (screen reader announces "Acme" twice):**
 ```html
-<img alt="PrivateClawd" src="/logo.svg" />
-<span>PrivateClawd</span>
+<img alt="Acme" src="/logo.svg" />
+<span>Acme</span>
 ```
 
 **Good:**
 ```html
 <img alt="" src="/logo.svg" />
-<span>PrivateClawd</span>
+<span>Acme</span>
 ```
 
 ## Interactive Element Sizing

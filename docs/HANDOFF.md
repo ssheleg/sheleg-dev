@@ -1,3 +1,9 @@
+## v0.15.1: a neutral example brand (2026-10-22)
+
+- **Objective.** Remove a private project name from a shipped example (operator, 2026-10-22: no project names in public skills).
+- **Done.** `references/accessibility-perf.md` uses `Acme`; version 0.15.1.
+- **Next task.** After merge: tag `v0.15.1`, watch the release run, then the sshlg-skills pin bump.
+
 ## Short router descriptions, v0.15.0 (2026-10-20)
 
 Objective: free Claude Code's shared skill-listing budget (about 30,000 chars; 81 of
