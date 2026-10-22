@@ -1,3 +1,7 @@
+## v0.15.1: a neutral example brand
+
+- The accessibility reference's image-redundancy example used the name of one of the operator's private projects as its sample brand. It now uses `Acme`. No behaviour changes.
+
 ## v0.15.0: short router descriptions
 
 - Every skill's front-matter `description` is now a router, not a manual: one
