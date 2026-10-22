@@ -15,7 +15,8 @@
   paused subscription resumes, so it now maps to its own `paused`, with a note.
 - **Open.** B-107 (the SKILL client pins `2026-07-29.dahlia`, before the Pause endpoint) and
   B-108 (`billing_mode` described as fixed, while Stripe links a migration to flexible).
-- **Next task.** After merge: tag `v0.16.0`, watch the release, then the sshlg-skills pin bump; then B-107.
+- **Released (2026-10-22).** PR #34 squash `5842df5`, tag `v0.16.0`, release run 39785238543 green, npm `@ssheleg/sheleg-dev` 0.16.0; sshlg-skills pins it in 1.74.0 and the install reads back verified for Claude and current for Codex.
+- **Next task.** B-98 (priority 2.0, tied highest with B-105): `v0.7.0` is a lightweight tag where `v0.6.0` was annotated; then B-107, the client's API pin before the Pause endpoint.
 
 ## 0.15.1 released and pinned (2026-10-22)
 
