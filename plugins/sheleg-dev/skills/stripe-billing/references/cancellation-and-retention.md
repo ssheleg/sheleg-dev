@@ -2,12 +2,14 @@
 
 **Load this when** implementing cancel or reactivation, or building the "before
 you go — 50% off your next invoice" card at the cancel step.
+Also when offering a pause in place of cancellation.
 
 *Every parameter path, enum and required-field claim below is read from the
 Stripe OpenAPI spec at API version `2026-07-29.dahlia` (the latest, confirmed
 against `docs.stripe.com/changelog`) and from `docs.stripe.com` on 2026-08-25.
-The two facts the documentation does not answer are marked as such, with the
-commands that answer them.*
+The pause section was read from `docs.stripe.com` on 2026-10-22, when the
+newest GA version was `2026-09-30.endive`. The facts the documentation does not
+answer are marked as such, with the commands that answer them.*
 
 ## Contents
 
@@ -19,6 +21,7 @@ commands that answer them.*
 - [Nobody tells you the customer stayed](#nobody-tells-you-the-customer-stayed)
 - [Applying it yourself: `discounts` is a replacement, not an append](#applying-it-yourself-discounts-is-a-replacement-not-an-append)
 - [Reading a discount now costs one more hop](#reading-a-discount-now-costs-one-more-hop)
+- [A pause instead of a cancellation](#a-pause-instead-of-a-cancellation)
 - [Where the flow is simply not available](#where-the-flow-is-simply-not-available)
 - [A save is not a renewal, and it is not a churn event either](#a-save-is-not-a-renewal-and-it-is-not-a-churn-event-either)
 - [The test matrix](#the-test-matrix)
@@ -339,6 +342,172 @@ one — and both new wrapper objects carry a `type` enum whose only current valu
 is `"coupon"`. Switch on it rather than assuming it: that enum exists because
 something else is coming.
 
+## A pause instead of a cancellation
+
+Some of the people who press cancel want a break, not an exit, and a pause keeps
+their subscription, their payment method and their history. It is also the offer
+that turns into an obstacle most easily, so the screen rule comes before any API
+call:
+
+- **The pause offer must not lengthen the cancel path.** One screen: pause and
+  cancel side by side, cancel still one tap away and as visible as the pause, no
+  option preselected, no second "are you sure" behind the pause. GP Bullhound's
+  *Consumer Subscription Software* report (October 2025, p. 18) records that
+  cancelling must be as easy as subscribing under California law from
+  2025-07-01, with a pause offered as the alternative.
+- **The portal cannot make this offer.** `flow_data.subscription_cancel.retention.type`
+  still takes only `coupon_offer`
+  ([API reference](https://docs.stripe.com/api/customer_portal/sessions/create), read
+  2026-10-22), so a pause is your own screen: the case
+  [Applying it yourself](#applying-it-yourself-discounts-is-a-replacement-not-an-append)
+  describes.
+
+Stripe has two different things called pause, and they disagree on the one
+question your product cares about: does the customer keep access?
+
+| | **`pause_collection`** | **Pause endpoint** |
+|---|---|---|
+| Call | `subscriptions.update` with `pause_collection` | `subscriptions.pause` (`POST /v1/subscriptions/{id}/pause`) |
+| `status` | unchanged, stays `active` | `paused` |
+| Invoices | still generated, handled by `behavior` | not generated until resumed |
+| Access, in Stripe's words | "Your customer retains access to the service" | "stops both service delivery and invoice generation" |
+| Automatic resume | `resumes_at` | only through a pause schedule on a subscription schedule |
+| Webhooks | `customer.subscription.updated` only | `customer.subscription.paused` and `.resumed`, plus `.updated` and `entitlements.active_entitlement_summary.updated` |
+| Requires | nothing stated | flexible `billing_mode`, API version `2026-09-30.endive` or later |
+
+Sources, read 2026-10-22:
+[Pause payment collection](https://docs.stripe.com/billing/subscriptions/pause-payment),
+[Pause subscriptions](https://docs.stripe.com/billing/subscriptions/pause),
+[Using webhooks with subscriptions](https://docs.stripe.com/billing/subscriptions/webhooks),
+[the `2026-09-30.endive` changelog entry](https://docs.stripe.com/changelog/endive/2026-09-30/pause-subscription).
+
+### `pause_collection`: free service, not a pause
+
+```ts
+// The customer asked for a break, and nothing is owed for the paused months.
+await stripe.subscriptions.update(subId, {
+  pause_collection: { behavior: "void", resumes_at: resumeAt },   // Unix seconds
+});
+
+// Resume early: unset it with an empty value.
+await stripe.subscriptions.update(subId, { pause_collection: "" });
+```
+
+`behavior` decides what happens to the invoices that keep being created:
+
+| `behavior` | The invoices | Use it for |
+|---|---|---|
+| `keep_as_draft` | created as `draft` with `auto_advance: false`, to finalize and collect later | a grace period you intend to collect; **not** a customer's pause, because it builds a debt they did not agree to |
+| `mark_uncollectible` | marked uncollectible, but Stripe **applies the customer balance first**, so an invoice the balance covers becomes `paid` | when you want the record and can explain the spent credit |
+| `void` | voided, "no record of charges is created" | a pause the customer asked for |
+
+Without `resumes_at`, collection stays paused until you unset `pause_collection`.
+Four things the call does not do:
+
+- **It does not change access.** `status` stays `active`, so every check that reads
+  status keeps granting. If your product promises "paused means no access", the
+  access decision has to read `pause_collection` too; if it promises "paused means
+  free", say so on the screen, because that is what this call delivers.
+- **It does not stop dunning already in flight.** "Invoices created before you
+  pause subscriptions continue to be retried unless you void them." Pausing a
+  `past_due` customer leaves the failing invoice live.
+- **It does not finalize the drafts on resume.** After `keep_as_draft`, list the
+  subscription's invoices with `status: "draft"` and set `auto_advance: true` on
+  each, or they stay drafts.
+- **It does not override a schedule.** On a subscription managed by a schedule,
+  scheduled updates still take effect, and a phase transition does not remove
+  `pause_collection`.
+
+**How you learn of it:** only `customer.subscription.updated`, with
+`event.data.previous_attributes.pause_collection` saying that it changed. No
+`customer.subscription.paused` and no `.resumed`: Stripe's webhook table says it
+does not send them for paused collection, "because invoices continue to be
+created during that time period". Stripe also sends no upcoming-invoice emails or
+webhooks for the paused invoices. A handler that only switches on status sees
+nothing happen. **Not answered by the documentation:** whether reaching
+`resumes_at` emits a `customer.subscription.updated` as Stripe clears the field.
+Advance a test clock past it with `stripe listen` running, and record what arrives.
+
+### The Pause endpoint: the pause a customer means
+
+```ts
+// Flexible billing_mode only, Stripe API version 2026-09-30.endive or later.
+await stripe.subscriptions.pause(subId, {
+  bill_for: { unused_time_from: { type: "now" } },  // the default: credit unused days
+  invoicing_behavior: "pending_invoice_item",       // the default: credit waits for resume
+});
+
+const sub = await stripe.subscriptions.resume(subId, {
+  payment_behavior: "resume_on_payment_success",    // Stripe's recommendation
+  billing_cycle_anchor: { type: "now" },
+  proration_behavior: "create_prorations",
+});
+if (sub.status !== "active") {
+  // still paused: the resumption invoice awaits payment (see sub.pending_update)
+}
+```
+
+- **The API version is a prerequisite.** The endpoint first shipped in
+  `2026-05-27.preview` and reached a GA version in `2026-09-30.endive`. The
+  client in `SKILL.md` pins `2026-07-29.dahlia`; move that pin, and the webhook
+  endpoint's version, before relying on it.
+- **Effect:** `status` becomes `paused`, each item's `current_period_end` moves to
+  the pause time, invoice generation stops, and existing invoices keep advancing.
+  The pause takes effect immediately; a pause from a future date needs a pause
+  schedule, and a schedule removes the portal's cancel page
+  ([below](#where-the-flow-is-simply-not-available)).
+- **Billing at the pause:** by default unused licensed time is credited as a
+  pending invoice item that lands on the resumption invoice, and metered usage up
+  to now is billed. `unused_time_from: { type: "none" }` gives no credit. Choose it
+  deliberately and say it on the screen.
+- **A coupon keeps running while paused.** Its duration continues through the
+  pause, so a save discount and a pause together waste the discount.
+- **Resume:** requires `collection_method: charge_automatically`. With
+  `resume_on_payment_success` a failed payment leaves the subscription `paused`
+  and the pending update lives for a year; with the default
+  `resume_on_payment_attempt` a failed payment makes it `past_due` and the
+  pending update expires after 23 hours. A resume can return `200` while the
+  subscription is still `paused`: check the returned `status` and
+  `pending_update`, never the HTTP code.
+- **Refused for:** `send_invoice` collection, classic `billing_mode`, an active
+  subscription-level trial, an attached schedule, an active billing schedule, and
+  status `unpaid`, `incomplete`, `incomplete_expired`, `canceled` or already
+  `paused`. Check these before you show the offer, or the pause button 400s.
+
+**How you learn of it:** `customer.subscription.paused` (revoke access),
+`customer.subscription.resumed` (restore it), each with
+`customer.subscription.updated` and `entitlements.active_entitlement_summary.updated`.
+
+### Three roads to `paused`, and one field that tells them apart
+
+The same `paused` status also arrives without anyone asking for a pause. Read
+`status_details.paused.subscription.type`
+([Pause subscriptions](https://docs.stripe.com/billing/subscriptions/pause),
+[payment-failure pausing](https://docs.stripe.com/changelog/endive/2026-09-30/pause-on-payment-failure)):
+
+| `type` | Came from | What the customer needs to hear |
+|---|---|---|
+| `pause_requested` | your pause call | "Paused until you resume" |
+| `trial_end_without_payment_method` | a trial created with `trial_settings.end_behavior.missing_payment_method: "pause"` (the other values are `cancel` and `create_invoice`) | "Add a card to start": they never paid, so "welcome back" is wrong |
+| `first_payment_failure`, `final_payment_failure` | the optional automatic pause after payment failures, flexible mode | a dunning message, and **no** retention offer |
+| `system` | Stripe | read the subscription before saying anything |
+
+The trial road fires `customer.subscription.paused` too, and the subscription
+"can remain paused indefinitely"; it resumes through the same `resume` call or the
+portal's **Start subscription** once a payment method exists
+([free trials](https://docs.stripe.com/billing/subscriptions/trials/free-trials#create-free-trials-without-payment)).
+So a `customer.subscription.paused` handler that sends "enjoy your break" sends it
+to every trial that lapsed without a card.
+
+**`paused` is not `canceled`.** Revoke access and keep the account, its data and
+its row: the teardown that belongs in `customer.subscription.deleted` must not run
+on a pause. Give `paused` its own local state rather than folding it into
+`canceled`. Record the pause offer in the same ledger as the coupon
+(`offerId: "cancel-pause"`, written before the screen renders) and record
+acceptance from `customer.subscription.paused` with `pause_requested`, not from
+the absence of a cancellation. A pause is neither churn nor a save until it
+resumes or ends; its resume rate is the number worth having.
+
 ## Where the flow is simply not available
 
 Each of these makes the cancel page — and therefore the offer — disappear for
@@ -416,3 +585,15 @@ stripe subscriptions retrieve sub_... --expand discounts
       message, not a Stripe 400
 - [ ] `past_due`: no offer
 - [ ] a coupon applied from the Dashboard: the `count === 0` warning fires
+- [ ] the cancel screen with a pause offer: cancel is one tap away on the same
+      screen, nothing is preselected, and cancelling still works with the pause
+      offer ignored
+- [ ] `pause_collection` set: `status` stays `active`, only
+      `customer.subscription.updated` arrives, and access matches what the screen
+      promised
+- [ ] the Pause endpoint: `customer.subscription.paused` revokes access without
+      running the `customer.subscription.deleted` teardown; a resume with
+      `resume_on_payment_success` and a declining card leaves it `paused`
+- [ ] a trial ending without a card (`missing_payment_method: "pause"`) and a
+      requested pause get different messages, told apart by
+      `status_details.paused.subscription.type`

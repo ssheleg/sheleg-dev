@@ -95,7 +95,10 @@ STRIPE_SECRET_KEY="<injected-at-runtime>"
 `STRIPE_ENV_LIVE_HOLDS_TEST_CREDENTIAL` refuse opposite mode mismatches. Missing or
 unknown modes/keys fail closed. This bounded assertion recognises account secret and
 restricted keys (`sk_`/`rk_` with test/live mode); organization and other unrecognised
-keys need an explicit mode contract, not inferred safety. It never logs or returns the
+keys need an explicit mode contract, not inferred safety. The prefixes are Stripe's
+([API keys](https://docs.stripe.com/keys), read 2026-10-22): sandbox keys start
+`sk_test_`/`rk_test_`, live keys `sk_live_`/`rk_live_`, and organization keys
+`sk_org_`, which carry no mode. It never logs or returns the
 key. Agreement proves neither authenticity, account ownership nor permissions.
 Webhook signing secrets have a separate endpoint binding and are not classified here.
 
