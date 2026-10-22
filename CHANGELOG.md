@@ -1,3 +1,10 @@
+## Unreleased
+
+- `test/family_gate.py`, the family's canonical member gate (hub B-108, B-109): the board
+  parses (every row as wide as its header, no id twice) and `release.yml` keeps the tag-ancestry
+  check (`fetch-depth: 0`, `git merge-base --is-ancestor`), each watched failing on a plant by
+  `--self-test`. Wired into `npm test`; a byte-for-byte copy of the hub's `member-gate/family_gate.py`.
+
 ## v0.16.0: a pause in the cancel path, and B-86 closed
 
 - `stripe-billing/references/cancellation-and-retention.md` gains *A pause instead of a

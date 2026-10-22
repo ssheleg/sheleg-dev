@@ -71,7 +71,8 @@ git clone https://github.com/ssheleg/sheleg-dev && cd sheleg-dev
 One command:
 
 ```bash
-npm test          # python3 test/validate.py, then node test/moneygate_test.js,
+npm test          # python3 test/validate.py, then python3 test/family_gate.py
+                  # (and its --self-test), then node test/moneygate_test.js,
                   # then node test/fixtures_test.js
                   # then node test/installer_test.js
 ```
