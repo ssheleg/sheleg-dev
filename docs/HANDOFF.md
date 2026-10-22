@@ -1,7 +1,7 @@
 ## 0.15.1 released and pinned (2026-10-22)
 
 - **State.** sheleg-dev 0.15.1 is tagged, on npm and pinned by sshlg-skills 1.73.2; installed on the operator machine.
-- **Next task.** B-86: ship the boundary assertion `stripe-billing` prescribes; then the pause and win-back items of the hub's M2 plan (`ssheleg/sshlg-skills` `docs/runs/2026-10-22-m2-subscription-growth-plan.md`) (wave 2).
+- **Next task.** B-86: ship the boundary assertion `stripe-billing` prescribes; then the pause and win-back items of the hub's [M2 plan](https://github.com/ssheleg/sshlg-skills/blob/main/docs/runs/2026-10-22-m2-subscription-growth-plan.md) (wave 2).
 
 ## v0.15.1: a neutral example brand (2026-10-22)
 
