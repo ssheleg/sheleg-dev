@@ -44,7 +44,7 @@ defaulting silently:
 const MAP: Record<string, Status> = {
   active: "active", trialing: "trialing", past_due: "past_due",
   unpaid: "unpaid", canceled: "canceled", incomplete: "incomplete",
-  incomplete_expired: "canceled", paused: "canceled",
+  incomplete_expired: "canceled", paused: "paused",
 };
 export function mapStatus(s: string): Status {
   const m = MAP[s];
@@ -52,6 +52,11 @@ export function mapStatus(s: string): Status {
   return m ?? "incomplete";
 }
 ```
+
+`paused` is its own status, never `canceled`: Stripe's Pause endpoint and a trial that ended
+without a payment method both leave a subscription that resumes. Grant no access while it is
+paused, and keep it out of churn. `pause_collection` is different again: the status stays
+`active` (see `cancellation-and-retention.md`, *A pause instead of a cancellation*).
 
 ## Get-or-create customer
 

@@ -1,4 +1,4 @@
-## M2 G8: a pause in the cancel path; B-86 closed (2026-10-22, unreleased)
+## v0.16.0: a pause in the cancel path; B-86 closed (2026-10-22)
 
 - **Objective.** Hub M2 wave 2, gap G8: offer a pause in place of cancellation without
   lengthening the cancel path; close board row B-86.
@@ -11,10 +11,11 @@
   `billing_mode`); the section presents both mechanisms rather than `pause_collection` alone,
   because `pause_collection` keeps the customer's access on.
 - **Checks.** `npm test` exit 0 on branch `feat/m2-pause-b86`.
-- **Open.** `subscription-lifecycle.md`'s status map folds `paused` into `canceled`; the SKILL
-  client pins `2026-07-29.dahlia`; `cancellation-and-retention.md` says `billing_mode` cannot
-  change, while Stripe's pause docs now link a migration to flexible. None is filed yet.
-- **Next task.** Review and integrate this branch; then the win-back item of the hub's M2 plan.
+- **Also fixed.** `subscription-lifecycle.md`'s status map folded `paused` into `canceled`; a
+  paused subscription resumes, so it now maps to its own `paused`, with a note.
+- **Open.** B-107 (the SKILL client pins `2026-07-29.dahlia`, before the Pause endpoint) and
+  B-108 (`billing_mode` described as fixed, while Stripe links a migration to flexible).
+- **Next task.** After merge: tag `v0.16.0`, watch the release, then the sshlg-skills pin bump; then B-107.
 
 ## 0.15.1 released and pinned (2026-10-22)
 

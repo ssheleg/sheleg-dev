@@ -23,7 +23,18 @@ actually prints. Both were watched refusing a plant; see the SD-05 block.
 
 ---
 
-## Shipped state — v0.15.1
+## Shipped state — v0.16.0
+
+Candidate source, 2026-10-22 (hub M2 wave 2: a pause in the cancel path; B-86 closed).
+Publication is read on the release run and the registry, not here.
+
+| REQ | What changes | Evidence | Status |
+|---|---|---|---|
+| M2-G8 | `cancellation-and-retention.md` *A pause instead of a cancellation*: the screen rule, `pause_collection` against the Pause endpoint, the roads to `paused`, four test-matrix lines; `mapStatus` keeps `paused` apart from `canceled` | each Stripe fact cites its `docs.stripe.com` page, read 2026-10-22; `test/validate.py` structure and citation checks | implemented |
+| B-86 | Closed with evidence: `assertStripeEnv` and the `stripe-billing` row of `CREDENTIAL_BOUNDARIES` shipped in PR #25 (v0.13.4) | `test/audit_regressions/fw03_credentials.py` exit 0 (18 assertions) | closed |
+| Gate | Required candidate validator line | `OK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.16.0)` | observed: `npm test` exit 0 on candidate source |
+
+## Shipped in v0.15.1
 
 Candidate source, 2026-10-20 (context diet: short router descriptions). Publication is
 read on the release run and the registry, not here.

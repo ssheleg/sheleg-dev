@@ -1,4 +1,4 @@
-## Unreleased: a pause in the cancel path, and B-86 closed
+## v0.16.0: a pause in the cancel path, and B-86 closed
 
 - `stripe-billing/references/cancellation-and-retention.md` gains *A pause instead of a
   cancellation*: the screen rule (the pause offer does not lengthen the cancel path; one
@@ -14,6 +14,9 @@
 - `price-integrity.md` cites `docs.stripe.com/keys` for the key prefixes `assertStripeEnv`
   reads. Board row B-86 is closed: its assertion and `CREDENTIAL_BOUNDARIES` row shipped in
   v0.13.4 and the row had stayed open.
+- `subscription-lifecycle.md`: `mapStatus` maps `paused` to its own `paused`, no longer `canceled`;
+  a paused subscription resumes. Board: B-107 (the client's API pin predates the Pause endpoint)
+  and B-108 (`billing_mode` migration) filed.
 
 ## v0.15.1: a neutral example brand
 
