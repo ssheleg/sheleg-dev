@@ -1,3 +1,20 @@
+## Unreleased: a pause in the cancel path, and B-86 closed
+
+- `stripe-billing/references/cancellation-and-retention.md` gains *A pause instead of a
+  cancellation*: the screen rule (the pause offer does not lengthen the cancel path; one
+  screen, cancel one tap away), then Stripe's two pauses side by side. `pause_collection`
+  (`behavior` `keep_as_draft`, `mark_uncollectible` or `void`; `resumes_at`) keeps `status`
+  `active` and access on, and reaches the app only as `customer.subscription.updated`. The
+  Pause endpoint (flexible `billing_mode`, API `2026-09-30.endive`) sets `paused`, stops
+  invoices and emits `customer.subscription.paused` and `.resumed`.
+  `status_details.paused.subscription.type` separates a requested pause from a trial that
+  ended without a payment method (`trial_settings.end_behavior.missing_payment_method`) and
+  from a payment-failure pause. Four test-matrix lines; every fact cites `docs.stripe.com`,
+  read 2026-10-22.
+- `price-integrity.md` cites `docs.stripe.com/keys` for the key prefixes `assertStripeEnv`
+  reads. Board row B-86 is closed: its assertion and `CREDENTIAL_BOUNDARIES` row shipped in
+  v0.13.4 and the row had stayed open.
+
 ## v0.15.1: a neutral example brand
 
 - The accessibility reference's image-redundancy example used the name of one of the operator's private projects as its sample brand. It now uses `Acme`. No behaviour changes.

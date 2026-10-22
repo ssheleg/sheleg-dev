@@ -33,7 +33,7 @@ Deep material, loaded on demand:
 | [`references/stripe-agent-toolchain.md`](references/stripe-agent-toolchain.md) | starting from nothing, or about to guess an API shape — CLI, MCP, skills index, key handling |
 | [`references/webhook-events.md`](references/webhook-events.md) | writing or reviewing the handler — event catalogue, payload shapes, ordering, failure semantics |
 | [`references/subscription-lifecycle.md`](references/subscription-lifecycle.md) | implementing checkout, verify, renewal, seats, plan change, trials, clawback |
-| [`references/cancellation-and-retention.md`](references/cancellation-and-retention.md) | implementing cancel or reactivation, or offering a coupon at the cancel step |
+| [`references/cancellation-and-retention.md`](references/cancellation-and-retention.md) | implementing cancel or reactivation, or offering a coupon or a pause at the cancel step |
 | [`references/price-integrity.md`](references/price-integrity.md) | pricing lives in more than one file, or an advertised price must be proved against Stripe |
 | [`references/testing-and-local-dev.md`](references/testing-and-local-dev.md) | local webhooks and mocks, and the shipped `fixtures/` — the suite, already written |
 | [`references/provider-concentration.md`](references/provider-concentration.md) | growing revenue, opening a second market, separating involuntary churn, or if the payment account is limited |

@@ -1,3 +1,21 @@
+## M2 G8: a pause in the cancel path; B-86 closed (2026-10-22, unreleased)
+
+- **Objective.** Hub M2 wave 2, gap G8: offer a pause in place of cancellation without
+  lengthening the cancel path; close board row B-86.
+- **Done.** `stripe-billing/references/cancellation-and-retention.md` → *A pause instead of
+  a cancellation* (screen rule; `pause_collection` against the Pause endpoint; the three
+  roads to `paused`; four test-matrix lines), every Stripe fact cited to `docs.stripe.com`,
+  read 2026-10-22. B-86 was already implemented by PR #25 (v0.13.4); the board row is now
+  closed with that evidence and `price-integrity.md` cites the key-prefix source.
+- **Decision.** Stripe's docs added a GA Pause endpoint in `2026-09-30.endive` (flexible
+  `billing_mode`); the section presents both mechanisms rather than `pause_collection` alone,
+  because `pause_collection` keeps the customer's access on.
+- **Checks.** `npm test` exit 0 on branch `feat/m2-pause-b86`.
+- **Open.** `subscription-lifecycle.md`'s status map folds `paused` into `canceled`; the SKILL
+  client pins `2026-07-29.dahlia`; `cancellation-and-retention.md` says `billing_mode` cannot
+  change, while Stripe's pause docs now link a migration to flexible. None is filed yet.
+- **Next task.** Review and integrate this branch; then the win-back item of the hub's M2 plan.
+
 ## 0.15.1 released and pinned (2026-10-22)
 
 - **State.** sheleg-dev 0.15.1 is tagged, on npm and pinned by sshlg-skills 1.73.2; installed on the operator machine.
