@@ -23,7 +23,17 @@ actually prints. Both were watched refusing a plant; see the SD-05 block.
 
 ---
 
-## Shipped state — v0.16.0
+## Shipped state — v0.16.1
+
+Candidate source, 2026-10-24 (the family member gate; no skill text changes). Publication is
+read on the release run and the registry, not here.
+
+| REQ | What changes | Evidence | Status |
+|---|---|---|---|
+| FG-1 | `test/family_gate.py`, the hub's canonical member gate with its shared-mechanism declaration, runs in `npm test` with `--self-test` | `python3 test/family_gate.py --self-test`: 3 of 3 plants caught | implemented |
+| Gate | Required candidate validator line | `OK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.16.1)` | observed: `npm test` exit 0 on candidate source |
+
+## Shipped in v0.16.0
 
 Candidate source, 2026-10-22 (hub M2 wave 2: a pause in the cancel path; B-86 closed).
 Publication is read on the release run and the registry, not here.

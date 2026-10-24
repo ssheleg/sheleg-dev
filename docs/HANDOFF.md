@@ -1,3 +1,10 @@
+## v0.16.1: the family member gate (2026-10-24)
+
+- **Done.** the family member gate: the family member gate (`test/family_gate.py`, with its shared-mechanism
+  declaration) and the documentation merged since v0.16.0, released.
+- **Next task.** After merge: tag `v0.16.1`, watch the release, then the sshlg-skills pin bump; then
+  the highest open board row.
+
 ## v0.16.0: a pause in the cancel path; B-86 closed (2026-10-22)
 
 - **Objective.** Hub M2 wave 2, gap G8: offer a pause in place of cancellation without
