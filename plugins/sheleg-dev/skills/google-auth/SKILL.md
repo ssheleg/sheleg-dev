@@ -1,11 +1,10 @@
 ---
 name: google-auth
 description: >-
-  Use when a Node.js or Python server authenticates to Google: OAuth 2.0 flows, server-side
-  ID token verification, service accounts, Application Default Credentials, Workload
-  Identity Federation, API keys. Not for end-user web sign-in (google-signin). Opt out: no
-  wiring, без обвязки. Triggers - "google auth", "google-auth-library", "service account",
-  "ADC", "verifyIdToken", "авторизация Google", "сервисный аккаунт".
+  Use when a Node.js or Python server authenticates to Google: OAuth 2.0, ID token
+  checks, service accounts, ADC, Workload Identity, API keys. Not for end-user web
+  sign-in (google-signin). Opt out: no wiring, без обвязки. Triggers -
+  "google-auth-library", "service account", "сервисный аккаунт".
 license: MIT
 ---
 
@@ -290,3 +289,5 @@ if credentials.expired and credentials.refresh_token:
 More phrases that route here: "OAuth 2.0 Google", "Application Default Credentials",
 "Workload Identity Federation", "Google ID token", "GOOGLE_APPLICATION_CREDENTIALS", "Google
 SSO", "ключи сервисного аккаунта", "проверить ID-токен".
+
+Moved here from the description in 0.16.2: "авторизация Google".

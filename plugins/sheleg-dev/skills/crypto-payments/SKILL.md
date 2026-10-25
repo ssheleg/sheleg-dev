@@ -2,10 +2,9 @@
 name: crypto-payments
 description: >-
   Use when adding or auditing crypto checkout, crypto top-up or payment webhooks: invoice
-  states, signed callbacks, idempotent processing, underpayment and rate drift. Not for card
-  billing (stripe-billing). Opt out: no wiring, без обвязки. Triggers - "crypto payment",
-  "USDT payment", "payment webhook", "webhook signature", "underpayment", "приём
-  криптоплатежей", "оплата криптой", "вебхук платежа".
+  states, signed callbacks, idempotency, underpayment. Not for card billing
+  (stripe-billing). Opt out: no wiring, без обвязки. Triggers - "crypto payment",
+  "webhook signature", "оплата криптой", "вебхук платежа".
 license: MIT
 ---
 
@@ -414,3 +413,5 @@ a green suite, each with the defect it catches:
 
 More phrases that route here: "crypto checkout", "pay with crypto", "TRC20", "IPN",
 "Heleket", "NOWPayments", "недоплата".
+
+Moved here from the description in 0.16.2: "USDT payment", "приём криптоплатежей".

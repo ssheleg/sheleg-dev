@@ -2,10 +2,9 @@
 name: frontend-performance
 description: >-
   Use when building or auditing web pages for speed: Core Web Vitals (LCP, INP, CLS),
-  Lighthouse and PageSpeed scores, render-blocking resources, bundle size, fonts and
-  caching. Not for visual design (sheleg-design) or conversion work. Opt out: no wiring, без
-  обвязки. Triggers - "PageSpeed", "Lighthouse", "Core Web Vitals", "bundle size",
-  "performance budget", "ускорить сайт", "медленно грузится", "вес бандла".
+  blocking resources, bundle size, fonts, caching. Not for visual design (sheleg-design)
+  or conversion work. Opt out: no wiring, без обвязки. Triggers - "PageSpeed",
+  "Lighthouse", "ускорить сайт", "медленно грузится".
 license: MIT
 ---
 
@@ -225,3 +224,5 @@ how a typo survives review.
 
 More phrases that route here: "performance audit", "LCP", "CLS", "INP", "render-blocking",
 "code splitting", "lazy loading", "cache headers", "оптимизация скорости".
+
+Moved here from the description in 0.16.2: "вес бандла".

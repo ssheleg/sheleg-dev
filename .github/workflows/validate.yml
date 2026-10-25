@@ -175,13 +175,15 @@ jobs:
           # DEV-01, measured 2026-08-29: google-auth and google-signin both advertised
           # "google login", "GIS", "Sign In with Google" and the Russian sign-in phrase,
           # so a host matching either description fired on both. The fix stripped the
-          # end-user set from google-auth; this plant puts two of them back and the
-          # validator must refuse the collision rather than let the next edit re-ship it.
+          # end-user set from google-auth; this plant puts two of google-signin's quoted
+          # literals back and the validator must refuse the collision rather than let the
+          # next edit re-ship it. Anchored on one literal since 0.16.2: the description
+          # wraps after `Triggers -`, so the label and the list share no line.
           p = "/tmp/trig-copy/plugins/sheleg-dev/skills/google-auth/SKILL.md"
           s = open(p, encoding="utf-8").read()
-          old = 'Triggers - "google auth",'
+          old = '"google-auth-library",'
           assert old in s, "PLANT DID NOT LAND: google-auth description changed shape"
-          s2 = s.replace(old, 'Triggers - "google auth", "google login", "GIS",', 1)
+          s2 = s.replace(old, '"google-auth-library", "sign in with google", "one tap",', 1)
           assert s2 != s, "PLANT DID NOT LAND: the collision was not planted"
           open(p, "w", encoding="utf-8").write(s2)
           PY
