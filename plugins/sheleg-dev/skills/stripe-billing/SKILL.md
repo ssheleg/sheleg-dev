@@ -1,12 +1,10 @@
 ---
 name: stripe-billing
 description: >-
-  Use when connecting a product to Stripe, fixing a payment bug ("баг в оплате") or auditing
-  a live integration: checkout, renewals, refunds, cancellation and the retention coupon,
-  and the webhook that grants an entitlement. Not for crypto (crypto-payments). Opt out: no
-  wiring, без обвязки. Triggers - "add Stripe", "Stripe checkout", "subscription billing",
-  "webhook signature", "cancel subscription", "подключить Stripe", "оплата подпиской",
-  "вебхук Stripe".
+  Use when connecting a product to Stripe, fixing a payment bug or auditing it:
+  checkout, renewals, refunds, cancellation, the access-granting webhook. Not for crypto
+  (crypto-payments). Opt out: no wiring, без обвязки. Triggers - "add Stripe", "webhook
+  signature", "подключить Stripe", "баг в оплате".
 license: MIT
 ---
 
@@ -411,3 +409,6 @@ be kept true.
 
 More phrases that route here: "invoice.paid", "proration", "refund", "retention coupon",
 "скидка при отмене", "биллинг подписок", "оплата".
+
+Moved here from the description in 0.16.2: "Stripe checkout", "subscription billing",
+"cancel subscription", "оплата подпиской", "вебхук Stripe".

@@ -23,7 +23,17 @@ actually prints. Both were watched refusing a plant; see the SD-05 block.
 
 ---
 
-## Shipped state — v0.16.1
+## Shipped state — v0.16.2
+
+Candidate source, 2026-10-25 (hub B-255 (a): descriptions within a 300-character budget). Publication
+is read on the release run and the registry, not here.
+
+| REQ | What changes | Evidence | Status |
+|---|---|---|---|
+| B-255a | Every `description` at most 300 characters, whitespace collapsed (total 2875 to 2078); dropped quoted triggers kept in each body's `## Triggers` | the hub's `node test/advertised_check.js --member sheleg-dev`: 42 routed triggers across 6 skills advertised; `python3 test/negatives.py`: 48 of 48 guards reject their plant | implemented |
+| Gate | Required candidate validator line | `OK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.16.2)` | observed: `npm test` exit 0 on candidate source |
+
+## Shipped in v0.16.1
 
 Candidate source, 2026-10-24 (the family member gate; no skill text changes). Publication is
 read on the release run and the registry, not here.

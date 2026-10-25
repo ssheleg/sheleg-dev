@@ -1,3 +1,21 @@
+## v0.16.2: descriptions within a 300-character budget
+
+- Every skill description now fits a budget of about 300 characters (hub board row B-255 (a)):
+  Claude Code lists every installed skill's description each session against a shared budget of
+  about 30,000 characters, and the operator's listing measured 51,178, so less-used skills lost
+  their descriptions. Measured with whitespace collapsed: `ad-tracking` 408 → 297,
+  `crypto-payments` 398 → 298, `error-tracking` 395 → 292, `frontend-performance` 412 → 299,
+  `google-auth` 417 → 293, `google-signin` 386 → 300, `stripe-billing` 459 → 299; total 2875 →
+  2078.
+- Each description keeps its router sentence, its boundary against sibling skills, the opt-out
+  phrase and a short English and Russian trigger list. Every quoted trigger the description
+  dropped is kept in the body's `## Triggers` section, so the family hook's words stay advertised
+  (`test/advertised_check.js` in the hub).
+- The CI negative for a duplicated trigger literal now anchors on `"google-auth-library",` and
+  plants two literals `google-signin` still quotes (`"sign in with google"`, `"one tap"`): the old
+  anchor `Triggers - "google auth",` left the description. `docs/evals/stripe-billing.md` carries
+  the re-measured body (4647 tokens, 406 lines).
+
 ## v0.16.1: the family member gate
 
 - `test/family_gate.py`, the family's canonical member gate (hub B-108, B-109): the board

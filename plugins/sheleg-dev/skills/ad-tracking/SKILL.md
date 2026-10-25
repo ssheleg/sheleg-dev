@@ -1,11 +1,10 @@
 ---
 name: ad-tracking
 description: >-
-  Use when wiring or auditing ad pixels and conversion tracking on the web: GA4, Google Ads,
-  Meta Pixel and CAPI, LinkedIn Insight Tag, under Consent Mode v2 and GDPR/DMA. Not for
-  running the campaigns, or the charge itself (stripe-billing). Opt out: no wiring, без
-  обвязки. Triggers - "conversion tracking", "meta pixel", "consent mode", "GA4", "CAPI",
-  "отслеживание конверсий", "пиксель Meta", "ретаргетинг".
+  Use when wiring or auditing ad pixels and conversion tracking: GA4, Google Ads, Meta
+  Pixel and CAPI, LinkedIn, Consent Mode v2. Not for campaigns or the charge
+  (stripe-billing). Opt out: no wiring, без обвязки. Triggers - "conversion tracking",
+  "meta pixel", "CAPI", "пиксель Meta", "ретаргетинг".
 license: MIT
 ---
 
@@ -426,3 +425,5 @@ and what to do about it — see the `frontend-performance` skill in this pack.
 More phrases that route here: "ad tracking", "fbq", "google ads", "gtag", "cookie consent",
 "enhanced conversions", "retargeting", "purchase event", "gclid", "UTM", "attribution",
 "согласие на куки", "аналитика рекламы".
+
+Moved here from the description in 0.16.2: "отслеживание конверсий".

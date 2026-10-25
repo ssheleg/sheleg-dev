@@ -1,11 +1,10 @@
 ---
 name: google-signin
 description: >-
-  Use when implementing or debugging Google sign-in on a website: the GIS button or One Tap,
-  server-side ID token checks, linking Google to password accounts, login CSRF. Not for a
-  server authenticating to Google (google-auth). Opt out: no wiring, без обвязки. Triggers -
-  "sign in with google", "google login", "GIS", "one tap", "account linking", "вход через
-  Google", "связать аккаунты".
+  Use when building or debugging Google sign-in on a website: the GIS button or One Tap,
+  server-side ID token checks, account linking, login CSRF. Not for a server
+  authenticating to Google (google-auth). Opt out: no wiring, без обвязки. Triggers -
+  "sign in with google", "one tap", "вход через Google".
 license: MIT
 ---
 
@@ -165,3 +164,5 @@ attacker's account.
 More phrases that route here: "google sign-in button", "google.accounts.id", "gsi/client",
 "verify google token", "login csrf", "g_csrf_token", "кнопка входа Google", "проверить токен
 Google", "origin is not allowed for the given client ID".
+
+Moved here from the description in 0.16.2: "связать аккаунты".
