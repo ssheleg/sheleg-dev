@@ -1,3 +1,11 @@
+## v0.16.3: product analytics routes to ad-tracking
+
+- "product analytics" / «аналитика продукта» join `ad-tracking`'s `## Triggers` (hub board row
+  B-267). The skill owns that ground by its own text: its architecture diagram puts Mixpanel
+  "(product analytics)" behind the same consent layer as the pixels, and it carries Mixpanel's
+  `alias` / `identify` rules. The description is unchanged. The body's opening sentence is
+  shortened to pay for the words: 4,748 of 4,750 tokens (`audit_skill.py --house`).
+
 ## v0.16.2: descriptions within a 300-character budget
 
 - Every skill description now fits a budget of about 300 characters (hub board row B-255 (a)):

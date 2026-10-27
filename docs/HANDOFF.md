@@ -1,3 +1,12 @@
+## v0.16.3: product analytics routes to ad-tracking (2026-10-27)
+
+- **Done.** Hub board row B-267 (sheleg-dev part): `ad-tracking`'s `## Triggers` gains "product
+  analytics" / «аналитика продукта». The skill's architecture diagram already names Mixpanel as the
+  product analytics tag behind its consent layer, so the ground is its own. Body 4,748 of 4,750
+  tokens after a shorter opening sentence. Gate: `npm test`.
+- **Next task.** After merge: tag `v0.16.3`, watch the release, then the hub adds the route row with
+  a fixture (B-267) and bumps the pin.
+
 ## v0.16.2: descriptions within a 300-character budget (2026-10-25)
 
 - **Done.** Every skill description cut to at most 300 characters (hub B-255 (a)); total 2875 → 2078
