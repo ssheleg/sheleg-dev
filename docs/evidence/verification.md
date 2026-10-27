@@ -23,7 +23,17 @@ actually prints. Both were watched refusing a plant; see the SD-05 block.
 
 ---
 
-## Shipped state — v0.16.2
+## Shipped state — v0.16.3
+
+Candidate source, 2026-10-27 (hub B-267: product analytics routes to ad-tracking). Publication
+is read on the release run and the registry, not here.
+
+| REQ | What changes | Evidence | Status |
+|---|---|---|---|
+| B-267 | `ad-tracking`'s `## Triggers` advertises "product analytics" and «аналитика продукта»; description unchanged; body 4,748 of 4,750 tokens | `audit_skill.py --house plugins/sheleg-dev/skills/ad-tracking`: 0 GAP, 19 PASS | implemented |
+| Gate | Required candidate validator line | `OK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.16.3)` | observed: `npm test` exit 0 on candidate source |
+
+## Shipped in v0.16.2
 
 Candidate source, 2026-10-25 (hub B-255 (a): descriptions within a 300-character budget). Publication
 is read on the release run and the registry, not here.

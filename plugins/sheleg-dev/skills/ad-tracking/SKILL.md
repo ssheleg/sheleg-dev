@@ -10,7 +10,7 @@ license: MIT
 
 # Advertising Analytics & Conversion Tracking Integration
 
-Complete reference for integrating Google Analytics 4, Google Ads, Meta (Facebook) Pixel, and LinkedIn Insight Tag into web applications with proper consent management, standard event mapping, user identification, and GDPR/DMA compliance.
+Integrating Google Analytics 4, Google Ads, Meta (Facebook) Pixel and LinkedIn Insight Tag into web apps: consent, standard event mapping, user identification, GDPR/DMA compliance.
 
 ---
 
@@ -424,6 +424,6 @@ and what to do about it — see the `frontend-performance` skill in this pack.
 
 More phrases that route here: "ad tracking", "fbq", "google ads", "gtag", "cookie consent",
 "enhanced conversions", "retargeting", "purchase event", "gclid", "UTM", "attribution",
-"согласие на куки", "аналитика рекламы".
+"согласие на куки", "аналитика рекламы", "product analytics", "аналитика продукта".
 
 Moved here from the description in 0.16.2: "отслеживание конверсий".
