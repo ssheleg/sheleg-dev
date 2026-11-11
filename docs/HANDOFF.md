@@ -1,3 +1,13 @@
+## v0.16.4: audit fixes (2026-11-11)
+
+- **Done.** Audit findings S1 to S7 of the 2026-11-11 family audit (see CHANGELOG v0.16.4): Stripe
+  pin `2026-10-28.endive`, money-gate fast path, `live-flag` limited to payments, human-gate
+  remedies, the duplicate sign-in guide removed, per-rail webhook-signature triggers, neutral
+  example name, eval staleness note. Gate: `npm run test:all`.
+- **Open.** B-109 (narrow the `mcp__.*` matcher to money-tool names; needs proof of the matcher's
+  anchoring and case rules first). Evals were not re-run (they cost money).
+- **Next task.** After merge: tag `v0.16.4`, watch the release, read back npm; the hub re-pins.
+
 ## v0.16.3: product analytics routes to ad-tracking (2026-10-27)
 
 - **Done.** Hub board row B-267 (sheleg-dev part): `ad-tracking`'s `## Triggers` gains "product

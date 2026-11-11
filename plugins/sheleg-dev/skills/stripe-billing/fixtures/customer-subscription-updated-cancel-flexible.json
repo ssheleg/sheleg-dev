@@ -1,7 +1,7 @@
 {
   "id": "evt_PLACEHOLDER_cancel_flexible",
   "object": "event",
-  "api_version": "2026-07-29.dahlia",
+  "api_version": "2026-10-28.endive",
   "created": 1767226000,
   "livemode": false,
   "pending_webhooks": 1,

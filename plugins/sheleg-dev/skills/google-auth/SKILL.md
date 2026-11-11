@@ -272,7 +272,7 @@ if credentials.expired and credentials.refresh_token:
 
 - **[OAuth 2.0 Web Server Flow](references/oauth2-web-server.md)** — Complete OAuth 2.0 flow: parameters, consent, token exchange, refresh, revocation, incremental auth, error handling (Node.js + Python)
 - **[ADC & Service Accounts](references/adc-and-service-accounts.md)** — Application Default Credentials setup, service account keys, JWT, Compute credentials, environment configuration (Node.js + Python)
-- **[Sign In with Google](references/sign-in-with-google.md)** — Google Identity Services (GIS), ID token verification, CSRF protection, One Tap, FedCM (Node.js + Python)
+- **Sign In with Google** lives in the google-signin skill, one home: its full guide covers GIS, ID token verification (Node.js + Python), the nonce and CSRF contracts, account linking and FedCM
 - **[Workload Identity Federation](references/workload-identity.md)** — AWS, Azure, OIDC/SAML federation, workforce identity, executable-sourced credentials (Node.js + Python)
 
 ## Degradation

@@ -163,7 +163,7 @@ person has signed the category off **for this session**:
 | `refund` | `stripe refunds create`, a POST to a `…/v1/refunds` URL, or a `create_refund` tool |
 | `payout` | `stripe payouts\|transfers create`, a POST to `…/v1/payouts`, `…/v1/transfers` or Heleket's `…/v1/payout` |
 | `dispute` | `stripe disputes close`, or `…/v1/disputes/…/close` — closing one accepts the loss |
-| `live-flag` | an explicit `--live` / `--live-mode` flag |
+| `live-flag` | an explicit `--live` / `--live-mode` flag on the `stripe` CLI, or on a command naming the Stripe or Heleket API host; another tool's own `--live` is not gated |
 | `self-authorisation` | a command that sets this gate's own switch. Never authorisable |
 | `skip-billing` | `SKIP_BILLING=true` in a run declaring production — the free-money path. Never authorisable |
 
@@ -179,8 +179,9 @@ It compares `STRIPE_PRODUCT_MODE` with a secret/restricted key prefix before cli
 construction and fails on unknown formats. It does not prove credential validity
 or grant permission for a provider operation.
 
-**Authorising one.** The authorised person exports the category — or `all` — in the
-shell that starts the session, and starts a new one:
+**Authorising one.** Moving real money is a human gate: the operator's go in chat for
+that act. With it, the act runs in a session started with the category (or `all`) in
+its environment:
 
 ```bash
 SHELEG_DEV_LIVE_AUTHORISED=refund claude

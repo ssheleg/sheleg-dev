@@ -2,9 +2,9 @@
 name: crypto-payments
 description: >-
   Use when adding or auditing crypto checkout, crypto top-up or payment webhooks: invoice
-  states, signed callbacks, idempotency, underpayment. Not for card billing
-  (stripe-billing). Opt out: no wiring, без обвязки. Triggers - "crypto payment",
-  "webhook signature", "оплата криптой", "вебхук платежа".
+  states, signed callbacks, idempotency, underpayment. Not for cards (stripe-billing).
+  Opt out: no wiring, без обвязки. Triggers - "crypto payment", "crypto webhook
+  signature", "оплата криптой", "вебхук платежа".
 license: MIT
 ---
 

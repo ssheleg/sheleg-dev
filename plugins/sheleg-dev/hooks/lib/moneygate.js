@@ -281,7 +281,7 @@ const NO_TEST_VARIANT = new Map([
     'status limits app access; it is not a fake credential or proof that user data is synthetic.'],
   ['HELEKET_API_KEY',
     'Heleket issues one key per merchant, it is also the webhook signing secret, and it ' +
-    'carries no test/live marker — so there is no test value this can hold ' +
+    'carries no test/live marker, so there is no test value this can hold ' +
     '(crypto-payments/references/heleket-provider.md, "The test/live boundary").'],
 ]);
 
@@ -390,6 +390,17 @@ const MONEY_TOOL = [
 
 const LIVE_FLAG = /^--live(?:-?mode)?$/;
 
+/**
+ * Where a `--live` flag means production MONEY access, as opposed to any tool's own idea
+ * of "live" (a dev server's live reload, a preview's live mode). The flag is refused only
+ * on a payment CLI this module already reads (`stripe`, the CLI `MONEY_CLI` parses) or on
+ * a command that names a payment provider's API host (Stripe's, and Heleket's from
+ * `crypto-payments/references/heleket-provider.md`). Anywhere else it is not this gate's
+ * business, and refusing it there is the false positive that gets a hook switched off.
+ */
+const PAYMENT_CLIS = new Set(['stripe']);
+const PAYMENT_HOST = /(?:^|[/.@])api\.(?:stripe|heleket)\.com\b/i;
+
 // ------------------------------------------------------------- the verdict
 
 /**
@@ -404,21 +415,23 @@ function remedy(category, runEnv) {
   const spec = CATEGORIES[category] || { authorisable: true };
   if (!spec.authorisable) {
     if (category === 'self-authorisation') {
-      return `Authorisation is not this run's to grant. Ask the operator to export ` +
-        `${AUTH_VAR} in the shell that starts the session, then start a new one — a value ` +
-        'set from inside a tool call is not the environment this gate reads.';
+      return 'Authorisation is not this run\'s to grant. This is a human gate: moving real ' +
+        'money needs the operator\'s go in chat for this act. With it, the act runs in a ' +
+        `session whose own environment carries ${AUTH_VAR}; a value set from inside a tool ` +
+        'call is not the environment this gate reads.';
     }
     return 'Run the mock path with a non-production declaration, or take the production ' +
       'path with real billing. There is no flag that makes this one pass.';
   }
   if (runEnv === 'test') {
     return 'This run declares a non-production environment, and a test-declaring run cannot ' +
-      'be authorised for a live operation — no variable overrides that. Re-declare the ' +
+      'be authorised for a live operation: no variable overrides that. Re-declare the ' +
       'environment deliberately, or hand the prepared decision to the authorised person.';
   }
-  return `If this is intended, the authorised person exports ` +
-    `${AUTH_VAR}="${category}" (or "all") in the shell that starts the session and starts a ` +
-    'new one. Setting it from inside a tool call does not reach this gate.';
+  return 'This is a human gate: moving real money needs the operator\'s go in chat for this ' +
+    `act. With it, the act runs in a session whose own environment carries ` +
+    `${AUTH_VAR}="${category}" (or "all"). Setting it from inside a tool call does not ` +
+    'reach this gate.';
 }
 
 function deny(category, what, evidence, runEnv) {
@@ -464,7 +477,7 @@ function decide(payload, env) {
       if (!m.re.test(tool)) continue;
       if (allowedFor(m.category, e, sessionEnv)) return ALLOW;
       return deny(m.category, `\`${tool}\` moves money and no authorisation covers it`,
-        'The tool name is the whole evidence — its arguments were not read.', sessionEnv);
+        'The tool name is the whole evidence: its arguments were not read.', sessionEnv);
     }
     return ALLOW;
   }
@@ -498,7 +511,7 @@ function decide(payload, env) {
       if (allowedFor('credential', e, runEnv)) break;
       if (runEnv === 'production') {
         return deny('credential',
-          `this command exports ${name} — a provider credential`, why, runEnv);
+          `this command exports ${name}, a provider credential`, why, runEnv);
       }
       return deny('credential',
         `this command exports ${name} in a run declaring ${runEnv || 'nothing at all'}`,
@@ -550,8 +563,9 @@ function decide(payload, env) {
         categoryEvidence(m.category), runEnv);
     }
 
-    // 6. The explicit statement of live intent.
-    if (c.argv.some((a) => LIVE_FLAG.test(a)) && !allowedFor('live-flag', e, runEnv)) {
+    // 6. The explicit statement of live intent, on a payment CLI or a payment API host.
+    const onPayments = PAYMENT_CLIS.has(c.cmd) || c.argv.some((a) => PAYMENT_HOST.test(a));
+    if (onPayments && c.argv.some((a) => LIVE_FLAG.test(a)) && !allowedFor('live-flag', e, runEnv)) {
       return deny('live-flag', `an explicit --live flag on \`${c.cmd || 'the shell'}\``,
         'A --live flag is a request for production access, which manifesto M-30 puts on the ' +
         'manual-gate side by name.', runEnv);
@@ -571,7 +585,7 @@ function categoryEvidence(category) {
       'irreversible action as manual-gate territory.';
   }
   return 'stripe-billing/references/webhook-events.md: a dispute is "money already gone plus a ' +
-    'fee … route it to a human — evidence has a deadline." Closing one accepts the loss.';
+    'fee", to be routed to a human because its evidence has a deadline. Closing one accepts the loss.';
 }
 
 /**
@@ -590,8 +604,30 @@ function allowedFor(category, env, runEnv) {
   return set.has('all') || set.has(category);
 }
 
+/**
+ * Every substring a refusable payload must contain, lowercased, read from the rules above.
+ *
+ * `hooks/money-gate.js` carries a literal copy and exits before loading this module when
+ * none of them appears in the tool name (non-Bash) or the command (Bash), with backslashes
+ * and quotes removed first so `S\KIP_BILLING` or `"SKIP"_BILLING` still reaches `decide()`.
+ * `test/moneygate_test.js` fails when the copy and this list differ, and replays every
+ * refusal fixture through the real hook. A rule added above without a token here is a
+ * rule the hook would skip, so a new rule must extend this list.
+ */
+const TRIGGERS = (() => {
+  const all = [
+    AUTH_VAR, GATE_VAR, 'SKIP_BILLING', ...NO_TEST_VARIANT.keys(),
+    '_live_',                                   // LIVE_KEY: (sk|rk)_live_
+    '--live',                                   // LIVE_FLAG
+    ...MONEY_CLI.flatMap((m) => m.nouns),       // MONEY_CLI, and the roots of MONEY_URL and MONEY_TOOL
+  ].map((t) => t.toLowerCase());
+  // Keep the shortest form: `refund` already covers `refunds`.
+  return Object.freeze([...new Set(all)].filter((t, _, xs) => !xs.some((o) => o !== t && t.includes(o))).sort());
+})();
+
 module.exports = {
   decide, allowedFor, declaredEnv, normaliseEnv, authorised,
   executablePart, segments, tokenize, simpleCommands, bareName,
   CATEGORIES, NO_TEST_VARIANT, LIVE_KEY, READERS, AUTH_VAR, GATE_VAR, ENV_VARS, DECIDES,
+  PAYMENT_CLIS, PAYMENT_HOST, TRIGGERS,
 };

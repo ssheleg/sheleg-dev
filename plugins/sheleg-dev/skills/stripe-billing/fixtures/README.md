@@ -29,8 +29,10 @@ them rather than describing them.
 ## The fixtures
 
 Every file is a webhook event body shaped the way Stripe sends it on
-`2026-07-29.dahlia` — the period on the invoice **line**, the subscription id under
-`parent.subscription_details`, `amount_refunded` cumulative, minor units throughout.
+`2026-10-28.endive` (moved from `2026-07-29.dahlia` after the fields below were checked
+in the Stripe OpenAPI spec at that version on 2026-11-11): the period on the invoice
+**line**, the subscription id under `parent.subscription_details`, `amount_refunded`
+cumulative, minor units throughout.
 
 | File | What it is | Why it exists |
 |---|---|---|

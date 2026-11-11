@@ -3,7 +3,7 @@
 > Self-contained, shareable guide. Explains the Google Identity Services (GIS)
 > ID-token flow end-to-end, how to configure it from scratch in any web app,
 > and the full security checklist. The reference implementation cited
-> throughout is Prowl (`web/auth.py`, `web/server.py`, `web/static/js/app.js`)
+> throughout is an example app (`web/auth.py`, `web/server.py`, `web/static/js/app.js`)
 > — but every section works standalone for any stack.
 
 ## Contents
@@ -13,7 +13,7 @@
 - [3. Setup from scratch (~10 minutes)](#3-setup-from-scratch-10-minutes)
 - [4. Security checklist (each item maps to a real attack)](#4-security-checklist-each-item-maps-to-a-real-attack)
 - [5. Troubleshooting](#5-troubleshooting)
-- [6. Reference implementation map (Prowl)](#6-reference-implementation-map-prowl)
+- [6. Reference implementation map (example app)](#6-reference-implementation-map-example-app)
 - [7. Minimal end-to-end skeleton (copy-paste starting point, FastAPI)](#7-minimal-end-to-end-skeleton-copy-paste-starting-point-fastapi)
 
 
@@ -184,7 +184,29 @@ def verify_google_token(credential: str) -> dict:
     return payload
 ```
 
-Node equivalent: `google-auth-library` → `client.verifyIdToken({ idToken, audience: CLIENT_ID })`.
+Node equivalent (`google-auth-library`), with the same `email_verified` rule:
+
+```js
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client();
+async function verifyGoogleToken(idToken) {
+  // checks signature, aud (a list is accepted for several clients), iss, exp
+  const ticket = await client.verifyIdToken({ idToken, audience: GOOGLE_CLIENT_ID });
+  const payload = ticket.getPayload();
+  if (!payload.email_verified) throw new Error('Google account email is not verified');
+  return payload;
+}
+```
+
+To admit only one Google Workspace organisation, also require the `hd` claim
+to equal your domain (`payload.hd === 'yourdomain.com'`); a consumer Gmail
+account carries no `hd`. Users are keyed by `sub`, never by `email`, and
+`given_name`, `family_name` and `locale` are optional display claims.
+
+Redirect mode instead of the popup: `data-ux_mode="redirect"` with
+`data-login_uri="https://yourapp.com/api/auth/google/form"` makes GIS POST the
+credential as a form, which is the form-POST flow of §4.4 with its own CSRF
+contract.
 
 ### 2.4 Account linking — the three-way branch (reference: `web/auth.py:358-435`)
 
@@ -208,7 +230,7 @@ Every Google login resolves to exactly one of three cases:
    third-party address (non-Gmail, no `hd`) create it UNVERIFIED and challenge
    the inbox before anything trusts the email → issue session.
 
-Then issue your own session. Prowl issues an HS256 app JWT (72 h, `ver` claim
+Then issue your own session. The example app issues an HS256 app JWT (72 h, `ver` claim
 for global revocation) delivered as an **HttpOnly, Secure, SameSite=Strict
 cookie** — out of reach of JS/XSS, never sent cross-site.
 
@@ -243,7 +265,7 @@ cookie** — out of reach of JS/XSS, never sent cross-site.
 GOOGLE_CLIENT_ID=1234567890-abc123.apps.googleusercontent.com
 ```
 
-- Inject it into the page server-side (Prowl: `server.py` replaces
+- Inject it into the page server-side (example app: `server.py` replaces
   `__GOOGLE_CLIENT_ID__` in the served HTML with the env value).
 - If the env var is empty → the button silently doesn't render and the
   backend returns "not configured". Honest degradation, no crash.
@@ -291,7 +313,7 @@ equal it exactly. Missing claim, missing expectation, expiry and re-use all
 reject. First sign-in passes; a replay from a new session meets a different
 expectation; a replay in the same session meets a consumed one.
 
-### 4.3 Account pre-hijacking guard (P3-01 in Prowl)
+### 4.3 Account pre-hijacking guard (P3-01)
 
 Attack: attacker registers `victim@gmail.com` with a password *before* the
 victim ever visits. Later the victim clicks "Sign in with Google". Naïve
@@ -324,7 +346,7 @@ def google_authoritative(payload):
   account-recovery flow** (reset via a fresh inbox challenge), which takes the
   account away from whoever pre-registered it rather than handing it over.
 
-### 4.4 Login-CSRF (P3-03 in Prowl)
+### 4.4 Login-CSRF (P3-03)
 
 Attack: attacker's page force-POSTs the **attacker's own** Google credential
 to your `/api/auth/google`; the victim's browser gets logged into the
@@ -378,11 +400,11 @@ shape that flow never sends.
 | `Invalid Google token: Token used too early/expired` | Server clock skew → sync NTP |
 | `Wrong recipient / audience mismatch` | Frontend and backend use different client IDs — single env source of truth |
 | 403 `access_denied` at consent | Check requested scopes, user type and Workspace controls. For an External Testing app requesting more than basic identity scopes, confirm the user is allowlisted. Publishing does not override administrator policy |
-| Works locally, fails in prod | Prod origin not in Authorized origins; or cookie has `Secure` on plain HTTP (Prowl dev: `PROWL_INSECURE_COOKIES=1`) |
+| Works locally, fails in prod | Prod origin not in Authorized origins; or cookie has `Secure` on plain HTTP (example app dev: `APP_INSECURE_COOKIES=1`) |
 | One Tap doesn't show / FedCM warnings | Third-party-cookie phase-out: GIS auto-migrates to FedCM; keep `gsi/client` unmodified and current — the rendered button flow is unaffected |
 | User "lost password" but signed up via Google | Expected: Google-only accounts have empty password hash. Recovery = sign in with Google using the same email |
 
-## 6. Reference implementation map (Prowl)
+## 6. Reference implementation map (example app)
 
 | Concern | Where |
 |---|---|
@@ -522,5 +544,5 @@ async def _finish_google_auth(req: Request, response: Response, credential: str)
 
 ---
 
-*Last verified against the Prowl codebase on 2026-07-08. If line numbers
+*Last verified against the example app's codebase on 2026-07-08. If line numbers
 drift, search for the function names — they are stable.*

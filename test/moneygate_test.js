@@ -32,6 +32,8 @@
 
 const assert = require('assert');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 const { execFileSync, spawnSync } = require('child_process');
 
 const HOOKS = path.join(__dirname, '..', 'plugins', 'sheleg-dev', 'hooks');
@@ -63,15 +65,22 @@ function check(name, fn) {
 /** A `PreToolUse` payload for a Bash command. */
 const bash = (command) => ({ tool_name: 'Bash', tool_input: { command } });
 
+/** Every refusal fixture, replayed later through the real hook process (the fast path). */
+const REFUSALS = [];
+
 function refuses(name, payload, env, category) {
+  REFUSALS.push({ name, payload, env: env || {} });
   check(`REFUSES ${name}`, () => {
     const v = gate.decide(payload, env || {});
     assert.strictEqual(v.allow, false, 'expected a refusal, got an allow');
     if (category) assert.strictEqual(v.category, category, `category was ${v.category}`);
     // A refusal with no next step is how a hook gets switched off.
     assert.ok(v.reason.includes(gate.DECIDES), 'the refusal does not say who decides');
-    assert.ok(/Re-declare|exports SHELEG_DEV_LIVE_AUTHORISED|export\s+SHELEG_DEV_LIVE_AUTHORISED|no flag that makes|Ask the operator/.test(v.reason),
+    assert.ok(/Re-declare|This is a human gate: moving real money needs the operator's go in chat|no flag that makes/.test(v.reason),
       'the refusal names no remedy');
+    // The remedy names the human gate; it never hands a person a shell command to run.
+    assert.ok(!/\bexport\s|Ask the operator to/.test(v.reason), 'the remedy hands someone a command');
+    assert.ok(!v.reason.includes('\u2014'), 'the refusal text carries an em dash');
     assert.ok(v.reason.startsWith('[sheleg-dev] refused:'), 'the refusal does not name its source');
   });
 }
@@ -163,8 +172,24 @@ refuses('a refund named as an MCP tool rather than a shell command',
 refuses('an explicit --live flag',
   bash('stripe balance retrieve --live'), {}, 'live-flag');
 
-refuses('an explicit --live-mode flag on an unknown CLI',
-  bash('./bin/settle --live-mode'), {}, 'live-flag');
+refuses('an explicit --live-mode flag on the Stripe CLI through npx',
+  bash('npx --yes stripe customers list --live-mode'), {}, 'live-flag');
+
+refuses('an explicit --livemode flag on the Stripe CLI inside bash -c',
+  bash("bash -c 'stripe charges list --livemode'"), {}, 'live-flag');
+
+refuses('an explicit --live flag on a script calling a payment API host',
+  bash('./scripts/reconcile.sh https://api.stripe.com/v1/charges --live'), {}, 'live-flag');
+
+// Shell escapes the lexer removes. The hook's fast path must not skip what decide() refuses.
+refuses('the free-money path spelled with a backslash escape',
+  bash('S\\KIP_BILLING=true NODE_ENV=production node server.js'), {}, 'skip-billing');
+
+refuses('the free-money path spelled with split quotes',
+  bash('"SKIP"_BILLING=true NODE_ENV=production node server.js'), {}, 'skip-billing');
+
+refuses('a refund spelled with a backslash escape',
+  bash('stripe re\\funds create --charge ch_PLACEHOLDER'), {}, 'refund');
 
 // ----------------------------------------------- refused: the gate's own authority
 
@@ -252,6 +277,13 @@ allows('an assignment-shaped string as an argument to grep',
 
 allows('the --live token as text rather than as a flag',
   bash('echo --live'));
+
+// live-flag is about payment access. Another tool's own "live" is not this gate's business.
+allows('an explicit --live-mode flag on a CLI that is not a payment CLI',
+  bash('./bin/settle --live-mode'));
+
+allows('a dev server started with --live',
+  bash('npm run dev -- --live'));
 
 allows('a read-only Stripe CLI call',
   bash('stripe refunds list --limit 3'));
@@ -384,6 +416,59 @@ check('the hook fails silent on a payload with no tool_input', () => {
   assert.strictEqual(r.stdout.trim(), '');
 });
 
+// The fast path: a payload with none of the triggers exits before lib/moneygate.js loads.
+// A preload script reports, at exit, whether the module reached require.cache.
+const PROBE_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'moneygate-probe-'));
+const PROBE = path.join(PROBE_DIR, 'probe.js');
+fs.writeFileSync(PROBE, "process.on('exit', () => process.stderr.write(" +
+  "Object.keys(require.cache).some((k) => k.endsWith('moneygate.js')) ? 'LOADED' : 'SKIPPED'));\n");
+
+function runProbed(payload) {
+  return spawnSync(process.execPath, ['-r', PROBE, HOOK], {
+    input: JSON.stringify(payload), encoding: 'utf8', env: {},
+  });
+}
+
+check('TRIGGERS in money-gate.js is the exact list lib/moneygate.js computes', () => {
+  const src = fs.readFileSync(HOOK, 'utf8');
+  const m = /const TRIGGERS = \[([\s\S]*?)\];/.exec(src);
+  assert.ok(m, 'money-gate.js carries no TRIGGERS literal');
+  const copy = [...m[1].matchAll(/'([^']*)'/g)].map((x) => x[1]);
+  assert.deepStrictEqual(copy, [...gate.TRIGGERS],
+    'money-gate.js TRIGGERS drifted from lib/moneygate.js; copy the computed list');
+});
+
+check('a payload without a trigger exits 0, silent, without loading the module', () => {
+  for (const payload of [
+    bash('npm test && git status'),
+    bash('./bin/settle --live-mode'.replace('--live-mode', '--watch')),
+    { tool_name: 'mcp__fabric__com_list', tool_input: { note: 'refund' } },
+  ]) {
+    const r = runProbed(payload);
+    assert.strictEqual(r.status, 0, `exit ${r.status}`);
+    assert.strictEqual(r.stdout.trim(), '', JSON.stringify(payload));
+    assert.strictEqual(r.stderr.trim(), 'SKIPPED', JSON.stringify(payload));
+  }
+});
+
+check('a payload with a trigger loads the module and is still refused', () => {
+  const r = runProbed(bash('stripe refunds create --charge ch_PLACEHOLDER'));
+  assert.strictEqual(r.status, 0, `exit ${r.status}`);
+  assert.strictEqual(JSON.parse(r.stdout).hookSpecificOutput.permissionDecision, 'deny');
+  assert.strictEqual(r.stderr.trim(), 'LOADED');
+});
+
+check('every refusal fixture is still refused through the real hook process', () => {
+  const missed = [];
+  for (const f of REFUSALS) {
+    const r = runHook(JSON.stringify(Object.assign({ hook_event_name: 'PreToolUse' }, f.payload)), f.env);
+    let decision = '';
+    try { decision = JSON.parse(r.stdout).hookSpecificOutput.permissionDecision; } catch (e) { /* none */ }
+    if (r.status !== 0 || decision !== 'deny') missed.push(f.name);
+  }
+  assert.deepStrictEqual(missed, [], `the hook let through: ${missed.join('; ')}`);
+});
+
 check('the hook is syntactically valid on its own', () => {
   execFileSync(process.execPath, ['--check', HOOK], { stdio: 'pipe' });
   execFileSync(process.execPath, ['--check', path.join(HOOKS, 'lib', 'moneygate.js')], { stdio: 'pipe' });
@@ -409,6 +494,8 @@ for (const name of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLOUD_PROJECT', 'GOOGLE_APPLICAT
 }
 
 // ------------------------------------------------------------------------- verdict
+
+fs.rmSync(PROBE_DIR, { recursive: true, force: true });
 
 if (failures.length) {
   console.error(`FAIL: ${failures.length} of ${passed + failures.length} money-gate fixtures`);

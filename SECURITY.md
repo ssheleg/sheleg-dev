@@ -17,7 +17,7 @@ documents name that does not exist here.
 
 ## What ships, and what of it executes
 
-`git ls-files plugins` returns **62 files: 35 markdown, one plugin manifest, three
+`git ls-files plugins` returns **61 files: 34 markdown, one plugin manifest, three
 files of the manual gate, 22 files of money fixtures, and one Stripe mode assertion.**
 The fixture runners read their adjacent JSON only when invoked. The new Stripe
 assertion is a pure function: caller-supplied mode and key in, mode or error code out;
@@ -26,7 +26,7 @@ no I/O, network or logging. Neither runs during installation.
 | Component | Count | Runtime behavior |
 |---|---|---|
 | `SKILL.md`, one per skill | 7 | Text. Read by the agent, executes nothing. |
-| `references/` files, loaded on demand | 26 | Text. Same. |
+| `references/` files, loaded on demand | 25 | Text. Same. |
 | `plugins/sheleg-dev/.claude-plugin/plugin.json` | 1 | Manifest read by Claude Code. |
 | `plugins/sheleg-dev/hooks/hooks.json` | 1 | Hook manifest read by Claude Code. Declares one `PreToolUse` hook and no `if` filter. |
 | `plugins/sheleg-dev/hooks/money-gate.js` | 1 | Runs on a tool call, when the plugin is enabled. Requires `path` and its own decision module — nothing else. Reads stdin, writes one JSON line, exits 0 on every path. |
@@ -39,7 +39,7 @@ no I/O, network or logging. Neither runs during installation.
 | `plugins/sheleg-dev/skills/*/fixtures/manifest.json` and its `README.md` | 4 | Text. The invariant-to-fixture-to-document map, which `test/validate.py` reads. |
 
 The published tarball is `bin/` and `plugins/` plus `README.md`, `CHANGELOG.md`,
-`SECURITY.md`, `LICENSE` and `package.json` — 68 files, listed by
+`SECURITY.md`, `LICENSE` and `package.json`: 67 files, listed by
 `npm pack --dry-run`. `install.sh`, `test/`, `docs/` and `CONTRIBUTING.md` are **not**
 in it; `test/validate.py` now refuses a path these shipped documents name that the
 tarball does not carry, because resolving in a clone is the wrong question for a
@@ -178,7 +178,7 @@ git clone https://github.com/ssheleg/sheleg-dev && cd sheleg-dev
 # self-describing documents name -- this file included.
 python3 test/validate.py
 
-# The shipped payload: 62 files.
+# The shipped payload: 61 files.
 git ls-files plugins
 
 # 27 lines: the plugin manifest, the three files of the manual gate, and the 22
@@ -223,6 +223,6 @@ grep -nE "require|child_process|exec|spawn|fetch|socket|rm -rf|cp -R|copyFileSyn
 # Live-key shapes across the skill payload: one line, and it is a placeholder.
 grep -rnE "sk_live_[A-Za-z0-9]|rk_live_[A-Za-z0-9]|whsec_[A-Za-z0-9]{8}|BEGIN [A-Z ]*PRIVATE KEY" plugins
 
-# What npm publishes, and nothing else: 68 files.
+# What npm publishes, and nothing else: 67 files.
 npm pack --dry-run
 ```
