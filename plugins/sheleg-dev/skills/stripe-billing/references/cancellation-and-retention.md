@@ -8,7 +8,8 @@ Also when offering a pause in place of cancellation.
 Stripe OpenAPI spec at API version `2026-07-29.dahlia` (the latest, confirmed
 against `docs.stripe.com/changelog`) and from `docs.stripe.com` on 2026-08-25.
 The pause section was read from `docs.stripe.com` on 2026-10-22, when the
-newest GA version was `2026-09-30.endive`. The facts the documentation does not
+newest GA version was `2026-09-30.endive`; on 2026-11-11 it was `2026-10-28.endive`
+(changelog and OpenAPI spec), which `SKILL.md` now pins. The facts the documentation does not
 answer are marked as such, with the commands that answer them.*
 
 ## Contents
@@ -449,8 +450,8 @@ if (sub.status !== "active") {
 
 - **The API version is a prerequisite.** The endpoint first shipped in
   `2026-05-27.preview` and reached a GA version in `2026-09-30.endive`. The
-  client in `SKILL.md` pins `2026-07-29.dahlia`; move that pin, and the webhook
-  endpoint's version, before relying on it.
+  client in `SKILL.md` pins `2026-10-28.endive` (checked 2026-11-11), which carries
+  it; the webhook endpoint's own version must be moved to match before relying on it.
 - **Effect:** `status` becomes `paused`, each item's `current_period_end` moves to
   the pause time, invoice generation stops, and existing invoices keep advancing.
   The pause takes effect immediately; a pause from a future date needs a pause

@@ -1,3 +1,34 @@
+## v0.16.4: audit fixes (2026-11-11)
+
+- **Stripe API pin moves to `2026-10-28.endive`.** The newest GA version in Stripe's changelog and
+  in the OpenAPI spec (`info.version`), read 2026-11-11. `stripe-billing/SKILL.md`, the 14 webhook
+  fixtures and `fixtures/README.md` move together; every fixture field the README names exists in
+  that spec, and the endive breaking changes touch none of them (`payment_method_types` is gone
+  only as a Checkout Session create parameter, which the skill already says never to pass). The
+  Pause endpoint section no longer tells the reader to move the pin first. Closes B-107.
+- **The money gate exits early.** `money-gate.js` checks the tool name (non-Bash) or the command
+  (Bash) for the trigger substrings before loading any module, and exits 0 when none appears.
+  `lib/moneygate.js` computes `TRIGGERS` from its own rules; the test fails when the hook's literal
+  copy differs, replays every refusal fixture through the real hook, and proves with a preload
+  probe that a trigger-free payload never loads the module. Measured 2026-11-11 (150 alternating
+  runs each, in-process time to exit): ordinary Bash 21.28 to 19.88 ms, MCP 20.73 to 20.38 ms.
+  The Node start itself (about 50 ms wall) remains; B-109 records the matcher-narrowing idea.
+- **`live-flag` is about payments only.** `--live` / `--live-mode` / `--livemode` is refused on
+  the `stripe` CLI or on a command naming the Stripe or Heleket API host; another tool's own
+  `--live` (a dev server) passes.
+- **Refusal remedies name the human gate.** Moving real money needs the operator's go in chat for
+  that act; the remedy no longer tells anyone to run an export command. No refusal string carries
+  an em dash, and the test asserts both.
+- **One home for Sign In with Google.** `google-auth/references/sign-in-with-google.md` is removed:
+  it duplicated `google-signin/references/full-guide.md` and had drifted (its Next.js and Flask
+  patterns minted or skipped the nonce). Its unique parts (Node verification, the Workspace `hd`
+  restriction, redirect mode) moved into the full guide; `google-auth/SKILL.md` points there.
+- The full guide names a neutral example app instead of an operator product.
+- `stripe-billing` and `crypto-payments` advertise "Stripe webhook signature" and "crypto webhook
+  signature" instead of one shared literal; both descriptions stay within their length (299 to
+  298, 298 to 298), and the declared shared trigger is gone from `test/validate.py`.
+- `test/evals/RESULTS.md` notes that its last run predates the current descriptions.
+
 ## v0.16.3: product analytics routes to ad-tracking
 
 - "product analytics" / «аналитика продукта» join `ad-tracking`'s `## Triggers` (hub board row

@@ -354,12 +354,9 @@ def check_references_resolve_both_ways():
 # skills sorted; the value is why the shared literal is a decision rather than a drift.
 # Same shape as FOREIGN_BY_DESIGN below: an enumeration is honest where a rule would
 # guess, and a stale entry is a failure rather than a hole.
-TRIGGERS_SHARED_BY_DESIGN = {
-    ("crypto-payments", "stripe-billing", "webhook signature"):
-        "both rails own a webhook-signature seam and either skill answers the phrase "
-        "correctly for its rail; the umbrella routes it to stripe-billing "
-        "(lib/triggers.js), and crypto-payments labels its scheme as one provider's",
-}
+# Empty since 0.16.4 (2026-11-11): the one entry, "webhook signature", became "Stripe
+# webhook signature" and "crypto webhook signature", so each rail advertises its own.
+TRIGGERS_SHARED_BY_DESIGN = {}
 
 
 # The family soft cap on a front-matter description (make-skill doctrine, 2026-10-20):

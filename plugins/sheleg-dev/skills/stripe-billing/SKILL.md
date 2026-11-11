@@ -1,10 +1,10 @@
 ---
 name: stripe-billing
 description: >-
-  Use when connecting a product to Stripe, fixing a payment bug or auditing it:
-  checkout, renewals, refunds, cancellation, the access-granting webhook. Not for crypto
-  (crypto-payments). Opt out: no wiring, без обвязки. Triggers - "add Stripe", "webhook
-  signature", "подключить Stripe", "баг в оплате".
+  Use when adding Stripe to a product, fixing or auditing its payments: checkout,
+  renewals, refunds, cancellation, the access-granting webhook. Not for crypto
+  (crypto-payments). Opt out: no wiring, без обвязки. Triggers - "add Stripe", "Stripe
+  webhook signature", "подключить Stripe", "баг в оплате".
 license: MIT
 ---
 
@@ -82,9 +82,9 @@ export function getStripe(): Stripe {
   if (!client) {
     const key = process.env.STRIPE_SECRET_KEY;
     assertStripeEnv(process.env.STRIPE_PRODUCT_MODE, key);
-    // Pin checked 2026-08-30 — 2026-08-26.dahlia was already newer. Confirm
-    // against Stripe's changelog before pinning; this line goes stale monthly.
-    client = new Stripe(key, { apiVersion: "2026-07-29.dahlia", maxNetworkRetries: 2 });
+    // Pin checked 2026-11-11: newest GA in Stripe's changelog and OpenAPI spec.
+    // Confirm before pinning; this line goes stale monthly.
+    client = new Stripe(key, { apiVersion: "2026-10-28.endive", maxNetworkRetries: 2 });
   }
   return client;
 }

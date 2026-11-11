@@ -32,13 +32,31 @@
  * inputs, and the command cannot alter either before this decides.
  */
 
-const path = require('path');
+/*
+ * The fast path. This hook is registered on every `Bash` and every `mcp__*` call, so for
+ * almost every call it should cost one Node start and nothing more. Before any module is
+ * loaded, the payload is checked for the substrings a refusable call must contain; a call
+ * with none of them exits 0 here.
+ *
+ * TRIGGERS is a literal copy of `lib/moneygate.js` `TRIGGERS`, which is computed from the
+ * rules themselves. `test/moneygate_test.js` fails when the two differ and replays every
+ * refusal fixture through this script, so a rule cannot be added without its token.
+ * It reads the same fields `decide()` reads: the tool name for a non-Bash tool, the
+ * command for Bash. Backslashes and quotes are removed first, because the lexer removes
+ * them too (`S\KIP_BILLING=true` and `"SKIP"_BILLING=true` are both assignments).
+ */
+const TRIGGERS = [
+  '--live', '_live_', 'dispute', 'google_client_secret', 'google_credentials',
+  'heleket_api_key', 'payout', 'refund', 'sheleg_dev_money_gate', 'skip_billing',
+  'transfer',
+];
 
-let gate = null;
-try {
-  gate = require(path.join(__dirname, 'lib', 'moneygate.js'));
-} catch (e) {
-  /* A gate that cannot load must not break the session. It exits 0 below. */
+function mayGate(data) {
+  const tool = String((data && data.tool_name) || '');
+  const input = (data && data.tool_input) || {};
+  const text = tool === 'Bash' ? String(input.command || '') : tool;
+  const hay = text.replace(/[\\'"]/g, '').toLowerCase();
+  return TRIGGERS.some((t) => hay.includes(t));
 }
 
 function deny(reason) {
@@ -57,8 +75,15 @@ process.stdin.on('error', () => process.exit(0));
 process.stdin.on('data', (chunk) => { raw += chunk; });
 process.stdin.on('end', () => {
   try {
-    if (!gate) return process.exit(0);
     const data = raw.trim().startsWith('{') ? JSON.parse(raw) : {};
+    if (!mayGate(data)) return process.exit(0);
+    let gate = null;
+    try {
+      gate = require([__dirname, 'lib', 'moneygate.js'].join('/'));
+    } catch (e) {
+      /* A gate that cannot load must not break the session. It exits 0 below. */
+    }
+    if (!gate) return process.exit(0);
     const verdict = gate.decide(data, process.env);
     if (verdict && !verdict.allow) deny(verdict.reason);
   } catch (e) {

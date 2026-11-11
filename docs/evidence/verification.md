@@ -23,7 +23,21 @@ actually prints. Both were watched refusing a plant; see the SD-05 block.
 
 ---
 
-## Shipped state — v0.16.3
+## Shipped state — v0.16.4
+
+Candidate source, 2026-11-11 (family audit fixes S1 to S7). Publication is read on the release
+run and the registry, not here.
+
+| REQ | What changes | Evidence | Status |
+|---|---|---|---|
+| S1 / B-107 | Stripe pin `2026-10-28.endive` in SKILL, fixtures, fixture README | `docs.stripe.com/upgrades` and `/changelog` read 2026-11-11; `stripe/openapi` `latest/openapi.spec3.json` `info.version` = `2026-10-28.endive`; fixture fields present in that spec | implemented |
+| S2 | hook exits before loading its module when no trigger appears | `node test/moneygate_test.js`: TRIGGERS parity, preload probe (SKIPPED / LOADED), every refusal replayed through the hook | implemented |
+| S3 | `live-flag` only on payment CLI or host; remedies name the human gate, no em dash | same command: new refuse and allow plants | implemented |
+| S4, S7 | duplicate sign-in guide removed; neutral example name | `python3 test/audit_regressions/fix-dv-10.01.py` | implemented |
+| S5 | per-rail webhook-signature triggers | hub `test/advertised_check.js --member sheleg-dev`: exit 0 | implemented |
+| Gate | Required candidate validator line | `OK: sheleg-dev structurally valid (28 checks, 7 skill(s), v0.16.4)` | observed: `npm run test:all` exit 0 on candidate source |
+
+## Shipped in v0.16.3
 
 Candidate source, 2026-10-27 (hub B-267: product analytics routes to ad-tracking). Publication
 is read on the release run and the registry, not here.

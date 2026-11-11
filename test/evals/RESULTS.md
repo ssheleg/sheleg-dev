@@ -2,6 +2,12 @@
 
 **Status: executed 2026-08-31 against two models; method and limits below.**
 
+**Note, 2026-11-11: stale.** The last run (2026-08-31, v0.11.1) predates the current
+descriptions: v0.16.2 cut every description to about 300 characters and v0.16.4 changed the
+`stripe-billing` and `crypto-payments` wording. The rates below describe those older
+descriptions, not the shipped ones. Not re-run: model trigger evals cost money and need a
+separate decision.
+
 CI still proves only that the files are shaped correctly and that the validator
 catches a planted invalid trigger class. The rows below are model runs executed
 from an agent harness, not from an interactive user session — the Method section

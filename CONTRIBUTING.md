@@ -8,7 +8,7 @@ files an agent reads on demand. That shapes what a good contribution looks like.
 **Almost, not entirely.** Since 2026-08-19 the pack also ships a **manual gate** — a
 `PreToolUse` hook under `plugins/sheleg-dev/hooks/` that refuses a refund, a payout,
 closing a dispute, a live `sk_live_…` key, an explicit assignment of a named provider credential in a run
-declaring `test`, an explicit `--live` flag, a command granting itself the gate's own
+declaring `test`, an explicit `--live` flag on a payment CLI, a command granting itself the gate's own
 switch, and `SKIP_BILLING=true` in production. It exists because four of this pack's own
 rules were sentences that stopped nothing. `README.md` → *The manual gate* is its single
 home; the rules below about executable code apply to it and to `install.sh` /

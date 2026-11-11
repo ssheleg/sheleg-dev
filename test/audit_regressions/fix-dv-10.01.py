@@ -30,8 +30,12 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 SKILL = os.path.join(ROOT, "plugins", "sheleg-dev", "skills", "google-signin", "SKILL.md")
 GUIDE = os.path.join(ROOT, "plugins", "sheleg-dev", "skills", "google-signin",
                      "references", "full-guide.md")
+# google-auth's own copy of the sign-in guide was removed on 2026-11-11 (it had drifted:
+# its Next.js and Flask patterns still minted or skipped the nonce). google-signin is the
+# one home; google-auth's SKILL.md points there.
 SIWG = os.path.join(ROOT, "plugins", "sheleg-dev", "skills", "google-auth",
                     "references", "sign-in-with-google.md")
+GA_SKILL = os.path.join(ROOT, "plugins", "sheleg-dev", "skills", "google-auth", "SKILL.md")
 
 failures = []
 
@@ -51,15 +55,18 @@ def read(p):
 
 
 def t_docs_carry_the_server_issued_contract():
-    for path, name in ((SKILL, "SKILL.md"), (GUIDE, "full-guide.md"), (SIWG, "sign-in-with-google.md")):
+    for path, name in ((SKILL, "SKILL.md"), (GUIDE, "full-guide.md")):
         d = read(path)
         assert "server-issued" in d.lower() or "server issues the nonce" in d.lower(), \
             f"{name}: the server-issued rule is missing"
         assert "one-time consume" in d, f"{name}: no one-time consume"
     g = read(GUIDE)
     assert "GET /api/auth/google/nonce" in g and "pre-auth HttpOnly" in g
-    s = read(SIWG)
-    assert "one contract, both skills" in s, "the two skills no longer share one contract"
+    assert not os.path.exists(SIWG), \
+        "google-auth carries its own sign-in guide again: a second copy of the contract drifts"
+    ga = read(GA_SKILL)
+    assert "Sign In with Google** lives in the google-signin skill" in ga, \
+        "google-auth no longer routes sign-in to google-signin's guide"
 
 
 def t_client_minted_nonce_is_gone():
@@ -71,9 +78,9 @@ def t_client_minted_nonce_is_gone():
     assert 'if data.nonce and payload.get("nonce")' not in g, \
         "the skip-if-missing branch survived"
     assert "nonce_store.pop" in g.replace("_nonce_store.pop", "nonce_store.pop")
-    s = read(SIWG)
-    assert "crypto.randomUUID();  // or any random string" not in s
-    assert "if body.nonce:" not in s, "the optional-nonce branch survived in google-auth"
+    assert "crypto.randomUUID()" not in g, "a client-minted nonce is back in the guide"
+    assert "if (nonce && payload.nonce" not in g and "if nonce and payload" not in g, \
+        "an optional-nonce branch is back in the guide"
 
 
 # ---------------- the contract, run as behaviour on one signed test flow
@@ -120,7 +127,7 @@ def t_flow_first_passes_replays_and_missing_reject():
 
 
 def main():
-    case("all three docs carry the server-issued, one-time contract",
+    case("both google-signin docs carry the server-issued, one-time contract; google-auth points there",
          t_docs_carry_the_server_issued_contract)
     case("the client-minted nonce and the skip-if-missing branch are gone",
          t_client_minted_nonce_is_gone)
