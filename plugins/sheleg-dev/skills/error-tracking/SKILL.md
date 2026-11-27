@@ -3,8 +3,8 @@ name: error-tracking
 description: >-
   Use when wiring error tracking into a service: the Sentry SDK, DSN placement, secret
   scrubbing, releases tied to commits. Not for agent trajectories (agent-evals) or
-  uptime vendors. Opt out: no wiring, без обвязки. Triggers - "add Sentry",
-  "SENTRY_DSN", "подключить Sentry", "трекинг ошибок".
+  uptime vendors. Opt out: no wiring, «без обвязки». Triggers - "add Sentry",
+  "SENTRY_DSN", «подключить Sentry», «трекинг ошибок».
 license: MIT
 ---
 
@@ -282,6 +282,6 @@ each.
 ## Triggers
 
 More phrases that route here: "set up error tracking", "sentry mcp", "scrub secrets from
-errors", "suspect commits", "why is Sentry empty", "релизы в Sentry", "наблюдаемость".
+errors", "suspect commits", "why is Sentry empty", «релизы в Sentry», «наблюдаемость».
 
-Moved here from the description in 0.16.2: "release tracking", "секреты в Sentry".
+Moved here from the description in 0.16.2: "release tracking", «секреты в Sentry».
